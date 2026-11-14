@@ -35,12 +35,21 @@ export function emit(world: World, event: GameEvent): void {
 
 export function addHouse(
   world: World,
-  init: { id?: HouseId; openness?: Openness; isMinor?: boolean; realm?: number; traits?: string[]; stones?: number } = {},
+  init: {
+    id?: HouseId;
+    name?: string;
+    openness?: Openness;
+    isMinor?: boolean;
+    realm?: number;
+    traits?: string[];
+    stones?: number;
+  } = {},
 ): House {
   const id = init.id ?? newId(world, 'h');
   if (world.houses.has(id)) throw new Error(`house ${id} already exists`);
   const house: House = {
     id,
+    name: init.name ?? id,
     openness: init.openness ?? 'open',
     isMinor: init.isMinor ?? false,
     realm: init.realm ?? 1,

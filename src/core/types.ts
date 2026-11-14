@@ -27,6 +27,8 @@ export interface ClanMember {
 /** 一个玩家的家族（当家人就是玩家的 OC） */
 export interface House {
   id: HouseId;
+  /** 当家人 OC 的名字（界面显示用） */
+  name: string;
   openness: Openness;
   isMinor: boolean;
   /** 当家人的境界。永远不会因失败而下降（#8） */

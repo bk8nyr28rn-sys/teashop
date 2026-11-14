@@ -163,7 +163,12 @@ export const RISKY_SHARE = 0.3;
 export const LOVE_BUDGET_SHARE = 0.5;
 
 /** 一次上线会话里玩家做的事。isPresent 判断真人搭档此刻在不在场 */
-export function playSession(world: World, agent: Agent, isPresent: (houseId: string) => boolean = () => false): void {
+export function playSession(
+  world: World,
+  agent: Agent,
+  isPresent: (houseId: string) => boolean = () => false,
+  opts: { decideHeirHome?: boolean } = {},
+): void {
   const house: House = getHouse(world, agent.houseId);
   const p = agent.profile;
   const rng = world.rng;
@@ -194,7 +199,9 @@ export function playSession(world: World, agent: Agent, isPresent: (houseId: str
     if (other && !thread.heirId && thread.strands >= world.config.heir.strandThreshold) {
       signHeir(world, house.id, thread.id);
       const made = createHeir(world, thread.id);
-      if (made.ok) setHeirHomeByAgreement(world, made.value.id, rng.pick(made.value.parents), made.value.parents);
+      if (made.ok && (opts.decideHeirHome ?? true)) {
+        setHeirHomeByAgreement(world, made.value.id, rng.pick(made.value.parents), made.value.parents);
+      }
     }
   }
 

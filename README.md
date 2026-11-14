@@ -15,6 +15,7 @@ src/core/   逻辑核心：只有规则，不依赖任何引擎和 Node API，�
   rivals.ts   NPC 情敌和真人抢亲
   tick.ts     每小时推进一次
 src/sim/    数值模拟器（只在开发时用，不进游戏）
+src/web/    网页可玩原型：界面只是一层壳，规则全部来自 src/core
 test/       单元测试，每条决定至少一个
 ```
 
@@ -30,7 +31,17 @@ npm run sim         # 数值模拟：5 类玩家，每类 200 人，30 天
 npm run sim -- --players 500 --days 60 --seed 3
 npm run sim -- --set grudge.dailyCap=20 --set breach.graceActions=8
 npm run sim -- --json
+npm run build:web   # 打包网页原型：dist/web/teashop.html（单文件，可直接用浏览器打开）
 ```
+
+## 网页原型
+
+用来先验证“好不好玩”，再投入做 Cocos 界面。打包出来是一个独立的 HTML 文件。
+
+- 你是“你”家的当家人；**阿青**是机器人好友（每天 9、13、21 点上线，会回应你、找你、和你一起守宅）；**白露**在你设为“专一”时偶尔来抢亲
+- 时间流速：暂停 / 实时 / 快进（1 时辰 = 2 秒）/ 极速（1 时辰 = 0.2 秒）
+- 存档在浏览器的 localStorage；重新打开时按离开时的流速补算离线时间（最多 14 天）
+- 逻辑核心新增：`save.ts`（存档读档，读档后继续玩和不存档完全一样）、`messages.ts`（事件转成戏文腔提示）、`checkIn`（上线）
 
 ## 模拟器里的玩家类型
 

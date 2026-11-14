@@ -6,6 +6,15 @@ export class Rng {
     this.state = seed >>> 0 || 1;
   }
 
+  /** 存档用：取出 / 恢复内部状态 */
+  getState(): number {
+    return this.state;
+  }
+
+  setState(state: number): void {
+    this.state = state >>> 0;
+  }
+
   /** [0, 1) */
   next(): number {
     let t = (this.state = (this.state + 0x6d2b79f5) >>> 0);

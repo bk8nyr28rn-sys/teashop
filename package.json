@@ -5,7 +5,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.sim.json",
-    "sim": "tsx src/sim/cli.ts"
+    "sim": "tsx src/sim/cli.ts",
+    "build:web": "node scripts/build-web.mjs"
   },
   "repository": {
     "type": "git",
@@ -17,6 +18,7 @@
   "homepage": "https://github.com/bk8nyr28rn-sys/teashop#readme",
   "devDependencies": {
     "@types/node": "^22.20.5",
+    "esbuild": "^0.25.12",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"
