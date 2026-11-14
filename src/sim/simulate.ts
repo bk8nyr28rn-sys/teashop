@@ -49,6 +49,9 @@ export interface ArchetypeReport {
   goldenDayMedian: number | null;
   /** 结出第一位嫡传是第几天（中位数） */
   heirDayMedian: number | null;
+  quarrelsPerWeek: number;
+  /** 争执里最后和好的比例 */
+  reconcileRate: number;
   realmAvg: number;
   tribulationSuccessRate: number;
   /** 达到陌生人匹配门槛境界是第几天（中位数） */
@@ -68,6 +71,8 @@ interface Counters {
   grudgeHistory: number[];
   goldenHour: number | null;
   heirHour: number | null;
+  quarrels: number;
+  reconciled: number;
   tribAttempts: number;
   tribSuccesses: number;
   gateHour: number | null;
@@ -131,6 +136,8 @@ function emptyCounters(): Counters {
     grudgeHistory: [],
     goldenHour: null,
     heirHour: null,
+    quarrels: 0,
+    reconciled: 0,
     tribAttempts: 0,
     tribSuccesses: 0,
     gateHour: null,
@@ -191,6 +198,17 @@ function count(e: GameEvent, counters: Map<string, Counters>, world: World): voi
       }
       break;
     }
+    case 'quarrel':
+    case 'quarrelEnded': {
+      const t = world.threads.get(e.thread)!;
+      for (const p of [t.a, t.b]) {
+        if (!p) continue;
+        const c = counters.get(p)!;
+        if (e.type === 'quarrel') c.quarrels++;
+        else if (e.reconciled) c.reconciled++;
+      }
+      break;
+    }
     case 'tribulation': {
       const c = counters.get(e.house)!;
       c.tribAttempts++;
@@ -243,6 +261,8 @@ function report(
     goldenShare: cs.filter((c) => c.goldenHour !== null).length / n,
     goldenDayMedian: medianDay(cs.map((c) => c.goldenHour)),
     heirDayMedian: medianDay(cs.map((c) => c.heirHour)),
+    quarrelsPerWeek: sum(cs.map((c) => c.quarrels)) / n / weeks,
+    reconcileRate: sum(cs.map((c) => c.quarrels)) === 0 ? 0 : sum(cs.map((c) => c.reconciled)) / sum(cs.map((c) => c.quarrels)),
     realmAvg: sum(houses.map((h) => h.realm)) / n,
     tribulationSuccessRate: sum(cs.map((c) => c.tribAttempts)) === 0 ? 0 : sum(cs.map((c) => c.tribSuccesses)) / sum(cs.map((c) => c.tribAttempts)),
     strangerGateDayMedian: medianDay(cs.map((c) => c.gateHour)),

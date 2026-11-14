@@ -70,6 +70,7 @@ export function tieThread(world: World, a: HouseId, partner: Partner): Result<Th
     state: 'active',
     cutAt: null,
     strandsAtCut: 0,
+    grudgeAtCut: 0,
     strain: {},
     pendingRequest: null,
     memberProgress: {},
@@ -77,6 +78,9 @@ export function tieThread(world: World, a: HouseId, partner: Partner): Result<Th
     heirId: null,
     golden: false,
     tier: 0,
+    quarrel: null,
+    lastTensionAt: null,
+    lastReunionAt: null,
     createdAt: world.hour,
   };
   world.threads.set(thread.id, thread);
@@ -131,6 +135,7 @@ function applyJealousy(world: World, by: HouseId, except: Thread, multiplier: nu
   for (const t of threadsOf(world, by)) {
     if (t === except || t.tier === 0 || isThreadFrozen(world, t)) continue;
     addStrands(world, t, -j.dimPerTier * t.tier * multiplier);
+    t.lastTensionAt = world.hour;
     const grudge = j.grudgePerTier * t.tier * multiplier;
     addGrudge(world, by, grudge, 'jealousy');
     const partner = otherSide(t, by);
@@ -144,7 +149,7 @@ function applyJealousy(world: World, by: HouseId, except: Thread, multiplier: nu
  * NPC 过几个小时才回（hourlyThreadUpdate），也会主动发来互动，不回一样算冷落。
  * 任何一次互动都会抵消自己这一方造成的心力分散（#7 高强度维护）。
  */
-export function interact(world: World, by: HouseId, threadId: ThreadId): Result {
+export function interact(world: World, by: HouseId, threadId: ThreadId, opts: { risky?: boolean } = {}): Result {
   const thread = getThread(world, threadId);
   if (thread.state !== 'active') return fail('这根线不在了');
   if (thread.a !== by && thread.b !== by) return fail('不是这根线的一方');
@@ -157,11 +162,74 @@ export function interact(world: World, by: HouseId, threadId: ThreadId): Result 
   const other = otherSide(thread, by) ?? NPC_SIDE;
   if (thread.pendingRequest && thread.pendingRequest.from === other) {
     thread.pendingRequest = null;
-    addStrands(world, thread, cfg.thread.interactionGain);
+    if (opts.risky && !thread.quarrel && world.rng.chance(cfg.quarrel.riskyChance)) {
+      startQuarrel(world, thread, 'risky');
+    } else {
+      addStrands(world, thread, cfg.thread.interactionGain * (opts.risky ? cfg.quarrel.riskyGainMultiplier : 1));
+    }
   } else if (!thread.pendingRequest) {
     thread.pendingRequest = { from: by, at: world.hour };
   }
   return ok();
+}
+
+/** 开始一场争执：一部分浓度散成怨丝（两边各生），头像变脸 */
+export function startQuarrel(world: World, thread: Thread, cause: 'misunderstanding' | 'risky'): void {
+  if (thread.quarrel || thread.state !== 'active') return;
+  const qc = world.config.quarrel;
+  const lost = thread.strands * qc.lossRatio;
+  const grudge = lost * qc.grudgeRatio;
+  addStrands(world, thread, -lost);
+  addGrudge(world, thread.a, grudge, 'quarrel');
+  if (thread.b) addGrudge(world, thread.b, grudge, 'quarrel');
+  thread.quarrel = { lost, grudge, since: world.hour, reconciled: [] };
+  thread.lastTensionAt = world.hour;
+  emit(world, { type: 'quarrel', hour: world.hour, thread: thread.id, cause, lost });
+}
+
+/**
+ * 和好：期限内两人都和好，散掉的原数聚回。
+ * 破镜重圆（冷却内只有一次）：这次争执生的怨丝有一小部分转化回红线，并从怨丝池清掉。
+ * NPC 在玩家和好后自动跟着和好。
+ */
+export function reconcileQuarrel(world: World, by: HouseId, threadId: ThreadId): Result<{ done: boolean }> {
+  const thread = getThread(world, threadId);
+  const q = thread.quarrel;
+  if (!q) return fail('没有在争执');
+  if (thread.a !== by && thread.b !== by) return fail('不是这根线的一方');
+  spendAction(getHouse(world, by));
+  if (!q.reconciled.includes(by)) q.reconciled.push(by);
+  const needed = thread.b ? [thread.a, thread.b] : [thread.a];
+  if (!needed.every((id) => q.reconciled.includes(id))) return { ok: true, value: { done: false } };
+  const reunionOk = reunionReady(world, thread);
+  const restored = q.lost - q.grudge + reunionConvert(world, thread, needed, q.grudge);
+  addStrands(world, thread, restored);
+  const reunion = reunionOk;
+  thread.quarrel = null;
+  emit(world, { type: 'quarrelEnded', hour: world.hour, thread: thread.id, reconciled: true, restored, reunion });
+  return { ok: true, value: { done: true } };
+}
+
+function reunionReady(world: World, thread: Thread): boolean {
+  const cd = world.config.quarrel.reunionCooldownDays * HOURS_PER_DAY;
+  return thread.lastReunionAt === null || world.hour - thread.lastReunionAt >= cd;
+}
+
+/**
+ * 破镜重圆：冷却内只有一次。每一方把这次生的怨丝（每边 grudgePerSide）的一小部分
+ * 从怨丝池里清掉、转回红线。返回转回的情丝总量。
+ */
+function reunionConvert(world: World, thread: Thread, sides: HouseId[], grudgePerSide: number): number {
+  if (!reunionReady(world, thread)) return 0;
+  let total = 0;
+  for (const side of sides) {
+    const house = getHouse(world, side);
+    const converted = Math.min(house.grudge, grudgePerSide * world.config.quarrel.reunionConvert);
+    house.grudge -= converted;
+    total += converted;
+  }
+  thread.lastReunionAt = world.hour;
+  return total;
 }
 
 function relieveStrain(world: World, thread: Thread, by: HouseId): void {
@@ -224,23 +292,28 @@ export function cutThread(world: World, by: HouseId, threadId: ThreadId): Result
   if (thread.b) addGrudge(world, thread.b, grudge, 'cut');
 
   thread.strandsAtCut = thread.strands;
+  thread.grudgeAtCut = grudge;
   thread.strands = 0;
   thread.tier = 0;
   thread.state = 'cut';
   thread.cutAt = world.hour;
   thread.pendingRequest = null;
   thread.strain = {};
+  thread.quarrel = null;
   thread.heirSignatures = [];
   emit(world, { type: 'cut', hour: world.hour, thread: thread.id, by });
   settleHeirOnBreakup(world, thread);
   return ok();
 }
 
-/** #4 复合：期限内、双方都同意，浓度恢复到剪线前的若干倍（破镜重圆） */
+/**
+ * #4 复合：期限内、双方都同意。没变成怨丝的部分原数恢复；
+ * 变成怨丝的部分按破镜重圆规则转化一小部分（和争执共用冷却）。
+ */
 export function reconcile(world: World, threadId: ThreadId, consenting: HouseId[]): Result {
   const thread = getThread(world, threadId);
   if (thread.state !== 'cut' || thread.cutAt === null) return fail('只有剪掉的线才能复合');
-  const { reconcileWindowDays, reconcileBonus } = world.config.cut;
+  const { reconcileWindowDays, toGrudgeRatio } = world.config.cut;
   if (world.hour - thread.cutAt > reconcileWindowDays * HOURS_PER_DAY) return fail('已经过了复合期限');
   const needed = thread.b ? [thread.a, thread.b] : [thread.a];
   if (!needed.every((id) => consenting.includes(id))) return fail('复合需要双方都同意');
@@ -248,7 +321,8 @@ export function reconcile(world: World, threadId: ThreadId, consenting: HouseId[
 
   thread.state = 'active';
   thread.cutAt = null;
-  addStrands(world, thread, thread.strandsAtCut * reconcileBonus);
+  const restored = thread.strandsAtCut * (1 - toGrudgeRatio) + reunionConvert(world, thread, needed, thread.grudgeAtCut);
+  addStrands(world, thread, restored);
   emit(world, { type: 'reconciled', hour: world.hour, thread: thread.id });
   return ok();
 }
@@ -271,6 +345,7 @@ export function blockHouse(world: World, by: HouseId, other: HouseId): Result {
     t.state = 'severed';
     t.pendingRequest = null;
     t.strain = {};
+    t.quarrel = null;
     t.heirSignatures = [];
     settleHeirOnBreakup(world, t);
   }
@@ -314,11 +389,26 @@ export function dailyThreadUpdate(world: World): void {
     const neglecter = req ? (req.from === NPC_SIDE ? thread.a : otherSide(thread, req.from)) : null;
     if (req && neglecter && world.hour - req.at >= cfg.neglect.graceDays * HOURS_PER_DAY) {
       addStrands(world, thread, -cfg.neglect.dimPerDay);
+      thread.lastTensionAt = world.hour;
       addGrudge(world, neglecter, cfg.neglect.grudgePerDay, 'neglect');
       if (cfg.neglect.grudgeTo === 'both' && req.from !== NPC_SIDE) {
         addGrudge(world, req.from, cfg.neglect.grudgePerDay, 'neglect');
       }
       emit(world, { type: 'neglect', hour: world.hour, thread: thread.id, neglecter });
+    }
+
+    // 争执：超时没和好就算了；没在争执的线可能随机误会，关系紧张时更容易
+    const qc = cfg.quarrel;
+    if (thread.quarrel) {
+      if (world.hour - thread.quarrel.since >= qc.reconcileWindowDays * HOURS_PER_DAY) {
+        thread.quarrel = null;
+        emit(world, { type: 'quarrelEnded', hour: world.hour, thread: thread.id, reconciled: false, restored: 0, reunion: false });
+      }
+    } else {
+      const tense = thread.lastTensionAt !== null && world.hour - thread.lastTensionAt <= qc.tensionDays * HOURS_PER_DAY;
+      if (thread.strands > 0 && world.rng.chance(qc.baseChancePerDay * (tense ? qc.tensionMultiplier : 1))) {
+        startQuarrel(world, thread, 'misunderstanding');
+      }
     }
 
     // NPC 散修也会主动发来互动

@@ -10,6 +10,8 @@ import {
   cutThread,
   dailyThreadUpdate,
   doorPower,
+  startQuarrel,
+  reconcileQuarrel,
   attemptTribulation,
   brewBreakthroughPill,
   canAttemptTribulation,
@@ -52,8 +54,8 @@ function hours(w: World, n: number): void {
   for (let i = 0; i < n; i++) advanceHour(w);
 }
 
-/** 只推进时间、跳过每天结算以外的随机砸门：把鬼的概率设成 0 */
-const calm: DeepPartial<GameConfig> = { ghosts: { wildPerHour: 0, spiritPerHourPerGrudge: 0 } };
+/** 关掉随机砸门和随机误会，让测试只看要测的规则 */
+const calm: DeepPartial<GameConfig> = { ghosts: { wildPerHour: 0, spiritPerHourPerGrudge: 0 }, quarrel: { baseChancePerDay: 0 } };
 
 describe('#12 每日怨丝上限', () => {
   it('超出上限的部分直接散掉，第二天重新计算', () => {
@@ -109,8 +111,8 @@ describe('#3 #4 剪线、复合、拉黑', () => {
     expect(t.strands).toBe(0);
   });
 
-  it('期限内双方同意可以复合，浓度比剪线前更高', () => {
-    const w = world({ ...calm, cut: { reconcileWindowDays: 7, reconcileBonus: 1.2 } });
+  it('期限内双方同意可以复合：散开的部分聚回，怨丝部分按破镜重圆转化一小部分', () => {
+    const w = world({ ...calm, cut: { reconcileWindowDays: 7, toGrudgeRatio: 0.5 }, quarrel: { reunionConvert: 0.2 } });
     addHouse(w, { id: 'A' });
     addHouse(w, { id: 'B' });
     const t = tie(w, 'A', 'B');
@@ -118,7 +120,21 @@ describe('#3 #4 剪线、复合、拉黑', () => {
     cutThread(w, 'A', t.id);
     expect(reconcile(w, t.id, ['A']).ok).toBe(false);
     expect(reconcile(w, t.id, ['A', 'B']).ok).toBe(true);
-    expect(t.strands).toBeCloseTo(60);
+    expect(t.strands).toBeCloseTo(25 + 5 + 5);
+    expect(getHouse(w, 'A').grudge).toBeCloseTo(20);
+  });
+
+  it('剪线再复合刷不了浓度', () => {
+    const w = world(calm);
+    addHouse(w, { id: 'A' });
+    addHouse(w, { id: 'B' });
+    const t = tie(w, 'A', 'B');
+    t.strands = 100;
+    for (let i = 0; i < 3; i++) {
+      cutThread(w, 'A', t.id);
+      reconcile(w, t.id, ['A', 'B']);
+    }
+    expect(t.strands).toBeLessThan(100);
   });
 
   it('过了期限就不能复合', () => {
@@ -346,6 +362,110 @@ describe('关系分级与吃醋', () => {
     addStrands(w, tc, 32); // 知己
     interact(w, 'A', tb.id);
     expect(w.config.tiers.names[tc.tier]).toBe('相识');
+  });
+});
+
+describe('争执与和好', () => {
+  function pair(config: DeepPartial<GameConfig> = {}) {
+    const w = world({ ...calm, ...config });
+    addHouse(w, { id: 'A' });
+    addHouse(w, { id: 'B' });
+    const t = tie(w, 'A', 'B');
+    addStrands(w, t, 100);
+    return { w, t };
+  }
+
+  it('争执时一部分浓度散掉，其中一部分变成怨丝，两边各生', () => {
+    const { w, t } = pair({ quarrel: { lossRatio: 0.2, grudgeRatio: 0.5 } });
+    startQuarrel(w, t, 'misunderstanding');
+    expect(t.strands).toBe(80);
+    expect(getHouse(w, 'A').grudge).toBe(10);
+    expect(getHouse(w, 'B').grudge).toBe(10);
+  });
+
+  it('两人都和好才算数；没变成怨丝的部分聚回，破镜重圆再从怨丝转化一小部分', () => {
+    const { w, t } = pair({ quarrel: { lossRatio: 0.2, grudgeRatio: 0.5, reunionConvert: 0.2 } });
+    startQuarrel(w, t, 'misunderstanding');
+    const first = reconcileQuarrel(w, 'A', t.id);
+    expect(first.ok && first.value.done).toBe(false);
+    expect(t.quarrel).not.toBeNull();
+    reconcileQuarrel(w, 'B', t.id);
+    expect(t.quarrel).toBeNull();
+    expect(t.strands).toBeCloseTo(80 + 10 + 2 + 2);
+    expect(getHouse(w, 'A').grudge).toBeCloseTo(8);
+  });
+
+  it('吵架刷不了：每吵一次都会亏一点，冷却内没有破镜重圆', () => {
+    const { w, t } = pair({ quarrel: { lossRatio: 0.2, grudgeRatio: 0.5, reunionConvert: 0.2, reunionCooldownDays: 30 } });
+    startQuarrel(w, t, 'risky');
+    reconcileQuarrel(w, 'A', t.id);
+    reconcileQuarrel(w, 'B', t.id);
+    const before = t.strands;
+    startQuarrel(w, t, 'risky');
+    reconcileQuarrel(w, 'A', t.id);
+    reconcileQuarrel(w, 'B', t.id);
+    expect(t.strands).toBeLessThan(before);
+    expect(getHouse(w, 'A').grudge).toBeGreaterThan(8);
+  });
+
+  it('超过期限没和好，散掉的就散了', () => {
+    const { w, t } = pair({ quarrel: { lossRatio: 0.2, reconcileWindowDays: 3 } });
+    startQuarrel(w, t, 'misunderstanding');
+    reconcileQuarrel(w, 'A', t.id);
+    hours(w, 4 * DAY);
+    expect(t.quarrel).toBeNull();
+    expect(reconcileQuarrel(w, 'B', t.id).ok).toBe(false);
+    expect(t.strands).toBe(80);
+  });
+
+  it('NPC 线：玩家一和好就完成', () => {
+    const w = world(calm);
+    addHouse(w, { id: 'A' });
+    const r = tieThread(w, 'A', { kind: 'npc', name: '散修' });
+    if (!r.ok) throw new Error();
+    addStrands(w, r.value, 50);
+    startQuarrel(w, r.value, 'misunderstanding');
+    const done = reconcileQuarrel(w, 'A', r.value.id);
+    expect(done.ok && done.value.done).toBe(true);
+  });
+
+  it('关系紧张（刚吃过醋）时更容易误会', () => {
+    const count = (tense: boolean) => {
+      const w = world({ ...calm, quarrel: { baseChancePerDay: 0.05, tensionMultiplier: 4 } }, 3);
+      let n = 0;
+      w.listener = (e) => {
+        if (e.type === 'quarrel') n++;
+      };
+      for (let i = 0; i < 300; i++) {
+        addHouse(w, { id: `A${i}` });
+        addHouse(w, { id: `B${i}` });
+        const t = tie(w, `A${i}`, `B${i}`);
+        addStrands(w, t, 50);
+        if (tense) t.lastTensionAt = 1e9;
+      }
+      hours(w, DAY + 1);
+      return n;
+    };
+    expect(count(true)).toBeGreaterThan(count(false) * 2);
+  });
+
+  it('冒险说法：成功时增长翻倍，有概率引发误会', () => {
+    const grow = pair({ quarrel: { riskyChance: 0, riskyGainMultiplier: 2 } });
+    interact(grow.w, 'A', grow.t.id);
+    interact(grow.w, 'B', grow.t.id, { risky: true });
+    expect(grow.t.strands).toBe(100 + 2 * grow.w.config.thread.interactionGain);
+
+    const fight = pair({ quarrel: { riskyChance: 1 } });
+    interact(fight.w, 'A', fight.t.id);
+    interact(fight.w, 'B', fight.t.id, { risky: true });
+    expect(fight.t.quarrel).not.toBeNull();
+  });
+
+  it('剪线会结束争执', () => {
+    const { w, t } = pair();
+    startQuarrel(w, t, 'misunderstanding');
+    cutThread(w, 'A', t.id);
+    expect(t.quarrel).toBeNull();
   });
 });
 

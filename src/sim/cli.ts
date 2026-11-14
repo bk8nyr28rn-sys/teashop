@@ -72,6 +72,8 @@ function table(rows: ArchetypeReport[]): string {
     ['金缕占比', (r) => pct(r.goldenShare)],
     ['金缕中位天', (r) => (r.goldenDayMedian === null ? '—' : f1(r.goldenDayMedian))],
     ['嫡传中位天', (r) => (r.heirDayMedian === null ? '—' : f1(r.heirDayMedian))],
+    ['争执/周', (r) => f2(r.quarrelsPerWeek)],
+    ['和好率', (r) => pct(r.reconcileRate)],
     ['境界', (r) => f1(r.realmAvg)],
     ['渡劫成功率', (r) => pct(r.tribulationSuccessRate)],
     ['到匹配门槛中位天', (r) => (r.strangerGateDayMedian === null ? '—' : f1(r.strangerGateDayMedian))],

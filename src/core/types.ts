@@ -80,6 +80,8 @@ export interface Thread {
   state: ThreadState;
   cutAt: number | null;
   strandsAtCut: number;
+  /** 剪线时每边生的怨丝（复合时破镜重圆用） */
+  grudgeAtCut: number;
   /** #7 心力分散：键是“因为牵了别的线而造成分散”的那一方 */
   strain: Record<HouseId, number>;
   /** 一方发来、还没被回应的互动（#5）。from 为 NPC_SIDE 表示 NPC 发来的 */
@@ -92,6 +94,12 @@ export interface Thread {
   golden: boolean;
   /** 关系等级，下标对应 config.tiers.names */
   tier: number;
+  /** 争执中：散掉了多少、每边生了多少怨丝、从第几个小时开始、谁已经和好了 */
+  quarrel: { lost: number; grudge: number; since: number; reconciled: HouseId[] } | null;
+  /** 上一次破镜重圆的时间（冷却用） */
+  lastReunionAt: number | null;
+  /** 最近一次吃醋或被冷落的时间（判断关系是否紧张） */
+  lastTensionAt: number | null;
   createdAt: number;
 }
 
@@ -128,11 +136,13 @@ export type GameEvent =
   | { type: 'heirBorn'; hour: number; heir: HeirId; thread: ThreadId }
   | { type: 'heirHomeSet'; hour: number; heir: HeirId; home: HouseId; reason: 'agreed' | 'breakup' | 'adulthood' }
   | { type: 'golden'; hour: number; thread: ThreadId }
+  | { type: 'quarrel'; hour: number; thread: ThreadId; cause: 'misunderstanding' | 'risky'; lost: number }
+  | { type: 'quarrelEnded'; hour: number; thread: ThreadId; reconciled: boolean; restored: number; reunion: boolean }
   | { type: 'tribulation'; hour: number; house: HouseId; success: boolean; realm: number; usedPill: boolean }
   | { type: 'tierChanged'; hour: number; thread: ThreadId; from: number; to: number }
   | { type: 'bigInteraction'; hour: number; thread: ThreadId; by: HouseId; stake: number; success: boolean; stonesLost: number; strandsGained: number; coPresent: boolean };
 
-export type GrudgeSource = 'neglect' | 'strain' | 'jealousy' | 'cut' | 'spiritLost' | 'other';
+export type GrudgeSource = 'neglect' | 'strain' | 'jealousy' | 'quarrel' | 'cut' | 'spiritLost' | 'other';
 
 export interface World {
   /** 现实时间，单位小时。第 0 小时是某个周一的 0 点 */

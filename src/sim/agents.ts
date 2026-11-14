@@ -14,6 +14,7 @@ import {
   tieThread,
   interact,
   upgradeFormation,
+  reconcileQuarrel,
   attemptTribulation,
   brewBreakthroughPill,
   canAttemptTribulation,
@@ -154,6 +155,9 @@ export function startOfDay(world: World, agent: Agent): void {
   }
 }
 
+/** 小互动时选冒险说法的概率 */
+export const RISKY_SHARE = 0.3;
+
 /** 收到的灵石有多少比例存进感情预算，其余留给阵法 */
 export const LOVE_BUDGET_SHARE = 0.5;
 
@@ -173,9 +177,13 @@ export function playSession(world: World, agent: Agent, isPresent: (houseId: str
 
   for (const thread of threadsOf(world, house.id)) {
     const other = otherSide(thread, house.id);
+    // 争执中：先去和好（和回应互动一样看意愿）
+    if (thread.quarrel && !thread.quarrel.reconciled.includes(house.id) && rng.chance(p.respondChance)) {
+      reconcileQuarrel(world, house.id, thread.id);
+    }
     const theyAsked = thread.pendingRequest !== null && thread.pendingRequest.from !== house.id;
     if (theyAsked) {
-      if (rng.chance(p.respondChance)) interact(world, house.id, thread.id);
+      if (rng.chance(p.respondChance)) interact(world, house.id, thread.id, { risky: rng.chance(RISKY_SHARE) });
     } else if (rng.chance(p.interactChance)) {
       interact(world, house.id, thread.id);
     }

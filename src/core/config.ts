@@ -65,6 +65,28 @@ export interface GameConfig {
     failLossMax: number;
   };
 
+  /**
+   * 争执：随机误会（关系紧张时更容易），或小互动选了冒险的说法引发误会。
+   * 争执时一部分浓度散掉，其中 grudgeRatio 变成怨丝（两边各生），头像变脸。
+   * 期限内双方都“和好”：散掉的里面没变成怨丝的部分原数聚回；变成怨丝的部分，
+   * 破镜重圆时再有 reunionConvert 转化回红线（从怨丝池里清掉），其余只能靠打怨灵慢慢转回。
+   * 所以吵架总会亏一点，和好是止损。破镜重圆每根线 reunionCooldownDays 内只有一次（和剪线复合共用）。
+   */
+  quarrel: {
+    baseChancePerDay: number;
+    /** 最近几天内吃过醋或被冷落过，算“紧张” */
+    tensionDays: number;
+    tensionMultiplier: number;
+    lossRatio: number;
+    grudgeRatio: number;
+    reconcileWindowDays: number;
+    reunionConvert: number;
+    reunionCooldownDays: number;
+    /** 冒险说法：增长乘以 riskyGainMultiplier，但有 riskyChance 的概率引发误会 */
+    riskyGainMultiplier: number;
+    riskyChance: number;
+  };
+
   /** NPC 散修也要维护：回复有延迟，也会主动发来互动，不回就算冷落 */
   npc: {
     replyHours: number;
@@ -81,13 +103,14 @@ export interface GameConfig {
     strangerRealmGate: number;
   };
 
-  /** #3 #4 剪线与复合 */
+  /**
+   * #3 #4 剪线与复合。复合时，没变成怨丝的部分原数恢复，
+   * 变成怨丝的部分按破镜重圆规则转化一小部分（和争执共用 quarrel.reunionConvert 与冷却）。
+   */
   cut: {
-    /** 剪线时转成怨丝的比例，其余直接散掉 */
+    /** 剪线时转成怨丝的比例（两边各生），其余散开，复合时可以聚回 */
     toGrudgeRatio: number;
     reconcileWindowDays: number;
-    /** 复合时恢复到剪线前浓度的倍数（破镜重圆，> 1） */
-    reconcileBonus: number;
   };
 
   /** #5 冷落 */
@@ -242,6 +265,18 @@ export const defaultConfig: GameConfig = {
   grudge: { dailyCap: 30 },
   thread: { interactionGain: 0.5, goldenThreshold: 200, diminishing: 1 },
   npc: { replyHours: 12, requestChancePerDay: 0.5, investMultiplier: 1 },
+  quarrel: {
+    baseChancePerDay: 0.02,
+    tensionDays: 3,
+    tensionMultiplier: 3,
+    lossRatio: 0.2,
+    grudgeRatio: 0.5,
+    reconcileWindowDays: 3,
+    reunionConvert: 0.2,
+    reunionCooldownDays: 30,
+    riskyGainMultiplier: 2,
+    riskyChance: 0.25,
+  },
   tiers: { names: ['相识', '知己', '倾心', '挚爱', '金缕'], mins: [0, 30, 60, 120, 200] },
   jealousy: { dimPerTier: 0.2, grudgePerTier: 0.2, bigMultiplier: 1.5 },
   big: {
@@ -255,7 +290,7 @@ export const defaultConfig: GameConfig = {
     failLossMax: 1,
   },
   matching: { strangerRealmGate: 3 },
-  cut: { toGrudgeRatio: 0.5, reconcileWindowDays: 7, reconcileBonus: 1.2 },
+  cut: { toGrudgeRatio: 0.5, reconcileWindowDays: 7 },
   neglect: { graceDays: 3, dimPerDay: 4, grudgePerDay: 3, grudgeTo: 'both' },
   retreat: { daysPerWindow: 7, windowDays: 30 },
   multiPartner: {
