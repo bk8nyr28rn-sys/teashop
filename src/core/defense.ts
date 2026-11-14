@@ -163,6 +163,26 @@ export function brewBreakthroughPill(world: World, houseId: HouseId): Result {
   return ok();
 }
 
+/** 渡劫的胜算和各项加成（界面显示和实际结算用同一份） */
+export function tribulationOdds(
+  world: World,
+  houseId: HouseId,
+  opts: { usePill?: boolean; helperThreadId?: string } = {},
+): { door: number; helper: Thread | null; helperBonus: number; usePill: boolean; pillBonus: number; power: number; strength: number; chance: number } {
+  const house = getHouse(world, houseId);
+  const t = world.config.tribulation;
+  const usePill = (opts.usePill ?? true) && house.breakthroughPills > 0;
+  const helper = opts.helperThreadId
+    ? threadsOf(world, houseId).find((x) => x.id === opts.helperThreadId) ?? null
+    : pickHelper(world, houseId);
+  const door = doorPower(world, house);
+  const helperBonus = helper ? helper.strands * world.config.door.helperPerStrand : 0;
+  const pillBonus = usePill ? t.pillBonus : 0;
+  const power = door + helperBonus + pillBonus;
+  const strength = t.bossBaseStrength + house.realm * t.bossStrengthPerRealm;
+  return { door, helper, helperBonus, usePill, pillBonus, power, strength, chance: power / (power + strength) };
+}
+
 /**
  * 渡劫：玩家自选时机发起，打赢一只大鬼（野鬼）才算突破。
  * 可以叫一位搭档护法（默认红线最浓的那位），可以吃破境丹。
@@ -177,19 +197,11 @@ export function attemptTribulation(
   if (!check.ok) return check;
   const house = getHouse(world, houseId);
   const t = world.config.tribulation;
-  const usePill = (opts.usePill ?? true) && house.breakthroughPills > 0;
-  const helper = opts.helperThreadId
-    ? threadsOf(world, houseId).find((x) => x.id === opts.helperThreadId) ?? null
-    : pickHelper(world, houseId);
+  const odds = tribulationOdds(world, houseId, opts);
+  const usePill = odds.usePill;
   spendAction(house);
   if (usePill) house.breakthroughPills--;
-
-  const power =
-    doorPower(world, house) +
-    (helper ? helper.strands * world.config.door.helperPerStrand : 0) +
-    (usePill ? t.pillBonus : 0);
-  const strength = t.bossBaseStrength + house.realm * t.bossStrengthPerRealm;
-  const success = world.rng.chance(power / (power + strength));
+  const success = world.rng.chance(odds.chance);
 
   if (success) {
     house.cultivationProgress -= tribulationRequirement(world, house);

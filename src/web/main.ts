@@ -1,47 +1,73 @@
 import { Game } from './game';
-import { bind, render } from './ui';
+import { REGIONS, bind, render, type Region } from './ui';
 
-const root = document.getElementById('app')!;
+const app = document.getElementById('app')!;
 const game = new Game();
+const last: Partial<Record<Region, string>> = {};
 
-/** 输入框正在打字时不整页重画，免得把字吞掉 */
-function rerender(): void {
-  const focused = document.activeElement as HTMLInputElement | null;
-  const typing = focused?.id === 'npc-name';
-  const draft = typing ? focused!.value : (document.getElementById('npc-name') as HTMLInputElement | null)?.value ?? '';
-  render(game, root);
-  const input = document.getElementById('npc-name') as HTMLInputElement | null;
-  if (input) {
-    input.value = draft;
-    if (typing) {
-      input.focus();
-      input.setSelectionRange(draft.length, draft.length);
+/**
+ * 只重画内容变了的区域。重画时保住输入框里正在打的字、焦点和滚动位置，
+ * 并把循环动画对齐到同一个时间起点，免得每次重画都从头跳一下。
+ */
+function patch(id: Region, html: string): void {
+  if (last[id] === html) return;
+  const el = document.getElementById(id);
+  if (!el) return;
+  const active = document.activeElement;
+  const inputs = [...el.querySelectorAll<HTMLInputElement>('input[id]')].map((i) => ({
+    id: i.id,
+    value: i.value,
+    focused: i === active,
+    start: i.selectionStart,
+    end: i.selectionEnd,
+  }));
+  const scrolls = [...el.querySelectorAll<HTMLElement>('[data-keep-scroll][id]')].map((n) => ({ id: n.id, top: n.scrollTop }));
+
+  el.innerHTML = html;
+  el.style.setProperty('--sync', `-${Math.round(performance.now())}ms`);
+
+  for (const s of inputs) {
+    const i = document.getElementById(s.id) as HTMLInputElement | null;
+    if (!i) continue;
+    i.value = s.value;
+    if (s.focused) {
+      i.focus();
+      try {
+        i.setSelectionRange(s.start, s.end);
+      } catch {
+        // 有的输入框类型不支持选区，忽略
+      }
     }
   }
+  for (const s of scrolls) {
+    const n = document.getElementById(s.id);
+    if (n) n.scrollTop = s.top;
+  }
+  last[id] = html;
 }
 
-bind(game, root, rerender);
+function rerender(): void {
+  const frame = render(game);
+  for (const id of REGIONS) patch(id, frame[id]);
+}
+
+bind(game, app, rerender);
 rerender();
 
-/** 手指或鼠标按住时不重画：极速下每 100 毫秒重画一次，按下和松开之间按钮被换掉，点击就丢了 */
+/** 手指或鼠标按住时不重画：按下和松开之间如果按钮被换掉，这次点击就丢了 */
 let pressing = false;
-let dirty = false;
-root.addEventListener('pointerdown', () => (pressing = true));
+app.addEventListener('pointerdown', () => (pressing = true));
 const release = () => {
   pressing = false;
-  if (dirty) {
-    dirty = false;
-    // 等这次点击先处理完再重画
-    setTimeout(rerender, 0);
-  }
+  // 等这次点击先处理完再重画
+  setTimeout(rerender, 0);
 };
 window.addEventListener('pointerup', release);
 window.addEventListener('pointercancel', release);
 
 setInterval(() => {
-  if (!game.tick()) return;
-  if (pressing) dirty = true;
-  else rerender();
+  game.tick();
+  if (!pressing) rerender();
 }, 100);
 
 document.addEventListener('visibilitychange', () => {

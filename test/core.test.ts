@@ -10,6 +10,8 @@ import {
   cutThread,
   dailyThreadUpdate,
   doorPower,
+  tribulationOdds,
+  updateProfile,
   resolveRival,
   proposeSnatch,
   respondSnatch,
@@ -894,6 +896,34 @@ describe('#9 #10 #6 #15 族人与嫡传', () => {
     blockHouse(w, 'A', 'B');
     const r = heirAdulthoodChoice(w, heir.id);
     expect(r.ok && r.value).toBe('A');
+  });
+});
+
+describe('OC 资料与形象', () => {
+  it('可以改名字、性别、行当和形象；名字要 1–8 个字', () => {
+    const w = world();
+    addHouse(w, { id: 'A' });
+    const look = { robe: '#F0525A', trim: '#FFC24B', headdress: 'crown' as const, skin: '#FFE4D6', hair: '#2B2233' };
+    expect(updateProfile(w, 'A', { name: '  小满 ', gender: 'unsaid', traits: ['丑生'], appearance: look }).ok).toBe(true);
+    const a = getHouse(w, 'A');
+    expect(a.name).toBe('小满');
+    expect(a.gender).toBe('unsaid');
+    expect(a.traits).toEqual(['丑生']);
+    expect(a.appearance).toEqual(look);
+    expect(updateProfile(w, 'A', { name: '' }).ok).toBe(false);
+    expect(updateProfile(w, 'A', { name: '一二三四五六七八九' }).ok).toBe(false);
+    expect(a.name).toBe('小满');
+  });
+
+  it('界面显示的渡劫胜算和实际结算用的是同一份', () => {
+    const w = world(calm);
+    const a = addHouse(w, { id: 'A' });
+    a.cultivationProgress = 1e6;
+    a.breakthroughPills = 1;
+    const withPill = tribulationOdds(w, 'A', { usePill: true });
+    const noPill = tribulationOdds(w, 'A', { usePill: false });
+    expect(withPill.power - noPill.power).toBe(w.config.tribulation.pillBonus);
+    expect(withPill.chance).toBeGreaterThan(noPill.chance);
   });
 });
 

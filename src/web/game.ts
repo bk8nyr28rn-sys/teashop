@@ -30,9 +30,14 @@ import {
   startRetreat,
   threadsOf,
   tieThread,
+  updateProfile,
   upgradeFormation,
+  type Appearance,
   type GameEvent,
+  type Gender,
+  type GhostKind,
   type Result,
+  type Thread,
   type Tone,
   type World,
 } from '../core';
@@ -43,6 +48,7 @@ export const QING = 'qing';
 export const BAILU = 'bailu';
 
 export type Speed = 'pause' | 'real' | 'fast' | 'turbo';
+export const SPEEDS: Speed[] = ['pause', 'real', 'fast', 'turbo'];
 
 /** 每毫秒现实时间推进多少游戏小时 */
 export const SPEED_RATE: Record<Speed, number> = {
@@ -65,6 +71,28 @@ export interface LogEntry {
   tone: Tone;
 }
 
+export interface Notice {
+  text: string;
+  tone: Tone;
+  at: number;
+}
+
+/** 屏幕中央弹出的大字：打散怨灵、关系升级、突破这些爽点 */
+export interface Banner {
+  id: number;
+  title: string;
+  sub: string;
+  tone: Tone;
+  shownAt: number | null;
+}
+
+/** 场景里正在演的一次砸门（只用于画面） */
+export interface KnockFx {
+  kind: GhostKind;
+  outcome: 'defended' | 'purified' | 'guarded' | 'breach';
+  at: number;
+}
+
 interface Saved {
   world: string;
   lastRealMs: number;
@@ -80,56 +108,74 @@ const MAX_CATCHUP_HOURS = 14 * 24;
 /** 两次上线之间至少隔多少游戏小时，才算新的一次上线（checkIn） */
 const SESSION_GAP_HOURS = 6;
 
+const QING_LOOK: Appearance = { robe: '#52D6A6', trim: '#FFC24B', headdress: 'bun', skin: '#FFE4D6', hair: '#2B2233' };
+const BAILU_LOOK: Appearance = { robe: '#7FA8FF', trim: '#E9ECFF', headdress: 'crown', skin: '#F6CFB4', hair: '#2B2233' };
+
 export class Game {
   world: World;
   speed: Speed = 'fast';
   log: LogEntry[] = [];
-  /** 最近一次操作的提示（失败原因等） */
-  notice: { text: string; tone: Tone } | null = null;
+  /** 最近一次操作的提示（失败原因等），界面显示几秒 */
+  notice: Notice | null = null;
+  /** 离开期间发生的事，回来时给玩家看一眼 */
+  awayReport: LogEntry[] | null = null;
+  awayHours = 0;
   qing: Agent;
+
+  private knockFx: KnockFx | null = null;
+  private pendingKnock: GhostKind | null = null;
+  private grudgeBeforeKnock = 0;
+  private banners: Banner[] = [];
+  private bannerSeq = 0;
+  private collectAt = 0;
+  private tribFx: { success: boolean; at: number } | null = null;
+  private bigFx: { threadId: string; success: boolean; strands: number; lost: number; at: number } | null = null;
   private lastCheckInHour = -Infinity;
   private acc = 0;
   private lastTick = Date.now();
   /** 正在补离线时间：这段时间里“我”不在线 */
   private catchingUp = false;
+  private awayLog: LogEntry[] = [];
 
   constructor() {
     const loaded = this.load();
     if (loaded) {
       this.world = loaded.world;
       this.qing = makeQing(loaded.qingBudget);
+      this.attachListener();
       this.catchUpOffline(loaded.lastRealMs, loaded.speed);
     } else {
       this.world = newWorld();
       this.qing = makeQing(0);
-      this.say('锣鼓响起，新的一出开台了。你和阿青已经牵上一根红线。前三天有新手保护，先收灵石、升符阵。', 'info');
+      this.attachListener();
+      this.say('新的一局开始了。你和阿青已经牵上一根红线。前三天有新手保护，先收灵石、升符阵。', 'info');
     }
-    this.attachListener();
     this.sessionCheckIn();
   }
 
   // ---------- 时间 ----------
 
-  /** 每帧调用；返回这一帧是否推进了时间 */
-  tick(): boolean {
+  /** 每帧调用，按流速推进游戏时间 */
+  tick(): void {
     const now = Date.now();
     this.acc += (now - this.lastTick) * SPEED_RATE[this.speed];
     this.lastTick = now;
-    let stepped = false;
     let budget = 72;
     while (this.acc >= 1 && budget-- > 0) {
       this.stepHour(this.isMeOnline());
       this.acc -= 1;
-      stepped = true;
     }
     if (this.acc > 1) this.acc = 1;
-    return stepped;
   }
 
   setSpeed(speed: Speed): void {
     this.speed = speed;
     this.lastTick = Date.now();
     this.save();
+  }
+
+  cycleSpeed(): void {
+    this.setSpeed(SPEEDS[(SPEEDS.indexOf(this.speed) + 1) % SPEEDS.length] as Speed);
   }
 
   isMeOnline(): boolean {
@@ -161,13 +207,18 @@ export class Game {
   private catchUpOffline(lastRealMs: number, savedSpeed: Speed): void {
     const elapsed = Math.max(0, Date.now() - lastRealMs);
     const hours = Math.min(MAX_CATCHUP_HOURS, Math.floor(elapsed * SPEED_RATE[savedSpeed]));
-    this.speed = savedSpeed === 'pause' ? 'pause' : savedSpeed;
+    this.speed = savedSpeed;
     if (hours <= 0) return;
     this.catchingUp = true;
-    this.attachListener();
+    this.awayLog = [];
     for (let i = 0; i < hours; i++) this.stepHour(false);
     this.catchingUp = false;
-    this.say(`你离开了 ${hours} 个时辰（游戏小时），这期间的事都已结算。`, 'info');
+    this.awayHours = hours;
+    this.awayReport = this.awayLog.slice(0, 12);
+  }
+
+  dismissAway(): void {
+    this.awayReport = null;
   }
 
   /** 上线：两次上线之间隔够了才算新的一次（和好期限按它算） */
@@ -177,38 +228,196 @@ export class Game {
     this.lastCheckInHour = this.world.hour;
   }
 
-  // ---------- 日志 ----------
+  // ---------- 事件：日志和画面效果 ----------
 
   private attachListener(): void {
     this.world.listener = (e: GameEvent) => {
       const m = describeEvent(this.world, e, ME);
       if (m) this.say(m.text, m.tone);
+      if (!this.catchingUp) this.present(e);
     };
   }
 
+  /** 把事件变成画面效果和弹字 */
+  private present(e: GameEvent): void {
+    const w = this.world;
+    const me = w.houses.get(ME)!;
+    const now = Date.now();
+    const n1 = (x: number) => (Math.abs(x) >= 100 ? String(Math.round(x)) : x.toFixed(1).replace(/\.0$/, ''));
+    const mineThread = (id: string) => {
+      const t = w.threads.get(id);
+      return t && (t.a === ME || t.b === ME) ? t : null;
+    };
+    const partner = (t: Thread) => {
+      const other = t.a === ME ? t.b : t.a;
+      return other ? w.houses.get(other)?.name ?? other : t.npcName ?? '散修';
+    };
+
+    switch (e.type) {
+      case 'knock':
+        if (e.house === ME) {
+          this.pendingKnock = e.kind;
+          this.grudgeBeforeKnock = me.grudge;
+        }
+        break;
+      case 'defended':
+      case 'guarded':
+      case 'purified':
+      case 'breach': {
+        if (e.house !== ME) break;
+        const kind = this.pendingKnock;
+        this.pendingKnock = null;
+        if (!kind) break; // 渡劫失败也会触发 breach，由渡劫自己的弹字负责
+        this.knockFx = { kind, outcome: e.type, at: now };
+        const cleared = Math.max(0, this.grudgeBeforeKnock - me.grudge);
+        if (e.type === 'breach') this.banner('大阵被破…', `灵石 -${e.stonesLost} · 进入劫后余生`, 'bad');
+        else if (e.type === 'purified') this.banner('感化怨灵！', `净化 ${n1(cleared)} 缕怨丝 · 情丝 +${n1(e.strandsReturned)} · 它留下帮你守门`, 'good');
+        else if (kind === 'wild') this.banner(e.type === 'guarded' ? '护宅怨灵挡下了！' : '击退野鬼！', '诡心 +1', 'good');
+        else if (e.type === 'guarded') this.banner('护宅怨灵挡下了！', `净化 ${n1(cleared)} 缕怨丝`, 'good');
+        else this.banner('打散怨灵！', `净化 ${n1(cleared)} 缕怨丝 · 情丝 +${n1(e.strandsReturned)}`, 'good');
+        break;
+      }
+      case 'tierChanged': {
+        const t = mineThread(e.thread);
+        if (t && e.to > e.from) this.banner(`关系升级 · ${w.config.tiers.names[e.to] ?? ''}`, `你与${partner(t)}`, 'good');
+        break;
+      }
+      case 'memberBorn': {
+        const t = mineThread(e.thread);
+        if (e.house === ME && t) this.banner('族人 +1', `你与${partner(t)}的情丝所结`, 'good');
+        break;
+      }
+      case 'heirBorn': {
+        const t = mineThread(e.thread);
+        if (t) this.banner('嫡传降生！', `你与${partner(t)}的结晶`, 'good');
+        break;
+      }
+      case 'golden': {
+        const t = mineThread(e.thread);
+        if (t) this.banner('金缕！', `你与${partner(t)}的红线化作金丝`, 'good');
+        break;
+      }
+      case 'tribulation':
+        if (e.house !== ME) break;
+        this.tribFx = { success: e.success, at: now };
+        if (e.success) this.banner('突破！', `境界升至 ${e.realm}`, 'good');
+        else this.banner('渡劫失败…', '修为还在，3 天后再来', 'bad');
+        break;
+      case 'bigInteraction':
+        if (e.by !== ME) break;
+        this.bigFx = { threadId: e.thread, success: e.success, strands: e.strandsGained, lost: e.stonesLost, at: now };
+        if (e.success) this.banner('满载而归！', `情丝 +${n1(e.strandsGained)}`, 'good');
+        else this.banner('铩羽而归…', `折了 ${e.stonesLost} 灵石`, 'bad');
+        break;
+      case 'quarrel': {
+        const t = mineThread(e.thread);
+        if (t) this.banner('吵架了！', `你与${partner(t)}闹了别扭，快去和好`, 'drama');
+        break;
+      }
+      case 'quarrelEnded': {
+        const t = mineThread(e.thread);
+        if (t && e.reconciled) this.banner(e.reunion ? '破镜重圆！' : '和好如初', `聚回 ${n1(e.restored)} 缕情丝`, 'good');
+        break;
+      }
+      case 'rival': {
+        const t = mineThread(e.thread);
+        if (!t) break;
+        if (e.outcome === 'lost') this.banner('情敌得逞…', `你与${partner(t)}的红线淡了`, 'bad');
+        else this.banner('情敌退散！', e.outcome === 'purified' ? '你们情深，三言两语就化解了' : '红线更稳了', 'good');
+        break;
+      }
+      default:
+        break;
+    }
+  }
+
+  private banner(title: string, sub: string, tone: Tone): void {
+    // 极速时事件很密：最多排 3 条，旧的没来得及显示就丢掉
+    while (this.banners.length >= 3) this.banners.splice(1, 1);
+    this.banners.push({ id: ++this.bannerSeq, title, sub, tone, shownAt: null });
+  }
+
+  /** 现在该显示的弹字（每条显示 1.7 秒，排队播放） */
+  currentBanner(): Banner | null {
+    const now = Date.now();
+    while (this.banners.length > 0) {
+      const b = this.banners[0] as Banner;
+      if (b.shownAt === null) b.shownAt = now;
+      if (now - b.shownAt < 1700) return b;
+      this.banners.shift();
+    }
+    return null;
+  }
+
+  /** 刚收过灵石（用来让灵石数字跳一下） */
+  justCollected(): boolean {
+    return Date.now() - this.collectAt < 600;
+  }
+
   say(text: string, tone: Tone): void {
-    this.log.unshift({ hour: this.world.hour, text, tone });
+    const entry = { hour: this.world.hour, text, tone };
+    this.log.unshift(entry);
     if (this.log.length > 80) this.log.length = 80;
+    if (this.catchingUp) this.awayLog.unshift(entry);
+  }
+
+  /** 正在演的砸门（演 4 秒多） */
+  activeKnock(): KnockFx | null {
+    return this.knockFx && Date.now() - this.knockFx.at < 4200 ? this.knockFx : null;
+  }
+
+  activeTribulation(): { success: boolean } | null {
+    return this.tribFx && Date.now() - this.tribFx.at < 5000 ? this.tribFx : null;
+  }
+
+  activeBig(threadId: string): { success: boolean; strands: number; lost: number } | null {
+    return this.bigFx && this.bigFx.threadId === threadId && Date.now() - this.bigFx.at < 6000 ? this.bigFx : null;
+  }
+
+  activeNotice(): Notice | null {
+    return this.notice && Date.now() - this.notice.at < 3200 ? this.notice : null;
   }
 
   // ---------- 玩家操作 ----------
 
-  /** 包一层：每次操作都算一次上线检查；失败时显示原因 */
-  private act<T>(fn: () => Result<T>, ok?: (v: T) => string | null): void {
+  tell(text: string, tone: Tone = 'info'): void {
+    this.notice = { text, tone, at: Date.now() };
+  }
+
+  /** 包一层：每次操作都算一次上线检查；失败时显示原因。返回是否成功 */
+  private act<T>(fn: () => Result<T>, ok?: (v: T) => string | null): boolean {
     this.sessionCheckIn();
     const r = fn();
-    if (!r.ok) this.notice = { text: r.reason, tone: 'bad' };
+    if (!r.ok) this.tell(r.reason, 'bad');
     else {
       const msg = ok?.(r.value) ?? null;
-      this.notice = msg ? { text: msg, tone: 'info' } : null;
+      if (msg) this.tell(msg);
     }
     this.save();
+    return r.ok;
+  }
+
+  /** 这位搭档此刻是否在线（原型里只有阿青是会上线的“真人”） */
+  partnerOnline(t: Thread): boolean {
+    return t.b === QING && isOnline(this.world, this.qing);
+  }
+
+  needsSetup(): boolean {
+    return !this.world.houses.get(ME)!.appearance;
+  }
+
+  saveProfile(p: { name: string; gender: Gender; role: string; look: Appearance }): boolean {
+    return this.act(
+      () => updateProfile(this.world, ME, { name: p.name, gender: p.gender, traits: [p.role], appearance: p.look }),
+      () => '形象已保存。',
+    );
   }
 
   collect(): void {
     this.sessionCheckIn();
     const got = collectMeditation(this.world, ME);
-    this.notice = { text: got > 0 ? `收得 ${Math.round(got)} 灵石，修为也涨了。` : '刚收过，再打会儿坐。', tone: 'info' };
+    if (got > 0) this.collectAt = Date.now();
+    this.tell(got > 0 ? `收得 ${Math.round(got)} 灵石，修为也涨了。` : '刚收过，再打会儿坐。');
     this.save();
   }
 
@@ -216,27 +425,26 @@ export class Game {
   repair = () => this.act(() => repairFormation(this.world, ME), (n) => `修好了 ${n} 处阵眼。`);
   healPill = () => this.act(() => brewHealingPill(this.world, ME), () => '疗伤丹服下，族人痊愈。');
   breakPill = () => this.act(() => brewBreakthroughPill(this.world, ME), () => '炼成一颗破境丹。');
-  tribulation = () => this.act(() => attemptTribulation(this.world, ME), () => null);
+  tribulation = (usePill: boolean) => this.act(() => attemptTribulation(this.world, ME, { usePill }), () => null);
   retreat = (days: number) => this.act(() => startRetreat(this.world, ME, days), () => `闭关 ${days} 天：红线冻结，鬼不登门。`);
 
   toggleOpenness(): void {
     const me = this.world.houses.get(ME)!;
     me.openness = me.openness === 'open' ? 'devoted' : 'open';
-    this.notice = { text: me.openness === 'open' ? '你的 OC 改为“开放”。' : '你的 OC 改为“专一”。', tone: 'info' };
+    this.tell(me.openness === 'open' ? '你的 OC 改为“开放”。' : '你的 OC 改为“专一”。白露可能会来抢亲。');
     this.save();
   }
 
-  tieNpc(name: string): void {
+  tieNpc(name: string): boolean {
     const n = name.trim() || '无名散修';
-    this.act(() => tieThread(this.world, ME, { kind: 'npc', name: n }), () => `与散修${n}牵上了线。旧线会因心力分散变淡，要多维护。`);
+    return this.act(() => tieThread(this.world, ME, { kind: 'npc', name: n }), () => `与散修${n}牵上了线。旧线会心力分散，要多维护。`);
   }
 
   talk = (threadId: string, risky: boolean) => this.act(() => interact(this.world, ME, threadId, { risky }), () => null);
 
-  big(threadId: string, stake: number): void {
+  big(threadId: string, stake: number): boolean {
     const t = this.world.threads.get(threadId)!;
-    const partnerPresent = t.b === QING && isOnline(this.world, this.qing);
-    this.act(() => bigInteract(this.world, ME, threadId, stake, partnerPresent), () => null);
+    return this.act(() => bigInteract(this.world, ME, threadId, stake, this.partnerOnline(t)), () => null);
   }
 
   makeUp = (threadId: string) =>
@@ -247,7 +455,7 @@ export class Game {
 
   cut = (threadId: string) => this.act(() => cutThread(this.world, ME, threadId), () => null);
 
-  /** 复合：真人搭档（阿青）在期限内总会答应 */
+  /** 复合：原型里搭档在期限内总会答应 */
   reunite(threadId: string): void {
     const t = this.world.threads.get(threadId)!;
     const consent = t.b ? [t.a, t.b] : [t.a];
@@ -269,18 +477,26 @@ export class Game {
     );
   }
 
-  /** 第一版简化归属：两人商量，这里阿青总会同意你的提议 */
+  /** 第一版简化归属：两人商量，原型里阿青总会同意你的提议 */
   setHome = (heirId: string, home: string) =>
     this.act(() => setHeirHomeByAgreement(this.world, heirId, home, [ME, QING]), () => null);
 
   answerSnatch = (proposalId: string, accept: boolean) =>
-    this.act(() => respondSnatch(this.world, ME, proposalId, accept), (t) => (t ? '你随白露去了。旧线已剪。' : '你回绝了白露。'));
+    this.act(() => respondSnatch(this.world, ME, proposalId, accept), (t) => (t ? '你随白露去了，旧线已剪。' : '你回绝了白露。'));
 
+  /** 新开一局：保留你捏好的形象 */
   newGame(): void {
+    const old = this.world.houses.get(ME)!;
     this.world = newWorld();
+    if (old.appearance) {
+      updateProfile(this.world, ME, { name: old.name, gender: old.gender, traits: old.traits, appearance: old.appearance });
+    }
     this.qing = makeQing(0);
     this.log = [];
     this.notice = null;
+    this.awayReport = null;
+    this.knockFx = null;
+    this.banners = [];
     this.lastCheckInHour = -Infinity;
     this.attachListener();
     this.sessionCheckIn();
@@ -324,8 +540,8 @@ export class Game {
 function newWorld(): World {
   const w = createWorld({ seed: Math.floor(Math.random() * 1e9), recordEvents: false });
   addHouse(w, { id: ME, name: '你', stones: 120, traits: ['文武生'] });
-  addHouse(w, { id: QING, name: '阿青', openness: 'devoted', traits: ['正印花旦'] });
-  addHouse(w, { id: BAILU, name: '白露', realm: 3, traits: ['武生'] });
+  addHouse(w, { id: QING, name: '阿青', openness: 'devoted', traits: ['正印花旦'], appearance: QING_LOOK });
+  addHouse(w, { id: BAILU, name: '白露', realm: 3, traits: ['武生'], appearance: BAILU_LOOK });
   const t = tieThread(w, ME, { kind: 'friend', house: QING });
   if (t.ok) addStrands(w, t.value, 12);
   return w;

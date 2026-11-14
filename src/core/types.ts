@@ -13,6 +13,18 @@ export type Openness = 'open' | 'devoted';
 
 export type GhostKind = 'wild' | 'spirit';
 
+/** OC 的形象（玩家自己设置；颜色是十六进制色值，具体可选项由界面层定） */
+export interface Appearance {
+  robe: string;
+  trim: string;
+  headdress: 'bun' | 'guan' | 'plain' | 'feather' | 'crown';
+  skin: string;
+  hair: string;
+}
+
+/** OC 的性别：随时可改，和行当、头饰都不挂钩 */
+export type Gender = 'male' | 'female' | 'other' | 'unsaid';
+
 /** 族人：由某根红线结出，记录父母（#9） */
 export interface ClanMember {
   id: string;
@@ -29,6 +41,9 @@ export interface House {
   id: HouseId;
   /** 当家人 OC 的名字（界面显示用） */
   name: string;
+  gender?: Gender;
+  /** 形象；没设置过时为空，界面层用默认形象并引导玩家设置 */
+  appearance?: Appearance;
   openness: Openness;
   isMinor: boolean;
   /** 当家人的境界。永远不会因失败而下降（#8） */

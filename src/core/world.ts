@@ -1,6 +1,6 @@
 import { mergeConfig, type DeepPartial, type GameConfig } from './config';
 import { Rng } from './rng';
-import type { GameEvent, House, HouseId, Openness, Result, Thread, World } from './types';
+import type { Appearance, GameEvent, Gender, House, HouseId, Openness, Result, Thread, World } from './types';
 
 export const HOURS_PER_DAY = 24;
 
@@ -43,6 +43,8 @@ export function addHouse(
     realm?: number;
     traits?: string[];
     stones?: number;
+    gender?: Gender;
+    appearance?: Appearance;
   } = {},
 ): House {
   const id = init.id ?? newId(world, 'h');
@@ -50,6 +52,8 @@ export function addHouse(
   const house: House = {
     id,
     name: init.name ?? id,
+    gender: init.gender,
+    appearance: init.appearance,
     openness: init.openness ?? 'open',
     isMinor: init.isMinor ?? false,
     realm: init.realm ?? 1,
@@ -145,6 +149,28 @@ export function isProtected(world: World, house: House): boolean {
 export function isThreadFrozen(world: World, thread: Thread): boolean {
   if (isInRetreat(world, getHouse(world, thread.a))) return true;
   return thread.b !== null && isInRetreat(world, getHouse(world, thread.b));
+}
+
+/**
+ * 修改 OC 的资料：名字、性别、行当（特质）、形象。随时可改。
+ * 名字是玩家自己输入的文字，联网后别人看得到，上线前要接敏感词审核。
+ */
+export function updateProfile(
+  world: World,
+  houseId: HouseId,
+  patch: { name?: string; gender?: Gender; traits?: string[]; appearance?: Appearance },
+): Result {
+  const house = getHouse(world, houseId);
+  if (patch.name !== undefined) {
+    const name = patch.name.trim();
+    const length = [...name].length;
+    if (length < 1 || length > 8) return fail('名字要 1–8 个字');
+    house.name = name;
+  }
+  if (patch.gender !== undefined) house.gender = patch.gender;
+  if (patch.traits !== undefined) house.traits = [...patch.traits];
+  if (patch.appearance !== undefined) house.appearance = { ...patch.appearance };
+  return ok();
 }
 
 /** 玩家做了一次行动。劫后余生按行动次数倒数（#8 #11） */

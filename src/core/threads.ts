@@ -261,6 +261,12 @@ function reunionConvert(world: World, thread: Thread, sides: HouseId[], grudgePe
   return total;
 }
 
+/** 大互动的成功率：真人搭档同时在场有加成，NPC 线没有 */
+export function bigSuccessChance(world: World, thread: Thread, partnerPresent: boolean): number {
+  const b = world.config.big;
+  return Math.min(1, b.baseSuccess + (partnerPresent && thread.b !== null ? b.coPresenceBonus : 0));
+}
+
 function relieveStrain(world: World, thread: Thread, by: HouseId): void {
   const relief = world.config.multiPartner.reliefPerInteraction;
   if (thread.strain[by]) thread.strain[by] = Math.max(0, thread.strain[by]! - relief);
@@ -290,7 +296,7 @@ export function bigInteract(
   applyJealousy(world, by, thread, world.config.jealousy.bigMultiplier);
 
   const coPresent = partnerPresent && thread.b !== null;
-  const success = world.rng.chance(Math.min(1, b.baseSuccess + (coPresent ? b.coPresenceBonus : 0)));
+  const success = world.rng.chance(bigSuccessChance(world, thread, partnerPresent));
   let stonesLost: number;
   let strandsGained = 0;
   if (success) {

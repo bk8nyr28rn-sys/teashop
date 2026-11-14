@@ -8,7 +8,7 @@ export interface Message {
 }
 
 /**
- * 把事件写成玩家看得懂的一句话（戏文腔，原创，不引现成唱词）。
+ * 把事件写成玩家看得懂的一句话。戏曲只做点缀：只有嫡传、渡劫、金缕这几个喜事带一点贺戏的说法。
  * me 是“我”的家族 id：和我无关的事件返回 null。
  */
 export function describeEvent(world: World, e: GameEvent, me: HouseId): Message | null {
@@ -103,12 +103,12 @@ export function describeEvent(world: World, e: GameEvent, me: HouseId): Message 
         if (!mine(t)) return null;
         const who = partnerOf(t);
         return e.success
-          ? { text: `${who}为你们押上 ${e.stake} 灵石，唱了一出好戏，情丝 +${e.strandsGained.toFixed(1)}。`, tone: 'good' }
-          : { text: `${who}为你们押上 ${e.stake} 灵石，可惜演砸了。`, tone: 'info' };
+          ? { text: `${who}押上 ${e.stake} 灵石邀你结伴历练，满载而归，情丝 +${e.strandsGained.toFixed(1)}。`, tone: 'good' }
+          : { text: `${who}押上 ${e.stake} 灵石邀你结伴历练，可惜失手了。`, tone: 'info' };
       }
       return e.success
-        ? { text: `押上 ${e.stake} 灵石，一出好戏：情丝 +${e.strandsGained.toFixed(1)}${e.coPresent ? '（搭档在场）' : ''}。`, tone: 'good' }
-        : { text: `押上 ${e.stake} 灵石，演砸了，失了 ${e.stonesLost} 灵石。`, tone: 'bad' };
+        ? { text: `押上 ${e.stake} 灵石结伴历练，满载而归：情丝 +${e.strandsGained.toFixed(1)}${e.coPresent ? '（搭档在场）' : ''}。`, tone: 'good' }
+        : { text: `押上 ${e.stake} 灵石结伴历练，失手了，折了 ${e.stonesLost} 灵石。`, tone: 'bad' };
     }
     case 'quarrel': {
       const t = thread(e.thread);
