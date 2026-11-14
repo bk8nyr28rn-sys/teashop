@@ -120,7 +120,7 @@ export function isInRetreat(world: World, house: House, hour = world.hour): bool
   return house.isMinor && !minorAllowedNow(world, hour);
 }
 
-/** 任意一方在闭关，这根线就冻结：不变淡、不生怨、冷落不计时 */
+/** 任意一方在闭关，这根线就冻结：不变淡、不生怨、冷落不计时（族人照常结） */
 export function isThreadFrozen(world: World, thread: Thread): boolean {
   if (isInRetreat(world, getHouse(world, thread.a))) return true;
   return thread.b !== null && isInRetreat(world, getHouse(world, thread.b));

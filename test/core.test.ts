@@ -191,6 +191,17 @@ describe('#5 冷落与闭关', () => {
     expect(getHouse(w, 'B').grudge).toBe(0);
   });
 
+  it('闭关期间族人照常结：冻结只管保护，不停止成长', () => {
+    const w = world({ ...calm, family: { memberStrandHours: 100 } });
+    addHouse(w, { id: 'A' });
+    addHouse(w, { id: 'B' });
+    const t = tie(w, 'A', 'B');
+    t.strands = 50;
+    startRetreat(w, 'A', 3);
+    hours(w, 2);
+    expect(getHouse(w, 'A').members).toHaveLength(1);
+  });
+
   it('闭关有每个周期的天数上限', () => {
     const w = world({ retreat: { daysPerWindow: 7, windowDays: 30 } });
     addHouse(w, { id: 'A' });

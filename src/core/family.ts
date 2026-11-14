@@ -1,19 +1,19 @@
 import { addStrands } from './threads';
 import type { ClanMember, Heir, HeirId, HouseId, Result, Thread, ThreadId, World } from './types';
-import { emit, fail, getHouse, getThread, isThreadFrozen, newId, ok, rankedThreads, spendAction } from './world';
+import { emit, fail, getHouse, getThread, newId, ok, rankedThreads, spendAction } from './world';
 
 const blockedBetween = (world: World, x: HouseId, y: HouseId): boolean =>
   getHouse(world, x).blocked.includes(y) || getHouse(world, y).blocked.includes(x);
 
 /**
- * #9 每小时调用：红线按浓度慢慢结出族人，两边各结各的。
- * 每家按回报递减计算：最浓的线全速，其余的线依次打折，多对象不会线性多出族人。
+ * #9 每小时调用：红线按浓度慢慢结出族人，两边各结各的（回报递减默认关闭）。
+ * 闭关不影响结族人：冻结只负责保护（不变淡、不生怨、冷落不计时、鬼不来），不停止成长。
  */
 export function hourlyFamily(world: World): void {
   const need = world.config.family.memberStrandHours;
   for (const house of world.houses.values()) {
     for (const { thread, weight } of rankedThreads(world, house.id)) {
-      if (thread.strands <= 0 || isThreadFrozen(world, thread)) continue;
+      if (thread.strands <= 0) continue;
       let progress = (thread.memberProgress[house.id] ?? 0) + thread.strands * weight;
       while (progress >= need) {
         progress -= need;
