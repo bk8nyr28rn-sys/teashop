@@ -13,6 +13,8 @@ export function createWorld(
     threads: new Map(),
     threadsByHouse: new Map(),
     heirs: new Map(),
+    snatchProposals: new Map(),
+    snatchCooldowns: new Map(),
     config: mergeConfig(opts.config),
     rng: new Rng(opts.seed ?? 1),
     events: [],

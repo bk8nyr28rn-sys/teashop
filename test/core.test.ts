@@ -10,6 +10,10 @@ import {
   cutThread,
   dailyThreadUpdate,
   doorPower,
+  resolveRival,
+  proposeSnatch,
+  respondSnatch,
+  threadBetween,
   checkIn,
   startQuarrel,
   reconcileQuarrel,
@@ -55,8 +59,12 @@ function hours(w: World, n: number): void {
   for (let i = 0; i < n; i++) advanceHour(w);
 }
 
-/** 关掉随机砸门和随机误会，让测试只看要测的规则 */
-const calm: DeepPartial<GameConfig> = { ghosts: { wildPerHour: 0, spiritPerHourPerGrudge: 0 }, quarrel: { baseChancePerDay: 0 } };
+/** 关掉随机砸门、随机误会和 NPC 情敌，让测试只看要测的规则 */
+const calm: DeepPartial<GameConfig> = {
+  ghosts: { wildPerHour: 0, spiritPerHourPerGrudge: 0 },
+  quarrel: { baseChancePerDay: 0 },
+  rival: { chancePerDay: 0 },
+};
 
 describe('#12 每日怨丝上限', () => {
   it('超出上限的部分直接散掉，第二天重新计算', () => {
@@ -484,6 +492,100 @@ describe('争执与和好', () => {
     startQuarrel(w, t, 'misunderstanding');
     cutThread(w, 'A', t.id);
     expect(t.quarrel).toBeNull();
+  });
+});
+
+describe('NPC 情敌', () => {
+  function pair(strands: number, config: DeepPartial<GameConfig> = {}) {
+    const w = world({ ...calm, ...config });
+    addHouse(w, { id: 'A' });
+    addHouse(w, { id: 'B' });
+    const t = tie(w, 'A', 'B');
+    addStrands(w, t, strands);
+    return { w, t };
+  }
+
+  it('红线够浓就感化：外来怨丝化成情丝，怨灵留下来帮忙守门', () => {
+    const { w, t } = pair(70, { conversion: { purifyThreshold: 60, purifyReturn: 0.5 }, rival: { grudge: 20 } });
+    expect(resolveRival(w, t, 'A')).toBe('purified');
+    expect(t.strands).toBe(80);
+    expect(getHouse(w, 'A').guardianKnocks).toBeGreaterThan(0);
+    expect(getHouse(w, 'A').grudge).toBe(0);
+  });
+
+  it('打散：关系更稳（这根线涨情丝）', () => {
+    const { w, t } = pair(30, { rival: { strengthBase: 0, strengthPerGrudge: 0 } });
+    expect(resolveRival(w, t, 'A')).toBe('defeated');
+    expect(t.strands).toBeGreaterThan(30);
+  });
+
+  it('输了：这根线变淡，但不算门被砸破', () => {
+    const { w, t } = pair(30, { rival: { strengthBase: 1e9, dimOnLoss: 10 } });
+    expect(resolveRival(w, t, 'A')).toBe('lost');
+    expect(t.strands).toBe(20);
+    expect(w.events.some((e) => e.type === 'breach')).toBe(false);
+  });
+
+  it('闭关期间情敌不会来', () => {
+    const { w } = pair(30, { rival: { chancePerDay: 1 } });
+    startRetreat(w, 'A', 3);
+    hours(w, 2 * DAY + 1);
+    expect(w.events.some((e) => e.type === 'rival')).toBe(false);
+  });
+});
+
+describe('真人抢亲', () => {
+  function triangle(openness: 'open' | 'devoted' = 'devoted') {
+    const w = world(calm);
+    addHouse(w, { id: 'A', openness });
+    addHouse(w, { id: 'B' });
+    addHouse(w, { id: 'C' });
+    const old = tie(w, 'A', 'B');
+    addStrands(w, old, 40);
+    return { w, old };
+  }
+
+  it('只能对专一且已有线的人发起；开放的人直接递线', () => {
+    expect(proposeSnatch(triangle('open').w, 'C', 'A', 'friend').ok).toBe(false);
+    expect(proposeSnatch(triangle('devoted').w, 'C', 'A', 'friend').ok).toBe(true);
+  });
+
+  it('对方同意：旧线按剪线处理（两边生怨），和抢亲的人牵新线', () => {
+    const { w, old } = triangle();
+    const p = proposeSnatch(w, 'C', 'A', 'friend');
+    if (!p.ok) throw new Error(p.reason);
+    const r = respondSnatch(w, 'A', p.value.id, true);
+    expect(r.ok).toBe(true);
+    expect(old.state).toBe('cut');
+    expect(getHouse(w, 'B').grudge).toBeGreaterThan(0);
+    expect(threadBetween(w, 'A', 'C')?.state).toBe('active');
+  });
+
+  it('对方拒绝：什么都不变', () => {
+    const { w, old } = triangle();
+    const p = proposeSnatch(w, 'C', 'A', 'friend');
+    if (!p.ok) throw new Error(p.reason);
+    respondSnatch(w, 'A', p.value.id, false);
+    expect(old.state).toBe('active');
+    expect(threadBetween(w, 'A', 'C')).toBeNull();
+  });
+
+  it('只有被抢的人能回应；同一人对同一人有冷却；拉黑后不能发起', () => {
+    const { w } = triangle();
+    const p = proposeSnatch(w, 'C', 'A', 'friend');
+    if (!p.ok) throw new Error(p.reason);
+    expect(respondSnatch(w, 'B', p.value.id, true).ok).toBe(false);
+    expect(proposeSnatch(w, 'C', 'A', 'friend').ok).toBe(false);
+    hours(w, 8 * DAY);
+    expect(proposeSnatch(w, 'C', 'A', 'friend').ok).toBe(true);
+    blockHouse(w, 'A', 'C');
+    hours(w, 8 * DAY);
+    expect(proposeSnatch(w, 'C', 'A', 'friend').ok).toBe(false);
+  });
+
+  it('陌生人之间要过等级门槛', () => {
+    const { w } = triangle();
+    expect(proposeSnatch(w, 'C', 'A', 'stranger').ok).toBe(false);
   });
 });
 

@@ -6,6 +6,7 @@ export * from './config';
 export * from './defense';
 export * from './family';
 export * from './grudge';
+export * from './rivals';
 export * from './rng';
 export * from './threads';
 export * from './tick';

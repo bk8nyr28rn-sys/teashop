@@ -140,11 +140,23 @@ export type GameEvent =
   | { type: 'golden'; hour: number; thread: ThreadId }
   | { type: 'quarrel'; hour: number; thread: ThreadId; cause: 'misunderstanding' | 'risky'; lost: number }
   | { type: 'quarrelEnded'; hour: number; thread: ThreadId; reconciled: boolean; restored: number; reunion: boolean }
+  | { type: 'rival'; hour: number; thread: ThreadId; house: HouseId; outcome: 'purified' | 'defeated' | 'lost'; strands: number }
+  | { type: 'snatchProposed'; hour: number; proposal: string; by: HouseId; target: HouseId }
+  | { type: 'snatchResolved'; hour: number; proposal: string; accepted: boolean; from: HouseId | null }
   | { type: 'tribulation'; hour: number; house: HouseId; success: boolean; realm: number; usedPill: boolean }
   | { type: 'tierChanged'; hour: number; thread: ThreadId; from: number; to: number }
   | { type: 'bigInteraction'; hour: number; thread: ThreadId; by: HouseId; stake: number; success: boolean; stonesLost: number; strandsGained: number; coPresent: boolean };
 
 export type GrudgeSource = 'neglect' | 'strain' | 'jealousy' | 'quarrel' | 'cut' | 'spiritLost' | 'other';
+
+/** 真人抢亲的提议 */
+export interface SnatchProposal {
+  id: string;
+  by: HouseId;
+  target: HouseId;
+  kind: 'friend' | 'stranger';
+  at: number;
+}
 
 export interface World {
   /** 现实时间，单位小时。第 0 小时是某个周一的 0 点 */
@@ -154,6 +166,9 @@ export interface World {
   /** 索引：每家参与的红线 id（含已剪、已拉黑的） */
   threadsByHouse: Map<HouseId, ThreadId[]>;
   heirs: Map<HeirId, Heir>;
+  snatchProposals: Map<string, SnatchProposal>;
+  /** 抢亲冷却：键是“发起人->对象”，值是上次发起的时间 */
+  snatchCooldowns: Map<string, number>;
   config: GameConfig;
   rng: Rng;
   events: GameEvent[];

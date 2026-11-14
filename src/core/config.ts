@@ -90,6 +90,27 @@ export interface GameConfig {
     riskyChance: number;
   };
 
+  /**
+   * NPC 情敌：每根线每天有小概率出现，带来一只外来怨灵敲被“抢”那一方的门（怨丝不进池子）。
+   * 红线够浓就感化；打散则按还原比例加到这根线上（关系更稳）；输了这根线变淡（不算砸破）。
+   */
+  rival: {
+    chancePerDay: number;
+    grudge: number;
+    strengthBase: number;
+    strengthPerGrudge: number;
+    dimOnLoss: number;
+  };
+
+  /**
+   * 真人抢亲：只能对专一且已有线的人发起，对方同意才成立（旧线按剪线处理，再牵新线）。
+   * 同一人对同一人有冷却；提议过期作废。
+   */
+  snatch: {
+    cooldownDays: number;
+    proposalExpireDays: number;
+  };
+
   /** NPC 散修也要维护：回复有延迟，也会主动发来互动，不回就算冷落 */
   npc: {
     replyHours: number;
@@ -281,6 +302,8 @@ export const defaultConfig: GameConfig = {
     riskyGainMultiplier: 2,
     riskyChance: 0.25,
   },
+  rival: { chancePerDay: 0.04, grudge: 15, strengthBase: 20, strengthPerGrudge: 2.5, dimOnLoss: 10 },
+  snatch: { cooldownDays: 7, proposalExpireDays: 3 },
   tiers: { names: ['相识', '知己', '倾心', '挚爱', '金缕'], mins: [0, 30, 60, 120, 200] },
   jealousy: { dimPerTier: 0.2, grudgePerTier: 0.2, bigMultiplier: 1.5 },
   big: {

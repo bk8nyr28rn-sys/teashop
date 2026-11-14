@@ -1,5 +1,6 @@
 import { resolveKnock, rollKnock } from './defense';
 import { dailyFamily, hourlyFamily } from './family';
+import { dailyRivals } from './rivals';
 import { dailyThreadUpdate, hourlyThreadUpdate } from './threads';
 import type { House, World } from './types';
 import { hourOfDay } from './world';
@@ -26,5 +27,6 @@ function daily(world: World): void {
     house.ward *= 1 - world.config.door.wardDecayPerDay;
   }
   dailyThreadUpdate(world);
+  dailyRivals(world);
   dailyFamily(world);
 }
