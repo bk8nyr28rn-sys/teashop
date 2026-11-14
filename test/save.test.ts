@@ -53,6 +53,19 @@ describe('存档', () => {
 });
 
 describe('事件提示', () => {
+  it('搭档传话、回话、递台阶时，戏文里有提示；自己的不提示', () => {
+    const w = busyWorld();
+    const seen: GameEvent[] = [];
+    w.listener = (e) => seen.push(e);
+    const t = [...w.threads.values()].find((x) => x.b === 'qing')!;
+    interact(w, 'qing', t.id);
+    interact(w, 'me', t.id);
+    const request = seen.find((e) => e.type === 'interaction' && e.kind === 'request');
+    const reply = seen.find((e) => e.type === 'interaction' && e.kind === 'reply');
+    expect(describeEvent(w, request!, 'me')?.text).toContain('阿青');
+    expect(describeEvent(w, reply!, 'me')).toBeNull();
+  });
+
   it('和我有关的事件都有一句话，和我无关的返回 null', () => {
     const w = busyWorld();
     const seen: GameEvent[] = [];

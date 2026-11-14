@@ -1,6 +1,6 @@
 import { returnStrands } from './threads';
 import type { GhostKind, House, HouseId, Result, Thread, World } from './types';
-import { emit, fail, getHouse, isInRetreat, ok, rankedThreads, spendAction, threadsOf } from './world';
+import { emit, fail, getHouse, isInRetreat, isProtected, ok, rankedThreads, spendAction, threadsOf } from './world';
 
 /** 护宅大阵（门）当前的强度 */
 export function doorPower(world: World, house: House): number {
@@ -30,10 +30,10 @@ export function pickHelper(world: World, houseId: HouseId): Thread | null {
 
 /**
  * #11 这一小时有没有鬼来砸门（在线、离线都可能）。
- * 闭关期间（#5 #21）和劫后余生期间（#8）不来。一小时最多一次，怨灵优先。
+ * 闭关期间（#5 #21）、劫后余生期间（#8）和新手保护期内不来。一小时最多一次，怨灵优先。
  */
 export function rollKnock(world: World, house: House): GhostKind | null {
-  if (isInRetreat(world, house) || house.graceActionsLeft > 0) return null;
+  if (isInRetreat(world, house) || house.graceActionsLeft > 0 || isProtected(world, house)) return null;
   const g = world.config.ghosts;
   if (house.grudge > 0) {
     const p = Math.min(g.spiritMaxPerHour, house.grudge * g.spiritPerHourPerGrudge);

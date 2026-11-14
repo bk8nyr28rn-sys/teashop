@@ -649,7 +649,7 @@ describe('大互动', () => {
 
 describe('#8 #11 守宅：失败惩罚与劫后余生', () => {
   it('门被砸破后进入劫后余生，期间不会再被砸', () => {
-    const w = world({ ghosts: { wildPerHour: 1, wildBaseStrength: 1e9 } });
+    const w = world({ ghosts: { wildPerHour: 1, wildBaseStrength: 1e9 }, newbie: { protectionDays: 0 } });
     const a = addHouse(w, { id: 'A', stones: 100 });
     hours(w, 1);
     expect(w.events.filter((e) => e.type === 'breach')).toHaveLength(1);
@@ -665,7 +665,11 @@ describe('#8 #11 守宅：失败惩罚与劫后余生', () => {
   });
 
   it('当家人不掉修为；灵石损失有上限', () => {
-    const w = world({ ghosts: { wildPerHour: 1, wildBaseStrength: 1e9 }, breach: { stoneLossRatio: 0.5, stoneLossCap: 100 } });
+    const w = world({
+      ghosts: { wildPerHour: 1, wildBaseStrength: 1e9 },
+      breach: { stoneLossRatio: 0.5, stoneLossCap: 100 },
+      newbie: { protectionDays: 0 },
+    });
     const a = addHouse(w, { id: 'A', stones: 1000, realm: 4 });
     hours(w, 1);
     expect(a.realm).toBe(4);
@@ -731,6 +735,28 @@ describe('渡劫', () => {
     expect(a.breakthroughPills).toBe(1);
     attemptTribulation(w, 'A');
     expect(a.breakthroughPills).toBe(0);
+  });
+});
+
+describe('新手保护', () => {
+  it('保护期内野鬼和怨灵都不来，过了保护期才来', () => {
+    const w = world({ ghosts: { wildPerHour: 1, wildBaseStrength: 1e9 }, newbie: { protectionDays: 3 } });
+    const a = addHouse(w, { id: 'A', stones: 100 });
+    a.grudge = 30;
+    hours(w, 3 * DAY);
+    expect(w.events.some((e) => e.type === 'knock')).toBe(false);
+    hours(w, 2);
+    expect(w.events.some((e) => e.type === 'knock')).toBe(true);
+  });
+
+  it('保护期内情敌也不来', () => {
+    const w = world({ ...calm, rival: { chancePerDay: 1 }, newbie: { protectionDays: 3 } });
+    addHouse(w, { id: 'A' });
+    addHouse(w, { id: 'B' });
+    const t = tie(w, 'A', 'B');
+    addStrands(w, t, 30);
+    hours(w, 3 * DAY);
+    expect(w.events.some((e) => e.type === 'rival')).toBe(false);
   });
 });
 

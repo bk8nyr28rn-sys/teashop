@@ -89,11 +89,27 @@ export function describeEvent(world: World, e: GameEvent, me: HouseId): Message 
         ? { text: `与${partnerOf(t)}的关系进了一层：${tierName(e.to)}。`, tone: 'good' }
         : { text: `与${partnerOf(t)}的关系退了一层：${tierName(e.to)}。`, tone: 'bad' };
     }
-    case 'bigInteraction':
-      if (e.by !== me) return null;
+    case 'interaction': {
+      const t = thread(e.thread);
+      if (!mine(t) || e.by === me) return null;
+      const who = partnerOf(t);
+      if (e.kind === 'request') return { text: `${who}捎来一句话，等你回音。`, tone: 'info' };
+      if (e.kind === 'reply') return { text: `${who}回了你的话，红线添了几分。`, tone: 'good' };
+      return { text: `${who}先递了台阶，就等你一句和好。`, tone: 'drama' };
+    }
+    case 'bigInteraction': {
+      const t = thread(e.thread);
+      if (e.by !== me) {
+        if (!mine(t)) return null;
+        const who = partnerOf(t);
+        return e.success
+          ? { text: `${who}为你们押上 ${e.stake} 灵石，唱了一出好戏，情丝 +${e.strandsGained.toFixed(1)}。`, tone: 'good' }
+          : { text: `${who}为你们押上 ${e.stake} 灵石，可惜演砸了。`, tone: 'info' };
+      }
       return e.success
         ? { text: `押上 ${e.stake} 灵石，一出好戏：情丝 +${e.strandsGained.toFixed(1)}${e.coPresent ? '（搭档在场）' : ''}。`, tone: 'good' }
         : { text: `押上 ${e.stake} 灵石，演砸了，失了 ${e.stonesLost} 灵石。`, tone: 'bad' };
+    }
     case 'quarrel': {
       const t = thread(e.thread);
       if (!mine(t)) return null;

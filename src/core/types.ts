@@ -51,6 +51,8 @@ export interface House {
   guardianKnocks: number;
   members: ClanMember[];
 
+  /** 新手保护到第几个小时（旧存档没有这个字段，视为没有保护） */
+  protectedUntil?: number;
   /** 劫后余生：还剩几次行动内不触发砸门（#8） */
   graceActionsLeft: number;
   /** 主动闭关到第几个小时（#5） */
@@ -142,6 +144,7 @@ export type GameEvent =
   | { type: 'golden'; hour: number; thread: ThreadId }
   | { type: 'quarrel'; hour: number; thread: ThreadId; cause: 'misunderstanding' | 'risky'; lost: number }
   | { type: 'quarrelEnded'; hour: number; thread: ThreadId; reconciled: boolean; restored: number; reunion: boolean }
+  | { type: 'interaction'; hour: number; thread: ThreadId; by: HouseId; kind: 'request' | 'reply' | 'makeup' }
   | { type: 'rival'; hour: number; thread: ThreadId; house: HouseId; outcome: 'purified' | 'defeated' | 'lost'; strands: number }
   | { type: 'snatchProposed'; hour: number; proposal: string; by: HouseId; target: HouseId }
   | { type: 'snatchResolved'; hour: number; proposal: string; accepted: boolean; from: HouseId | null }

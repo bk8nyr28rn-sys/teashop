@@ -40,6 +40,8 @@ export function render(game: Game, root: HTMLElement): void {
   const quota = w.config.retreat.daysPerWindow - me.retreatDaysUsed;
 
   const status: string[] = [];
+  const protectedLeft = (me.protectedUntil ?? 0) - w.hour;
+  if (protectedLeft > 0) status.push(chip(`新手保护 · 还剩 ${Math.ceil(protectedLeft / HOURS_PER_DAY)} 天，鬼和情敌不会来`, 'jade'));
   if (retreating) status.push(chip('闭关中', 'jade'));
   if (me.graceActionsLeft > 0) status.push(chip(`劫后余生 · 还剩 ${me.graceActionsLeft} 次行动`, 'gold'));
   if (me.guardianKnocks > 0) status.push(chip(`护宅怨灵 × ${me.guardianKnocks}`, 'jade'));

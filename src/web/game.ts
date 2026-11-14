@@ -102,7 +102,7 @@ export class Game {
     } else {
       this.world = newWorld();
       this.qing = makeQing(0);
-      this.say('锣鼓响起，新的一出开台了。你和阿青已经牵上一根红线。', 'info');
+      this.say('锣鼓响起，新的一出开台了。你和阿青已经牵上一根红线。前三天有新手保护，先收灵石、升符阵。', 'info');
     }
     this.attachListener();
     this.sessionCheckIn();
@@ -284,7 +284,7 @@ export class Game {
     this.lastCheckInHour = -Infinity;
     this.attachListener();
     this.sessionCheckIn();
-    this.say('新开一局。你和阿青已经牵上一根红线。', 'info');
+    this.say('新开一局。你和阿青已经牵上一根红线。前三天有新手保护，先收灵石、升符阵。', 'info');
     this.save();
   }
 

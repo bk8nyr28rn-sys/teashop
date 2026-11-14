@@ -162,6 +162,7 @@ export function interact(world: World, by: HouseId, threadId: ThreadId, opts: { 
   const other = otherSide(thread, by) ?? NPC_SIDE;
   if (thread.pendingRequest && thread.pendingRequest.from === other) {
     thread.pendingRequest = null;
+    emit(world, { type: 'interaction', hour: world.hour, thread: thread.id, by, kind: 'reply' });
     if (opts.risky && !thread.quarrel && world.rng.chance(cfg.quarrel.riskyChance)) {
       startQuarrel(world, thread, 'risky');
     } else {
@@ -169,6 +170,7 @@ export function interact(world: World, by: HouseId, threadId: ThreadId, opts: { 
     }
   } else if (!thread.pendingRequest) {
     thread.pendingRequest = { from: by, at: world.hour };
+    emit(world, { type: 'interaction', hour: world.hour, thread: thread.id, by, kind: 'request' });
   }
   return ok();
 }
@@ -202,7 +204,10 @@ export function reconcileQuarrel(world: World, by: HouseId, threadId: ThreadId):
   spendAction(getHouse(world, by));
   if (!q.reconciled.includes(by)) q.reconciled.push(by);
   const needed = thread.b ? [thread.a, thread.b] : [thread.a];
-  if (!needed.every((id) => q.reconciled.includes(id))) return { ok: true, value: { done: false } };
+  if (!needed.every((id) => q.reconciled.includes(id))) {
+    emit(world, { type: 'interaction', hour: world.hour, thread: thread.id, by, kind: 'makeup' });
+    return { ok: true, value: { done: false } };
+  }
   const reunionOk = reunionReady(world, thread);
   const restored = q.lost - q.grudge + reunionConvert(world, thread, needed, q.grudge);
   addStrands(world, thread, restored);
@@ -435,6 +440,7 @@ export function dailyThreadUpdate(world: World): void {
     // NPC 散修也会主动发来互动
     if (!thread.b && !thread.pendingRequest && world.rng.chance(cfg.npc.requestChancePerDay)) {
       thread.pendingRequest = { from: NPC_SIDE, at: world.hour };
+      emit(world, { type: 'interaction', hour: world.hour, thread: thread.id, by: NPC_SIDE, kind: 'request' });
     }
 
     // #7 心力分散：旧线变淡；怨丝落在牵新线的一方，旧搭档专一的话两边都生
@@ -460,6 +466,7 @@ export function hourlyThreadUpdate(world: World): void {
     if (req && req.from === thread.a && world.hour - req.at >= delay && !isThreadFrozen(world, thread)) {
       thread.pendingRequest = null;
       addStrands(world, thread, world.config.thread.interactionGain);
+      emit(world, { type: 'interaction', hour: world.hour, thread: thread.id, by: NPC_SIDE, kind: 'reply' });
     }
   }
 }

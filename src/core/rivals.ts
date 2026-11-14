@@ -1,6 +1,6 @@
 import { addStrands, cutThread, isBlockedBetween, threadBetween, tieThread } from './threads';
 import type { HouseId, Result, SnatchProposal, Thread, World } from './types';
-import { HOURS_PER_DAY, emit, fail, getHouse, isThreadFrozen, newId, otherSide, threadsOf } from './world';
+import { HOURS_PER_DAY, emit, fail, getHouse, isProtected, isThreadFrozen, newId, otherSide, threadsOf } from './world';
 import { doorPower } from './defense';
 
 /**
@@ -13,7 +13,8 @@ export function dailyRivals(world: World): void {
     if (thread.state !== 'active' || thread.strands <= 0 || isThreadFrozen(world, thread)) continue;
     if (!world.rng.chance(r.chancePerDay)) continue;
     const target = thread.b ? world.rng.pick([thread.a, thread.b]) : thread.a;
-    if (getHouse(world, target).graceActionsLeft > 0) continue;
+    const house = getHouse(world, target);
+    if (house.graceActionsLeft > 0 || isProtected(world, house)) continue;
     resolveRival(world, thread, target);
   }
 }

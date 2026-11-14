@@ -63,6 +63,7 @@ export function addHouse(
     ward: 0,
     guardianKnocks: 0,
     members: [],
+    protectedUntil: world.hour + world.config.newbie.protectionDays * HOURS_PER_DAY,
     graceActionsLeft: 0,
     retreatUntil: 0,
     retreatWindowStart: 0,
@@ -133,6 +134,11 @@ export function minorAllowedNow(world: World, hour = world.hour): boolean {
 export function isInRetreat(world: World, house: House, hour = world.hour): boolean {
   if (house.retreatUntil > hour) return true;
   return house.isMinor && !minorAllowedNow(world, hour);
+}
+
+/** 新手保护期内：鬼和情敌都不会来 */
+export function isProtected(world: World, house: House): boolean {
+  return (house.protectedUntil ?? 0) > world.hour;
 }
 
 /** 任意一方在闭关，这根线就冻结：不变淡、不生怨、冷落不计时（族人照常结） */

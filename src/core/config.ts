@@ -170,6 +170,11 @@ export interface GameConfig {
     naturalDecayPerDay: number;
   };
 
+  /** 新手保护：新建家族后这么多天内，野鬼、怨灵和情敌都不会来 */
+  newbie: {
+    protectionDays: number;
+  };
+
   /** #11 #13 鬼 */
   ghosts: {
     /** 野鬼每小时来砸门的概率 */
@@ -327,6 +332,7 @@ export const defaultConfig: GameConfig = {
     reliefPerInteraction: 0.5,
     naturalDecayPerDay: 0.1,
   },
+  newbie: { protectionDays: 3 },
   ghosts: {
     wildPerHour: 0.02,
     wildBaseStrength: 30,
