@@ -58,6 +58,8 @@ export interface House {
   /** 拉黑了谁（#4） */
   blocked: HouseId[];
   lastMeditationCollect: number;
+  /** 累计上线次数（checkIn），和好期限按它算 */
+  sessions: number;
   /** 渡劫：当家人的修为进度、破境丹、冷却到第几个小时 */
   cultivationProgress: number;
   breakthroughPills: number;
@@ -94,8 +96,8 @@ export interface Thread {
   golden: boolean;
   /** 关系等级，下标对应 config.tiers.names */
   tier: number;
-  /** 争执中：散掉了多少、每边生了多少怨丝、从第几个小时开始、谁已经和好了 */
-  quarrel: { lost: number; grudge: number; since: number; reconciled: HouseId[] } | null;
+  /** 争执中：散掉了多少、每边生了多少怨丝、从第几个小时开始、谁已经和好了、开始时双方的上线次数 */
+  quarrel: { lost: number; grudge: number; since: number; reconciled: HouseId[]; sessionsAtStart: Record<HouseId, number> } | null;
   /** 上一次破镜重圆的时间（冷却用） */
   lastReunionAt: number | null;
   /** 最近一次吃醋或被冷落的时间（判断关系是否紧张） */

@@ -10,6 +10,7 @@ import {
   cutThread,
   dailyThreadUpdate,
   doorPower,
+  checkIn,
   startQuarrel,
   reconcileQuarrel,
   attemptTribulation,
@@ -408,14 +409,31 @@ describe('争执与和好', () => {
     expect(getHouse(w, 'A').grudge).toBeGreaterThan(8);
   });
 
-  it('超过期限没和好，散掉的就散了', () => {
-    const { w, t } = pair({ quarrel: { lossRatio: 0.2, reconcileWindowDays: 3 } });
+  it('期限按双方各自上线的次数算：只有一方上线多少次都不会到期', () => {
+    const { w, t } = pair({ quarrel: { reconcileWindowSessions: 3 } });
+    startQuarrel(w, t, 'misunderstanding');
+    for (let i = 0; i < 10; i++) checkIn(w, 'A');
+    expect(t.quarrel).not.toBeNull();
+  });
+
+  it('双方都各上线超过期限次数还没和好，散掉的就散了', () => {
+    const { w, t } = pair({ quarrel: { lossRatio: 0.2, reconcileWindowSessions: 3 } });
     startQuarrel(w, t, 'misunderstanding');
     reconcileQuarrel(w, 'A', t.id);
-    hours(w, 4 * DAY);
+    for (let i = 0; i < 4; i++) {
+      checkIn(w, 'A');
+      checkIn(w, 'B');
+    }
     expect(t.quarrel).toBeNull();
     expect(reconcileQuarrel(w, 'B', t.id).ok).toBe(false);
     expect(t.strands).toBe(80);
+  });
+
+  it('兜底：挂太多天也会结束（有人弃坑时）', () => {
+    const { w, t } = pair({ quarrel: { reconcileMaxDays: 14 } });
+    startQuarrel(w, t, 'misunderstanding');
+    hours(w, 15 * DAY);
+    expect(t.quarrel).toBeNull();
   });
 
   it('NPC 线：玩家一和好就完成', () => {

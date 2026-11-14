@@ -182,7 +182,9 @@ export function startQuarrel(world: World, thread: Thread, cause: 'misunderstand
   addStrands(world, thread, -lost);
   addGrudge(world, thread.a, grudge, 'quarrel');
   if (thread.b) addGrudge(world, thread.b, grudge, 'quarrel');
-  thread.quarrel = { lost, grudge, since: world.hour, reconciled: [] };
+  const sessionsAtStart: Record<HouseId, number> = { [thread.a]: getHouse(world, thread.a).sessions };
+  if (thread.b) sessionsAtStart[thread.b] = getHouse(world, thread.b).sessions;
+  thread.quarrel = { lost, grudge, since: world.hour, reconciled: [], sessionsAtStart };
   thread.lastTensionAt = world.hour;
   emit(world, { type: 'quarrel', hour: world.hour, thread: thread.id, cause, lost });
 }
@@ -208,6 +210,28 @@ export function reconcileQuarrel(world: World, by: HouseId, threadId: ThreadId):
   thread.quarrel = null;
   emit(world, { type: 'quarrelEnded', hour: world.hour, thread: thread.id, reconciled: true, restored, reunion });
   return { ok: true, value: { done: true } };
+}
+
+function expireQuarrel(world: World, thread: Thread): void {
+  thread.quarrel = null;
+  emit(world, { type: 'quarrelEnded', hour: world.hour, thread: thread.id, reconciled: false, restored: 0, reunion: false });
+}
+
+/**
+ * 玩家上线时调用一次。和好期限按双方各自上线的次数算：
+ * 两边都各上线够了 reconcileWindowSessions 次还没和好，争执就结束，散掉的就散了。
+ */
+export function checkIn(world: World, houseId: HouseId): void {
+  const house = getHouse(world, houseId);
+  house.sessions++;
+  const limit = world.config.quarrel.reconcileWindowSessions;
+  for (const thread of threadsOf(world, houseId)) {
+    const q = thread.quarrel;
+    if (!q) continue;
+    const sides = thread.b ? [thread.a, thread.b] : [thread.a];
+    const allUsedUp = sides.every((s) => getHouse(world, s).sessions - (q.sessionsAtStart[s] ?? 0) > limit);
+    if (allUsedUp) expireQuarrel(world, thread);
+  }
 }
 
 function reunionReady(world: World, thread: Thread): boolean {
@@ -397,13 +421,10 @@ export function dailyThreadUpdate(world: World): void {
       emit(world, { type: 'neglect', hour: world.hour, thread: thread.id, neglecter });
     }
 
-    // 争执：超时没和好就算了；没在争执的线可能随机误会，关系紧张时更容易
+    // 争执：过了兜底天数还没和好就算了；没在争执的线可能随机误会，关系紧张时更容易
     const qc = cfg.quarrel;
     if (thread.quarrel) {
-      if (world.hour - thread.quarrel.since >= qc.reconcileWindowDays * HOURS_PER_DAY) {
-        thread.quarrel = null;
-        emit(world, { type: 'quarrelEnded', hour: world.hour, thread: thread.id, reconciled: false, restored: 0, reunion: false });
-      }
+      if (world.hour - thread.quarrel.since >= qc.reconcileMaxDays * HOURS_PER_DAY) expireQuarrel(world, thread);
     } else {
       const tense = thread.lastTensionAt !== null && world.hour - thread.lastTensionAt <= qc.tensionDays * HOURS_PER_DAY;
       if (thread.strands > 0 && world.rng.chance(qc.baseChancePerDay * (tense ? qc.tensionMultiplier : 1))) {

@@ -79,7 +79,10 @@ export interface GameConfig {
     tensionMultiplier: number;
     lossRatio: number;
     grudgeRatio: number;
-    reconcileWindowDays: number;
+    /** 和好期限：双方各上线这么多次后还没和好就算了（忙碌的人不吃亏，同 #5 的思路） */
+    reconcileWindowSessions: number;
+    /** 兜底：最多挂这么多天（有人弃坑时不会一直挂着） */
+    reconcileMaxDays: number;
     reunionConvert: number;
     reunionCooldownDays: number;
     /** 冒险说法：增长乘以 riskyGainMultiplier，但有 riskyChance 的概率引发误会 */
@@ -271,7 +274,8 @@ export const defaultConfig: GameConfig = {
     tensionMultiplier: 3,
     lossRatio: 0.2,
     grudgeRatio: 0.5,
-    reconcileWindowDays: 3,
+    reconcileWindowSessions: 3,
+    reconcileMaxDays: 14,
     reunionConvert: 0.2,
     reunionCooldownDays: 30,
     riskyGainMultiplier: 2,

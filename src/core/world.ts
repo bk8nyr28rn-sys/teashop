@@ -58,6 +58,7 @@ export function addHouse(
     retreatDaysUsed: 0,
     blocked: [],
     lastMeditationCollect: world.hour,
+    sessions: 0,
     cultivationProgress: 0,
     breakthroughPills: 0,
     tribulationCooldownUntil: 0,

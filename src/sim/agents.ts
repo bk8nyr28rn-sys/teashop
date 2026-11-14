@@ -14,6 +14,7 @@ import {
   tieThread,
   interact,
   upgradeFormation,
+  checkIn,
   reconcileQuarrel,
   attemptTribulation,
   brewBreakthroughPill,
@@ -167,6 +168,7 @@ export function playSession(world: World, agent: Agent, isPresent: (houseId: str
   const p = agent.profile;
   const rng = world.rng;
 
+  checkIn(world, house.id);
   agent.loveBudget += collectMeditation(world, house.id) * LOVE_BUDGET_SHARE;
 
   // 渡劫：修为攒满就去，能炼破境丹就先炼一颗
