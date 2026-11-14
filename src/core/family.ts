@@ -1,3 +1,4 @@
+import { addStrands } from './threads';
 import type { ClanMember, Heir, HeirId, HouseId, Result, Thread, ThreadId, World } from './types';
 import { emit, fail, getHouse, getThread, isThreadFrozen, newId, ok, rankedThreads, spendAction } from './world';
 
@@ -79,7 +80,7 @@ export function createHeir(world: World, threadId: ThreadId): Result<Heir> {
   const thread = getThread(world, threadId);
   const b = thread.b as HouseId;
   const before = thread.strands;
-  thread.strands = before * (1 - world.config.heir.consumeRatio);
+  addStrands(world, thread, -before * world.config.heir.consumeRatio);
   const traitKinds = [...new Set([...getHouse(world, thread.a).traits, ...getHouse(world, b).traits])];
   const heir: Heir = {
     id: newId(world, 'heir'),

@@ -3,7 +3,8 @@
  *
  * 方案 v2 “待定数值”表里的每一项都在这里。
  * 已按模拟校准的：成长节奏（一对认真的好友约 90 天到金缕、约 24 天结嫡传）、
- * 怨丝还原比例（< 1:1）、多对象难度。其余仍是占位，要继续用模拟器调。
+ * 怨丝还原比例（< 1:1）、小互动和大互动的比例（忙碌玩家能追上）、多对象难度。
+ * 其余仍是占位，要继续用模拟器调。
  * 注释里的 #N 对应 v2 文档“决定记录”的编号。
  */
 export interface GameConfig {
@@ -14,7 +15,7 @@ export interface GameConfig {
 
   /** 牵线、互动 */
   thread: {
-    /** 一次互动（回应或主动发起）带来的情丝 */
+    /** 一次小互动（了解对方）带来的情丝。成长主要靠大互动，小互动只是零头 */
     interactionGain: number;
     /** 浓度上限；到达即为“金缕” */
     goldenThreshold: number;
@@ -23,6 +24,44 @@ export interface GameConfig {
      * 第 1 根线算 100%，第 2 根算本值，第 3 根算本值²……（多对象回报有天花板）
      */
     diminishing: number;
+  };
+
+  /**
+   * 关系分级：按浓度区间分级，每级解锁不同玩法；浓度掉到区间下限就降一级。
+   * mins 是每一级的浓度下限，最后一级就是金缕。
+   */
+  tiers: {
+    names: string[];
+    mins: number[];
+  };
+
+  /**
+   * 多对象吃醋：和一根线互动时，其他每根线都变淡并生怨丝。
+   * 越亲密的线越在乎：变淡和生怨都乘以那根线的等级（相识 = 0 不在乎）。
+   * 怨丝落在谁家沿用 #7：互动的人家里生；对方专一的话对方家也生。
+   */
+  jealousy: {
+    dimPerTier: number;
+    grudgePerTier: number;
+    /** 大互动引起的吃醋是普通互动的几倍 */
+    bigMultiplier: number;
+  };
+
+  /**
+   * 大互动：押上灵石，随机大成功或大失败。
+   * 成功：押注全部化为情丝，情丝 = 押注 × strandsPerStone × (1 + successEdge)，比失败时损失的略多
+   * 失败：随机损失押注的 failLossMin–failLossMax，其余退回，红线不变
+   * 真人搭档双方同时在场，成功率提高（鼓励真人组队）。付费道具永远不能用来押注。
+   */
+  big: {
+    minTier: number;
+    minStake: number;
+    strandsPerStone: number;
+    successEdge: number;
+    baseSuccess: number;
+    coPresenceBonus: number;
+    failLossMin: number;
+    failLossMax: number;
   };
 
   /** NPC 散修也要维护：回复有延迟，也会主动发来互动，不回就算冷落 */
@@ -176,18 +215,30 @@ export interface GameConfig {
 
 export const defaultConfig: GameConfig = {
   grudge: { dailyCap: 30 },
-  thread: { interactionGain: 1.7, goldenThreshold: 200, diminishing: 0.5 },
+  thread: { interactionGain: 0.5, goldenThreshold: 200, diminishing: 0.5 },
   npc: { replyHours: 12, requestChancePerDay: 0.5 },
+  tiers: { names: ['相识', '知己', '倾心', '挚爱', '金缕'], mins: [0, 30, 60, 120, 200] },
+  jealousy: { dimPerTier: 0.2, grudgePerTier: 0.2, bigMultiplier: 1.5 },
+  big: {
+    minTier: 0,
+    minStake: 20,
+    strandsPerStone: 0.05,
+    successEdge: 0.1,
+    baseSuccess: 0.5,
+    coPresenceBonus: 0.15,
+    failLossMin: 0.5,
+    failLossMax: 1,
+  },
   matching: { strangerRealmGate: 3 },
   cut: { toGrudgeRatio: 0.5, reconcileWindowDays: 7, reconcileBonus: 1.2 },
   neglect: { graceDays: 3, dimPerDay: 4, grudgePerDay: 3, grudgeTo: 'both' },
   retreat: { daysPerWindow: 7, windowDays: 30 },
   multiPartner: {
-    strainPerExisting: 3,
+    strainPerExisting: 1,
     dimPerStrain: 1,
     grudgePerStrain: 1,
     reliefPerInteraction: 0.5,
-    naturalDecayPerDay: 0.05,
+    naturalDecayPerDay: 0.1,
   },
   ghosts: {
     wildPerHour: 0.02,

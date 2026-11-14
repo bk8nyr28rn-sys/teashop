@@ -14,6 +14,7 @@ import {
   tieThread,
   interact,
   upgradeFormation,
+  bigInteract,
   dayOf,
   type House,
   type Openness,
@@ -124,6 +125,8 @@ export interface Agent {
   profile: Profile;
   /** 今天是否会上线（每天早上掷一次） */
   activeToday: boolean;
+  /** 留给大互动的灵石预算（收到的灵石按固定比例存进来，所有人分配方式一样） */
+  loveBudget: number;
 }
 
 /** 这一小时这个玩家在不在线 */
@@ -150,13 +153,16 @@ export function startOfDay(world: World, agent: Agent): void {
   if (day > 0 && day % 7 === 0 && agent.activeToday) getHouse(world, agent.houseId).realm++;
 }
 
-/** 一次上线会话里玩家做的事 */
-export function playSession(world: World, agent: Agent): void {
+/** 收到的灵石有多少比例存进感情预算，其余留给阵法 */
+export const LOVE_BUDGET_SHARE = 0.5;
+
+/** 一次上线会话里玩家做的事。isPresent 判断真人搭档此刻在不在场 */
+export function playSession(world: World, agent: Agent, isPresent: (houseId: string) => boolean = () => false): void {
   const house: House = getHouse(world, agent.houseId);
   const p = agent.profile;
   const rng = world.rng;
 
-  collectMeditation(world, house.id);
+  agent.loveBudget += collectMeditation(world, house.id) * LOVE_BUDGET_SHARE;
 
   for (const thread of threadsOf(world, house.id)) {
     const other = otherSide(thread, house.id);
@@ -175,7 +181,20 @@ export function playSession(world: World, agent: Agent): void {
     }
   }
 
-  if (house.formationDamage > 0) repairFormation(world, house.id);
-  else if (house.stones >= formationUpgradeCost(world, house)) upgradeFormation(world, house.id);
+  // 阵法只能用预算以外的灵石
+  const spare = () => house.stones - agent.loveBudget;
+  if (house.formationDamage > 0 && spare() >= world.config.economy.repairCostPerDamage) repairFormation(world, house.id);
+  else if (house.formationDamage === 0 && spare() >= formationUpgradeCost(world, house)) upgradeFormation(world, house.id);
   brewHealingPill(world, house.id);
+  agent.loveBudget = Math.min(agent.loveBudget, house.stones);
+
+  // 大互动：把感情预算全部押上，随机挑一根够格的线
+  const eligible = threadsOf(world, house.id).filter((t) => t.tier >= world.config.big.minTier);
+  const stake = Math.floor(agent.loveBudget);
+  if (eligible.length > 0 && stake >= world.config.big.minStake) {
+    const t = rng.pick(eligible);
+    const partner = otherSide(t, house.id);
+    const r = bigInteract(world, house.id, t.id, stake, partner !== null && isPresent(partner));
+    if (r.ok) agent.loveBudget -= r.value.stonesLost;
+  }
 }

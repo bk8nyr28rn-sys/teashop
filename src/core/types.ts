@@ -86,6 +86,8 @@ export interface Thread {
   heirSignatures: HouseId[];
   heirId: HeirId | null;
   golden: boolean;
+  /** 关系等级，下标对应 config.tiers.names */
+  tier: number;
   createdAt: number;
 }
 
@@ -121,9 +123,11 @@ export type GameEvent =
   | { type: 'memberBorn'; hour: number; house: HouseId; thread: ThreadId }
   | { type: 'heirBorn'; hour: number; heir: HeirId; thread: ThreadId }
   | { type: 'heirHomeSet'; hour: number; heir: HeirId; home: HouseId; reason: 'agreed' | 'breakup' | 'adulthood' }
-  | { type: 'golden'; hour: number; thread: ThreadId };
+  | { type: 'golden'; hour: number; thread: ThreadId }
+  | { type: 'tierChanged'; hour: number; thread: ThreadId; from: number; to: number }
+  | { type: 'bigInteraction'; hour: number; thread: ThreadId; by: HouseId; stake: number; success: boolean; stonesLost: number; strandsGained: number; coPresent: boolean };
 
-export type GrudgeSource = 'neglect' | 'strain' | 'cut' | 'spiritLost' | 'other';
+export type GrudgeSource = 'neglect' | 'strain' | 'jealousy' | 'cut' | 'spiritLost' | 'other';
 
 export interface World {
   /** 现实时间，单位小时。第 0 小时是某个周一的 0 点 */

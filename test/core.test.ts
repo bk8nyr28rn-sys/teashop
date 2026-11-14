@@ -10,6 +10,8 @@ import {
   cutThread,
   dailyThreadUpdate,
   doorPower,
+  addStrands,
+  bigInteract,
   NPC_SIDE,
   getHouse,
   heirAdulthoodChoice,
@@ -291,6 +293,102 @@ describe('NPC 线也要维护', () => {
     r.value.pendingRequest = { from: NPC_SIDE, at: 0 };
     hours(w, 4 * DAY + 1);
     expect(getHouse(w, 'A').grudge).toBeGreaterThan(0);
+  });
+});
+
+describe('关系分级与吃醋', () => {
+  it('按浓度分级，跨过区间会升级或降级', () => {
+    const w = world(calm);
+    addHouse(w, { id: 'A' });
+    addHouse(w, { id: 'B' });
+    const t = tie(w, 'A', 'B');
+    addStrands(w, t, 65);
+    expect(w.config.tiers.names[t.tier]).toBe('倾心');
+    addStrands(w, t, -10);
+    expect(w.config.tiers.names[t.tier]).toBe('知己');
+    expect(w.events.filter((e) => e.type === 'tierChanged')).toHaveLength(2);
+  });
+
+  it('和一根线互动，其他线按等级变淡并生怨；相识级别的线不在乎', () => {
+    const w = world({ ...calm, jealousy: { dimPerTier: 1, grudgePerTier: 1 } });
+    for (const id of ['A', 'B', 'C', 'D']) addHouse(w, { id });
+    const tb = tie(w, 'A', 'B');
+    const tc = tie(w, 'A', 'C');
+    const td = tie(w, 'A', 'D');
+    addStrands(w, tc, 65); // 倾心 = 2 级
+    addStrands(w, td, 10); // 相识 = 0 级
+    interact(w, 'A', tb.id);
+    expect(tc.strands).toBe(63);
+    expect(td.strands).toBe(10);
+    expect(getHouse(w, 'A').grudge).toBe(2);
+  });
+
+  it('吃醋把浓度压到区间下限以下就降级', () => {
+    const w = world({ ...calm, jealousy: { dimPerTier: 5 } });
+    for (const id of ['A', 'B', 'C']) addHouse(w, { id });
+    const tb = tie(w, 'A', 'B');
+    const tc = tie(w, 'A', 'C');
+    addStrands(w, tc, 32); // 知己
+    interact(w, 'A', tb.id);
+    expect(w.config.tiers.names[tc.tier]).toBe('相识');
+  });
+});
+
+describe('大互动', () => {
+  function setup(config: DeepPartial<GameConfig> = {}) {
+    const w = world({ ...calm, ...config });
+    addHouse(w, { id: 'A', stones: 1000 });
+    addHouse(w, { id: 'B' });
+    const t = tie(w, 'A', 'B');
+    return { w, t };
+  }
+
+  it('可以设关系等级门槛（默认没有），押注有下限', () => {
+    const { w, t } = setup({ big: { minTier: 1 } });
+    expect(bigInteract(w, 'A', t.id, 50).ok).toBe(false);
+    addStrands(w, t, 30);
+    expect(bigInteract(w, 'A', t.id, 5).ok).toBe(false);
+    expect(bigInteract(w, 'A', t.id, 50).ok).toBe(true);
+  });
+
+  it('成功：押注全部化为情丝，比失败时最多损失的还多一点', () => {
+    const { w, t } = setup({ big: { baseSuccess: 1, strandsPerStone: 0.1, successEdge: 0.1 } });
+    addStrands(w, t, 30);
+    const r = bigInteract(w, 'A', t.id, 100);
+    expect(r.ok && r.value.success).toBe(true);
+    expect(t.strands).toBeCloseTo(30 + 11);
+    expect(getHouse(w, 'A').stones).toBe(900);
+  });
+
+  it('失败：随机损失押注的一部分，红线不变', () => {
+    const { w, t } = setup({ big: { baseSuccess: 0, failLossMin: 0.5, failLossMax: 1 } });
+    addStrands(w, t, 30);
+    bigInteract(w, 'A', t.id, 100);
+    const lost = 1000 - getHouse(w, 'A').stones;
+    expect(lost).toBeGreaterThanOrEqual(50);
+    expect(lost).toBeLessThanOrEqual(100);
+    expect(t.strands).toBe(30);
+  });
+
+  it('真人搭档同时在场，成功率更高；NPC 线没有这个加成', () => {
+    const rate = (present: boolean, npc: boolean) => {
+      const w = world({ ...calm, big: { baseSuccess: 0.5, coPresenceBonus: 0.3 } }, 99);
+      addHouse(w, { id: 'A', stones: 1e9 });
+      addHouse(w, { id: 'B' });
+      const r = npc ? tieThread(w, 'A', { kind: 'npc', name: '散修' }) : tieThread(w, 'A', { kind: 'friend', house: 'B' });
+      if (!r.ok) throw new Error();
+      addStrands(w, r.value, 100);
+      let wins = 0;
+      for (let i = 0; i < 2000; i++) {
+        const res = bigInteract(w, 'A', r.value.id, 20, present);
+        if (res.ok && res.value.success) wins++;
+        r.value.strands = 100;
+      }
+      return wins / 2000;
+    };
+    expect(rate(true, false)).toBeGreaterThan(0.75);
+    expect(rate(false, false)).toBeLessThan(0.55);
+    expect(rate(true, true)).toBeLessThan(0.55);
   });
 });
 

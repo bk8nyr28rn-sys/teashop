@@ -97,7 +97,7 @@ export function simulate(opts: Partial<SimOptions> = {}): ArchetypeReport[] {
         c.breachesThisAbsence = 0;
       }
       c.wasOnline = on;
-      if (on) playSession(world, a);
+      if (on) playSession(world, a, (id) => online.has(id));
     }
 
     advanceHour(world, (house) => online.has(house.id));
@@ -140,7 +140,7 @@ function createAgents(world: World, o: SimOptions): Agent[] {
         isMinor: p.isMinor,
         traits: [world.rng.pick(['文武生', '小生', '正印花旦', '二帮花旦', '丑生', '武生'])],
       });
-      group.push({ houseId: house.id, archetype: arch, profile: p, activeToday: true });
+      group.push({ houseId: house.id, archetype: arch, profile: p, activeToday: true, loveBudget: 0 });
     }
     for (let i = 0; i < group.length; i++) {
       const me = group[i]!;

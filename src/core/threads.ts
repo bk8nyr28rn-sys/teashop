@@ -76,6 +76,7 @@ export function tieThread(world: World, a: HouseId, partner: Partner): Result<Th
     heirSignatures: [],
     heirId: null,
     golden: false,
+    tier: 0,
     createdAt: world.hour,
   };
   world.threads.set(thread.id, thread);
@@ -95,13 +96,45 @@ function addStrain(world: World, houseId: HouseId): void {
   for (const t of existing) t.strain[houseId] = (t.strain[houseId] ?? 0) + amount;
 }
 
-/** 加情丝，夹在 [0, 金缕] 之间；第一次到达金缕时发全服通报事件 */
+/** 浓度对应的关系等级（下标对应 config.tiers.names） */
+export function tierOf(world: World, strands: number): number {
+  const mins = world.config.tiers.mins;
+  let tier = 0;
+  for (let i = 0; i < mins.length; i++) if (strands >= mins[i]!) tier = i;
+  return tier;
+}
+
+/**
+ * 加（或减）情丝，夹在 [0, 金缕] 之间。
+ * 跨过等级区间时发 tierChanged（吃醋掉到下限就降级）；第一次到达金缕时发全服通报事件。
+ */
 export function addStrands(world: World, thread: Thread, amount: number): void {
   const cap = world.config.thread.goldenThreshold;
   thread.strands = Math.min(cap, Math.max(0, thread.strands + amount));
+  const tier = tierOf(world, thread.strands);
+  if (tier !== thread.tier) {
+    emit(world, { type: 'tierChanged', hour: world.hour, thread: thread.id, from: thread.tier, to: tier });
+    thread.tier = tier;
+  }
   if (!thread.golden && thread.strands >= cap) {
     thread.golden = true;
     emit(world, { type: 'golden', hour: world.hour, thread: thread.id });
+  }
+}
+
+/**
+ * 多对象吃醋：by 和某根线互动时，by 的其他每根线都按等级变淡、生怨。
+ * 怨丝落在 by 家；那根线的搭档专一的话，搭档家也生（沿用 #7）。
+ */
+function applyJealousy(world: World, by: HouseId, except: Thread, multiplier: number): void {
+  const j = world.config.jealousy;
+  for (const t of threadsOf(world, by)) {
+    if (t === except || t.tier === 0 || isThreadFrozen(world, t)) continue;
+    addStrands(world, t, -j.dimPerTier * t.tier * multiplier);
+    const grudge = j.grudgePerTier * t.tier * multiplier;
+    addGrudge(world, by, grudge, 'jealousy');
+    const partner = otherSide(t, by);
+    if (partner && getHouse(world, partner).openness === 'devoted') addGrudge(world, partner, grudge, 'jealousy');
   }
 }
 
@@ -118,8 +151,8 @@ export function interact(world: World, by: HouseId, threadId: ThreadId): Result 
   spendAction(getHouse(world, by));
 
   const cfg = world.config;
-  const relief = cfg.multiPartner.reliefPerInteraction;
-  if (thread.strain[by]) thread.strain[by] = Math.max(0, thread.strain[by]! - relief);
+  relieveStrain(world, thread, by);
+  applyJealousy(world, by, thread, 1);
 
   const other = otherSide(thread, by) ?? NPC_SIDE;
   if (thread.pendingRequest && thread.pendingRequest.from === other) {
@@ -129,6 +162,51 @@ export function interact(world: World, by: HouseId, threadId: ThreadId): Result 
     thread.pendingRequest = { from: by, at: world.hour };
   }
   return ok();
+}
+
+function relieveStrain(world: World, thread: Thread, by: HouseId): void {
+  const relief = world.config.multiPartner.reliefPerInteraction;
+  if (thread.strain[by]) thread.strain[by] = Math.max(0, thread.strain[by]! - relief);
+}
+
+/**
+ * 大互动：押上灵石，随机大成功或大失败（规则见 config.big）。
+ * partnerPresent：真人搭档此刻也在场（由界面层或模拟器判断），成功率提高；NPC 线没有这个加成。
+ */
+export function bigInteract(
+  world: World,
+  by: HouseId,
+  threadId: ThreadId,
+  stake: number,
+  partnerPresent = false,
+): Result<{ success: boolean; stonesLost: number; strandsGained: number }> {
+  const thread = getThread(world, threadId);
+  const house = getHouse(world, by);
+  const b = world.config.big;
+  if (thread.state !== 'active') return fail('这根线不在了');
+  if (thread.a !== by && thread.b !== by) return fail('不是这根线的一方');
+  if (thread.tier < b.minTier) return fail(`关系达到「${world.config.tiers.names[b.minTier]}」才能大互动`);
+  if (stake < b.minStake) return fail(`押注至少 ${b.minStake} 灵石`);
+  if (house.stones < stake) return fail('灵石不够');
+  spendAction(house);
+  relieveStrain(world, thread, by);
+  applyJealousy(world, by, thread, world.config.jealousy.bigMultiplier);
+
+  const coPresent = partnerPresent && thread.b !== null;
+  const success = world.rng.chance(Math.min(1, b.baseSuccess + (coPresent ? b.coPresenceBonus : 0)));
+  let stonesLost: number;
+  let strandsGained = 0;
+  if (success) {
+    stonesLost = stake;
+    strandsGained = stake * b.strandsPerStone * (1 + b.successEdge);
+    addStrands(world, thread, strandsGained);
+  } else {
+    const ratio = b.failLossMin + world.rng.next() * (b.failLossMax - b.failLossMin);
+    stonesLost = Math.round(stake * ratio);
+  }
+  house.stones -= stonesLost;
+  emit(world, { type: 'bigInteraction', hour: world.hour, thread: thread.id, by, stake, success, stonesLost, strandsGained, coPresent });
+  return { ok: true, value: { success, stonesLost, strandsGained } };
 }
 
 /**
@@ -147,6 +225,7 @@ export function cutThread(world: World, by: HouseId, threadId: ThreadId): Result
 
   thread.strandsAtCut = thread.strands;
   thread.strands = 0;
+  thread.tier = 0;
   thread.state = 'cut';
   thread.cutAt = world.hour;
   thread.pendingRequest = null;
@@ -169,7 +248,6 @@ export function reconcile(world: World, threadId: ThreadId, consenting: HouseId[
 
   thread.state = 'active';
   thread.cutAt = null;
-  thread.strands = 0;
   addStrands(world, thread, thread.strandsAtCut * reconcileBonus);
   emit(world, { type: 'reconciled', hour: world.hour, thread: thread.id });
   return ok();
@@ -189,6 +267,7 @@ export function blockHouse(world: World, by: HouseId, other: HouseId): Result {
     const between = t.a === other || t.b === other;
     if (!between || t.state === 'severed') continue;
     t.strands = 0;
+    t.tier = 0;
     t.state = 'severed';
     t.pendingRequest = null;
     t.strain = {};
