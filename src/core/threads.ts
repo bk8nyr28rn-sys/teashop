@@ -198,7 +198,7 @@ export function bigInteract(
   let strandsGained = 0;
   if (success) {
     stonesLost = stake;
-    strandsGained = stake * b.strandsPerStone * (1 + b.successEdge);
+    strandsGained = stake * b.strandsPerStone * (1 + b.successEdge) * (thread.b ? 1 : world.config.npc.investMultiplier);
     addStrands(world, thread, strandsGained);
   } else {
     const ratio = b.failLossMin + world.rng.next() * (b.failLossMax - b.failLossMin);

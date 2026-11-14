@@ -69,6 +69,11 @@ export interface GameConfig {
   npc: {
     replyHours: number;
     requestChancePerDay: number;
+    /**
+     * NPC 散修也会投入：NPC 线大互动成功时，情丝乘以这个倍数。
+     * 真人线是两个人各押各的预算，天然长得快；这个倍数用来拉近 NPC 线（#2）。
+     */
+    investMultiplier: number;
   };
 
   /** #2 陌生人匹配的等级门槛 */
@@ -217,7 +222,7 @@ export interface GameConfig {
 export const defaultConfig: GameConfig = {
   grudge: { dailyCap: 30 },
   thread: { interactionGain: 0.5, goldenThreshold: 200, diminishing: 1 },
-  npc: { replyHours: 12, requestChancePerDay: 0.5 },
+  npc: { replyHours: 12, requestChancePerDay: 0.5, investMultiplier: 1 },
   tiers: { names: ['相识', '知己', '倾心', '挚爱', '金缕'], mins: [0, 30, 60, 120, 200] },
   jealousy: { dimPerTier: 0.2, grudgePerTier: 0.2, bigMultiplier: 1.5 },
   big: {
