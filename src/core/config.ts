@@ -22,6 +22,7 @@ export interface GameConfig {
     /**
      * 回报递减：守门和结族人时，按浓度从高到低排，
      * 第 1 根线算 100%，第 2 根算本值，第 3 根算本值²……（多对象回报有天花板）
+     * 默认 1 = 关闭：大互动的感情预算按时间累积，多对象要分摊，已经起到同样的作用。
      */
     diminishing: number;
   };
@@ -215,7 +216,7 @@ export interface GameConfig {
 
 export const defaultConfig: GameConfig = {
   grudge: { dailyCap: 30 },
-  thread: { interactionGain: 0.5, goldenThreshold: 200, diminishing: 0.5 },
+  thread: { interactionGain: 0.5, goldenThreshold: 200, diminishing: 1 },
   npc: { replyHours: 12, requestChancePerDay: 0.5 },
   tiers: { names: ['相识', '知己', '倾心', '挚爱', '金缕'], mins: [0, 30, 60, 120, 200] },
   jealousy: { dimPerTier: 0.2, grudgePerTier: 0.2, bigMultiplier: 1.5 },
