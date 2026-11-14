@@ -21,7 +21,7 @@ import {
 } from '../core';
 
 /** 模拟用的玩家类型。都是粗略的行为假设，用来对比不同人群的体验 */
-export type Archetype = 'solo' | 'couple' | 'busy' | 'poly' | 'minor';
+export type Archetype = 'solo' | 'couple' | 'busy' | 'poly' | 'polyCasual' | 'minor';
 
 export interface Profile {
   label: string;
@@ -80,8 +80,20 @@ export const PROFILES: Record<Archetype, Profile> = {
     extraNpcPartnerDays: [],
     retreatDaysPerMonth: 5,
   },
+  polyCasual: {
+    label: '多对象（和一对一同样投入）',
+    sessionHours: [12, 21],
+    activeDayChance: 0.95,
+    interactChance: 0.8,
+    respondChance: 0.9,
+    openness: 'open',
+    isMinor: false,
+    partner: 'friend',
+    extraNpcPartnerDays: [3, 7, 12],
+    retreatDaysPerMonth: 0,
+  },
   poly: {
-    label: '多对象（1 真人 + 3 NPC）',
+    label: '多对象（高强度维护，每天 3 次）',
     sessionHours: [9, 13, 21],
     activeDayChance: 0.95,
     interactChance: 0.6,

@@ -63,7 +63,7 @@ export const DEFAULT_SIM: SimOptions = {
   playersPerArchetype: 200,
   days: 30,
   seed: 1,
-  archetypes: ['solo', 'couple', 'busy', 'poly', 'minor'],
+  archetypes: ['solo', 'couple', 'busy', 'poly', 'polyCasual', 'minor'],
   spiralGrudge: 40,
 };
 

@@ -1,6 +1,6 @@
 import { resolveKnock, rollKnock } from './defense';
 import { dailyFamily, hourlyFamily } from './family';
-import { dailyThreadUpdate } from './threads';
+import { dailyThreadUpdate, hourlyThreadUpdate } from './threads';
 import type { House, World } from './types';
 import { hourOfDay } from './world';
 
@@ -15,6 +15,7 @@ export function advanceHour(world: World, isOnline: (house: House) => boolean = 
     const kind = rollKnock(world, house);
     if (kind) resolveKnock(world, house.id, kind, isOnline(house));
   }
+  hourlyThreadUpdate(world);
   hourlyFamily(world);
   world.hour++;
 }

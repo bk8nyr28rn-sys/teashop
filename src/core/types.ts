@@ -2,6 +2,9 @@ import type { GameConfig } from './config';
 import type { Rng } from './rng';
 
 export type HouseId = string;
+
+/** 互动请求里代表“NPC 这一方”的标记 */
+export const NPC_SIDE = '@npc';
 export type ThreadId = string;
 export type HeirId = string;
 
@@ -75,10 +78,10 @@ export interface Thread {
   strandsAtCut: number;
   /** #7 心力分散：键是“因为牵了别的线而造成分散”的那一方 */
   strain: Record<HouseId, number>;
-  /** 一方发来、还没被回应的互动（#5） */
+  /** 一方发来、还没被回应的互动（#5）。from 为 NPC_SIDE 表示 NPC 发来的 */
   pendingRequest: { from: HouseId; at: number } | null;
-  /** 结族人的进度，单位“浓度·小时”（#9） */
-  memberProgress: number;
+  /** 结族人的进度，两边各算各的，单位“浓度·小时”（#9） */
+  memberProgress: Record<HouseId, number>;
   /** 嫡传签署（#9） */
   heirSignatures: HouseId[];
   heirId: HeirId | null;

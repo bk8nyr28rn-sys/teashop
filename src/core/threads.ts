@@ -1,6 +1,6 @@
 import { settleHeirOnBreakup } from './family';
 import { addGrudge } from './grudge';
-import type { HouseId, Result, Thread, ThreadId, World } from './types';
+import { NPC_SIDE, type HouseId, type Result, type Thread, type ThreadId, type World } from './types';
 import {
   HOURS_PER_DAY,
   emit,
@@ -73,7 +73,7 @@ export function tieThread(world: World, a: HouseId, partner: Partner): Result<Th
     strandsAtCut: 0,
     strain: {},
     pendingRequest: null,
-    memberProgress: 0,
+    memberProgress: {},
     heirSignatures: [],
     heirId: null,
     golden: false,
@@ -103,8 +103,8 @@ export function addStrands(world: World, thread: Thread, amount: number): void {
 
 /**
  * 互动（选项式回复）。
- * - 和 NPC：NPC 立刻回应，直接涨情丝。
- * - 和真人：对方有未回的互动 → 这次算回应，涨情丝；否则算主动发起，等对方回应。
+ * 对方（真人或 NPC）有未回的互动 → 这次算回应，涨情丝；否则算主动发起，等对方回应。
+ * NPC 过几个小时才回（hourlyThreadUpdate），也会主动发来互动，不回一样算冷落。
  * 任何一次互动都会抵消自己这一方造成的心力分散（#7 高强度维护）。
  */
 export function interact(world: World, by: HouseId, threadId: ThreadId): Result {
@@ -117,11 +117,7 @@ export function interact(world: World, by: HouseId, threadId: ThreadId): Result 
   const relief = cfg.multiPartner.reliefPerInteraction;
   if (thread.strain[by]) thread.strain[by] = Math.max(0, thread.strain[by]! - relief);
 
-  const other = otherSide(thread, by);
-  if (other === null) {
-    addStrands(world, thread, cfg.thread.interactionGain);
-    return ok();
-  }
+  const other = otherSide(thread, by) ?? NPC_SIDE;
   if (thread.pendingRequest && thread.pendingRequest.from === other) {
     thread.pendingRequest = null;
     addStrands(world, thread, cfg.thread.interactionGain);
@@ -230,13 +226,21 @@ export function dailyThreadUpdate(world: World): void {
     }
 
     // #5 冷落：只有搭档主动发来的互动超过几天没回才算
+    // 玩家发给 NPC 的请求，NPC 一定会回（hourlyThreadUpdate），所以只看“发给玩家的”
     const req = thread.pendingRequest;
-    if (req && thread.b && world.hour - req.at >= cfg.neglect.graceDays * HOURS_PER_DAY) {
-      const neglecter = otherSide(thread, req.from) as HouseId;
+    const neglecter = req ? (req.from === NPC_SIDE ? thread.a : otherSide(thread, req.from)) : null;
+    if (req && neglecter && world.hour - req.at >= cfg.neglect.graceDays * HOURS_PER_DAY) {
       addStrands(world, thread, -cfg.neglect.dimPerDay);
       addGrudge(world, neglecter, cfg.neglect.grudgePerDay, 'neglect');
-      if (cfg.neglect.grudgeTo === 'both') addGrudge(world, req.from, cfg.neglect.grudgePerDay, 'neglect');
+      if (cfg.neglect.grudgeTo === 'both' && req.from !== NPC_SIDE) {
+        addGrudge(world, req.from, cfg.neglect.grudgePerDay, 'neglect');
+      }
       emit(world, { type: 'neglect', hour: world.hour, thread: thread.id, neglecter });
+    }
+
+    // NPC 散修也会主动发来互动
+    if (!thread.b && !thread.pendingRequest && world.rng.chance(cfg.npc.requestChancePerDay)) {
+      thread.pendingRequest = { from: NPC_SIDE, at: world.hour };
     }
 
     // #7 心力分散：旧线变淡；怨丝落在牵新线的一方，旧搭档专一的话两边都生
@@ -249,6 +253,19 @@ export function dailyThreadUpdate(world: World): void {
         addGrudge(world, partner, value * cfg.multiPartner.grudgePerStrain, 'strain');
       }
       thread.strain[causer] = value * (1 - cfg.multiPartner.naturalDecayPerDay);
+    }
+  }
+}
+
+/** 每小时调用：NPC 过了回复延迟，回应玩家发来的互动 */
+export function hourlyThreadUpdate(world: World): void {
+  const delay = world.config.npc.replyHours;
+  for (const thread of world.threads.values()) {
+    if (thread.state !== 'active' || thread.b !== null) continue;
+    const req = thread.pendingRequest;
+    if (req && req.from === thread.a && world.hour - req.at >= delay && !isThreadFrozen(world, thread)) {
+      thread.pendingRequest = null;
+      addStrands(world, thread, world.config.thread.interactionGain);
     }
   }
 }

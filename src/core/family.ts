@@ -1,20 +1,24 @@
 import type { ClanMember, Heir, HeirId, HouseId, Result, Thread, ThreadId, World } from './types';
-import { emit, fail, getHouse, getThread, isThreadFrozen, newId, ok, spendAction } from './world';
+import { emit, fail, getHouse, getThread, isThreadFrozen, newId, ok, rankedThreads, spendAction } from './world';
 
 const blockedBetween = (world: World, x: HouseId, y: HouseId): boolean =>
   getHouse(world, x).blocked.includes(y) || getHouse(world, y).blocked.includes(x);
 
-/** #9 每小时调用：红线按浓度慢慢结出族人。真人线两边各结各的，NPC 线只结在玩家家里 */
+/**
+ * #9 每小时调用：红线按浓度慢慢结出族人，两边各结各的。
+ * 每家按回报递减计算：最浓的线全速，其余的线依次打折，多对象不会线性多出族人。
+ */
 export function hourlyFamily(world: World): void {
   const need = world.config.family.memberStrandHours;
-  for (const thread of world.threads.values()) {
-    if (thread.state !== 'active' || thread.strands <= 0) continue;
-    if (isThreadFrozen(world, thread)) continue;
-    thread.memberProgress += thread.strands;
-    while (thread.memberProgress >= need) {
-      thread.memberProgress -= need;
-      birthMember(world, thread.a, thread);
-      if (thread.b) birthMember(world, thread.b, thread);
+  for (const house of world.houses.values()) {
+    for (const { thread, weight } of rankedThreads(world, house.id)) {
+      if (thread.strands <= 0 || isThreadFrozen(world, thread)) continue;
+      let progress = (thread.memberProgress[house.id] ?? 0) + thread.strands * weight;
+      while (progress >= need) {
+        progress -= need;
+        birthMember(world, house.id, thread);
+      }
+      thread.memberProgress[house.id] = progress;
     }
   }
 }

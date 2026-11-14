@@ -9,6 +9,8 @@ import {
   createWorld,
   cutThread,
   dailyThreadUpdate,
+  doorPower,
+  NPC_SIDE,
   getHouse,
   heirAdulthoodChoice,
   interact,
@@ -223,7 +225,7 @@ describe('#7 多对象', () => {
   });
 
   it('对象越多，每根旧线加的心力分散越多', () => {
-    const w = world(calm);
+    const w = world({ ...calm, multiPartner: { strainPerExisting: 1 } });
     for (const id of ['A', 'B', 'C', 'D']) addHouse(w, { id });
     const t1 = tie(w, 'A', 'B');
     tie(w, 'A', 'C');
@@ -233,12 +235,62 @@ describe('#7 多对象', () => {
   });
 
   it('在旧线上互动可以抵消心力分散', () => {
-    const w = world(calm);
+    const w = world({ ...calm, multiPartner: { strainPerExisting: 1, reliefPerInteraction: 1 } });
     for (const id of ['A', 'B', 'C']) addHouse(w, { id });
     const t1 = tie(w, 'A', 'B');
     tie(w, 'A', 'C');
     interact(w, 'A', t1.id);
     expect(t1.strain['A']).toBe(0);
+  });
+});
+
+describe('多对象回报递减', () => {
+  it('守门：最浓的线全额，第二根打对折', () => {
+    const w = world({ thread: { diminishing: 0.5 }, door: { perStrand: 1 } });
+    for (const id of ['A', 'B', 'C']) addHouse(w, { id });
+    const before = doorPower(w, getHouse(w, 'A'));
+    const t1 = tie(w, 'A', 'B');
+    const t2 = tie(w, 'A', 'C');
+    t1.strands = 40;
+    t2.strands = 100;
+    expect(doorPower(w, getHouse(w, 'A')) - before).toBe(100 + 40 * 0.5);
+  });
+
+  it('结族人：第二根线只按一半速度结', () => {
+    const w = world({ ...calm, thread: { diminishing: 0.5 }, family: { memberStrandHours: 100 } });
+    addHouse(w, { id: 'A' });
+    const t1 = tieThread(w, 'A', { kind: 'npc', name: '甲' });
+    const t2 = tieThread(w, 'A', { kind: 'npc', name: '乙' });
+    if (!t1.ok || !t2.ok) throw new Error();
+    t1.value.strands = 50;
+    t2.value.strands = 50;
+    hours(w, 2);
+    expect(getHouse(w, 'A').members).toHaveLength(1);
+    hours(w, 2);
+    expect(getHouse(w, 'A').members).toHaveLength(3);
+  });
+});
+
+describe('NPC 线也要维护', () => {
+  it('NPC 过几个小时才回，回了才涨情丝', () => {
+    const w = world({ ...calm, npc: { replyHours: 12 } });
+    addHouse(w, { id: 'A' });
+    const r = tieThread(w, 'A', { kind: 'npc', name: '散修' });
+    if (!r.ok) throw new Error();
+    interact(w, 'A', r.value.id);
+    expect(r.value.strands).toBe(0);
+    hours(w, 13);
+    expect(r.value.strands).toBe(w.config.thread.interactionGain);
+  });
+
+  it('NPC 发来的互动不回，一样算冷落，怨丝只落在玩家家里', () => {
+    const w = world({ ...calm, neglect: { graceDays: 3, grudgePerDay: 3 } });
+    addHouse(w, { id: 'A' });
+    const r = tieThread(w, 'A', { kind: 'npc', name: '散修' });
+    if (!r.ok) throw new Error();
+    r.value.pendingRequest = { from: NPC_SIDE, at: 0 };
+    hours(w, 4 * DAY + 1);
+    expect(getHouse(w, 'A').grudge).toBeGreaterThan(0);
   });
 });
 

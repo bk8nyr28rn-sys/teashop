@@ -17,6 +17,17 @@ export interface GameConfig {
     interactionGain: number;
     /** 浓度上限；到达即为“金缕” */
     goldenThreshold: number;
+    /**
+     * 回报递减：守门和结族人时，按浓度从高到低排，
+     * 第 1 根线算 100%，第 2 根算本值，第 3 根算本值²……（多对象回报有天花板）
+     */
+    diminishing: number;
+  };
+
+  /** NPC 散修也要维护：回复有延迟，也会主动发来互动，不回就算冷落 */
+  npc: {
+    replyHours: number;
+    requestChancePerDay: number;
   };
 
   /** #2 陌生人匹配的等级门槛 */
@@ -159,17 +170,18 @@ export interface GameConfig {
 
 export const defaultConfig: GameConfig = {
   grudge: { dailyCap: 30 },
-  thread: { interactionGain: 3, goldenThreshold: 200 },
+  thread: { interactionGain: 3, goldenThreshold: 200, diminishing: 0.5 },
+  npc: { replyHours: 12, requestChancePerDay: 0.5 },
   matching: { strangerRealmGate: 3 },
   cut: { toGrudgeRatio: 0.5, reconcileWindowDays: 7, reconcileBonus: 1.2 },
   neglect: { graceDays: 3, dimPerDay: 4, grudgePerDay: 3, grudgeTo: 'both' },
   retreat: { daysPerWindow: 7, windowDays: 30 },
   multiPartner: {
-    strainPerExisting: 1,
+    strainPerExisting: 3,
     dimPerStrain: 1,
     grudgePerStrain: 1,
-    reliefPerInteraction: 1,
-    naturalDecayPerDay: 0.1,
+    reliefPerInteraction: 0.5,
+    naturalDecayPerDay: 0.05,
   },
   ghosts: {
     wildPerHour: 0.02,

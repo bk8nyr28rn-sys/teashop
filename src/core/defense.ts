@@ -1,14 +1,15 @@
 import { returnStrands } from './threads';
 import type { GhostKind, House, HouseId, Result, Thread, World } from './types';
-import { emit, fail, getHouse, isInRetreat, ok, spendAction, threadsOf } from './world';
+import { emit, fail, getHouse, isInRetreat, ok, rankedThreads, spendAction, threadsOf } from './world';
 
 /** 护宅大阵（门）当前的强度 */
 export function doorPower(world: World, house: House): number {
   const d = world.config.door;
   let cultivation = 0;
   for (const m of house.members) if (m.injuredUntil <= world.hour) cultivation += m.cultivation;
+  // 回报递减：最浓的线全额，其余依次打折
   let strands = 0;
-  for (const t of threadsOf(world, house.id)) strands += t.strands;
+  for (const { thread, weight } of rankedThreads(world, house.id)) strands += thread.strands * weight;
   const formation = Math.max(0, house.formationLevel - house.formationDamage);
   return (
     d.base +

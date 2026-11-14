@@ -90,6 +90,17 @@ export function threadsOf(world: World, houseId: HouseId, onlyActive = true): Th
   return out;
 }
 
+/**
+ * 回报递减：一家的 active 红线按浓度从高到低排，第 i 根（从 0 数）的权重 = diminishing^i。
+ * 守门和结族人都用这个权重，多对象有回报但有天花板。
+ */
+export function rankedThreads(world: World, houseId: HouseId): { thread: Thread; weight: number }[] {
+  const d = world.config.thread.diminishing;
+  return threadsOf(world, houseId)
+    .sort((x, y) => y.strands - x.strands || (x.id < y.id ? -1 : 1))
+    .map((thread, i) => ({ thread, weight: Math.pow(d, i) }));
+}
+
 /** 红线另一端：玩家 id，或 null（NPC） */
 export function otherSide(thread: Thread, houseId: HouseId): HouseId | null {
   return thread.a === houseId ? thread.b : thread.a;
