@@ -58,6 +58,10 @@ export interface House {
   /** 拉黑了谁（#4） */
   blocked: HouseId[];
   lastMeditationCollect: number;
+  /** 渡劫：当家人的修为进度、破境丹、冷却到第几个小时 */
+  cultivationProgress: number;
+  breakthroughPills: number;
+  tribulationCooldownUntil: number;
 }
 
 export type ThreadState = 'active' | 'cut' | 'severed';
@@ -124,6 +128,7 @@ export type GameEvent =
   | { type: 'heirBorn'; hour: number; heir: HeirId; thread: ThreadId }
   | { type: 'heirHomeSet'; hour: number; heir: HeirId; home: HouseId; reason: 'agreed' | 'breakup' | 'adulthood' }
   | { type: 'golden'; hour: number; thread: ThreadId }
+  | { type: 'tribulation'; hour: number; house: HouseId; success: boolean; realm: number; usedPill: boolean }
   | { type: 'tierChanged'; hour: number; thread: ThreadId; from: number; to: number }
   | { type: 'bigInteraction'; hour: number; thread: ThreadId; by: HouseId; stake: number; success: boolean; stonesLost: number; strandsGained: number; coPresent: boolean };
 

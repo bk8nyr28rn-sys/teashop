@@ -200,6 +200,23 @@ export interface GameConfig {
     consumeRatio: number;
   };
 
+  /**
+   * 渡劫：修为进度随打坐积累，攒满才能发起；打赢一只大鬼（野鬼）才算突破。
+   * 突破所需进度 = progressBase × 当前境界^progressExponent。
+   * 失败按门被砸破处理（#8，当家人不掉修为），并冷却几天，进度保留。
+   */
+  tribulation: {
+    progressPerHour: number;
+    progressBase: number;
+    progressExponent: number;
+    bossBaseStrength: number;
+    bossStrengthPerRealm: number;
+    /** 破境丹加多少胜算（守门力） */
+    pillBonus: number;
+    cooldownDays: number;
+    heartsReward: number;
+  };
+
   /** 经济 */
   economy: {
     meditationPerHour: number;
@@ -209,6 +226,8 @@ export interface GameConfig {
     repairCostPerDamage: number;
     /** 第一版最简炼丹：疗伤丹要几颗诡心 */
     healingPillHearts: number;
+    /** 破境丹要几颗诡心 */
+    breakthroughPillHearts: number;
   };
 
   /** #21 未成年人可玩时段（周一 = 0） */
@@ -291,12 +310,23 @@ export const defaultConfig: GameConfig = {
     memberCultivationPerDay: 0.5,
   },
   heir: { strandThreshold: 60, consumeRatio: 0.4 },
+  tribulation: {
+    progressPerHour: 1,
+    progressBase: 200,
+    progressExponent: 1.5,
+    bossBaseStrength: 40,
+    bossStrengthPerRealm: 10,
+    pillBonus: 30,
+    cooldownDays: 3,
+    heartsReward: 2,
+  },
   economy: {
     meditationPerHour: 2,
     formationUpgradeBaseCost: 50,
     formationCostExponent: 2,
     repairCostPerDamage: 20,
     healingPillHearts: 2,
+    breakthroughPillHearts: 3,
   },
   minors: { allowedWeekdays: [4, 5, 6], allowedHourStart: 20, allowedHourEnd: 21 },
 };

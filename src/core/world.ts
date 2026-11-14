@@ -58,6 +58,9 @@ export function addHouse(
     retreatDaysUsed: 0,
     blocked: [],
     lastMeditationCollect: world.hour,
+    cultivationProgress: 0,
+    breakthroughPills: 0,
+    tribulationCooldownUntil: 0,
   };
   world.houses.set(id, house);
   return house;

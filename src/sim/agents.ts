@@ -14,6 +14,9 @@ import {
   tieThread,
   interact,
   upgradeFormation,
+  attemptTribulation,
+  brewBreakthroughPill,
+  canAttemptTribulation,
   bigInteract,
   dayOf,
   type House,
@@ -149,8 +152,6 @@ export function startOfDay(world: World, agent: Agent): void {
   if (p.extraNpcPartnerDays.includes(day)) {
     tieThread(world, agent.houseId, { kind: 'npc', name: `散修${day}` });
   }
-  // 渡劫还没实现：先用“每活跃一周境界 +1”代替
-  if (day > 0 && day % 7 === 0 && agent.activeToday) getHouse(world, agent.houseId).realm++;
 }
 
 /** 收到的灵石有多少比例存进感情预算，其余留给阵法 */
@@ -163,6 +164,12 @@ export function playSession(world: World, agent: Agent, isPresent: (houseId: str
   const rng = world.rng;
 
   agent.loveBudget += collectMeditation(world, house.id) * LOVE_BUDGET_SHARE;
+
+  // 渡劫：修为攒满就去，能炼破境丹就先炼一颗
+  if (canAttemptTribulation(world, house.id).ok) {
+    if (house.breakthroughPills === 0) brewBreakthroughPill(world, house.id);
+    attemptTribulation(world, house.id);
+  }
 
   for (const thread of threadsOf(world, house.id)) {
     const other = otherSide(thread, house.id);

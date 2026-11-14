@@ -49,6 +49,10 @@ export interface ArchetypeReport {
   goldenDayMedian: number | null;
   /** 结出第一位嫡传是第几天（中位数） */
   heirDayMedian: number | null;
+  realmAvg: number;
+  tribulationSuccessRate: number;
+  /** 达到陌生人匹配门槛境界是第几天（中位数） */
+  strangerGateDayMedian: number | null;
 }
 
 interface Counters {
@@ -64,6 +68,9 @@ interface Counters {
   grudgeHistory: number[];
   goldenHour: number | null;
   heirHour: number | null;
+  tribAttempts: number;
+  tribSuccesses: number;
+  gateHour: number | null;
 }
 
 export const DEFAULT_SIM: SimOptions = {
@@ -124,6 +131,9 @@ function emptyCounters(): Counters {
     grudgeHistory: [],
     goldenHour: null,
     heirHour: null,
+    tribAttempts: 0,
+    tribSuccesses: 0,
+    gateHour: null,
   };
 }
 
@@ -181,6 +191,13 @@ function count(e: GameEvent, counters: Map<string, Counters>, world: World): voi
       }
       break;
     }
+    case 'tribulation': {
+      const c = counters.get(e.house)!;
+      c.tribAttempts++;
+      if (e.success) c.tribSuccesses++;
+      if (e.realm >= world.config.matching.strangerRealmGate) c.gateHour ??= e.hour;
+      break;
+    }
     case 'golden': {
       const t = world.threads.get(e.thread)!;
       for (const p of [t.a, t.b]) if (p) counters.get(p)!.goldenHour ??= e.hour;
@@ -226,6 +243,9 @@ function report(
     goldenShare: cs.filter((c) => c.goldenHour !== null).length / n,
     goldenDayMedian: medianDay(cs.map((c) => c.goldenHour)),
     heirDayMedian: medianDay(cs.map((c) => c.heirHour)),
+    realmAvg: sum(houses.map((h) => h.realm)) / n,
+    tribulationSuccessRate: sum(cs.map((c) => c.tribAttempts)) === 0 ? 0 : sum(cs.map((c) => c.tribSuccesses)) / sum(cs.map((c) => c.tribAttempts)),
+    strangerGateDayMedian: medianDay(cs.map((c) => c.gateHour)),
   };
 }
 

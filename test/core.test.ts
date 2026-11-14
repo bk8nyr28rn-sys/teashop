@@ -10,6 +10,10 @@ import {
   cutThread,
   dailyThreadUpdate,
   doorPower,
+  attemptTribulation,
+  brewBreakthroughPill,
+  canAttemptTribulation,
+  collectMeditation,
   addStrands,
   bigInteract,
   NPC_SIDE,
@@ -433,6 +437,60 @@ describe('#8 #11 守宅：失败惩罚与劫后余生', () => {
     const a = addHouse(w, { id: 'A' });
     startRetreat(w, 'A', 2);
     expect(rollKnock(w, a)).toBeNull();
+  });
+});
+
+describe('渡劫', () => {
+  function ready(config: DeepPartial<GameConfig> = {}) {
+    const w = world({ ...calm, ...config });
+    const a = addHouse(w, { id: 'A', realm: 1, stones: 1000 });
+    a.cultivationProgress = 1e6;
+    return { w, a };
+  }
+
+  it('修为进度没攒满不能发起', () => {
+    const w = world(calm);
+    addHouse(w, { id: 'A' });
+    expect(attemptTribulation(w, 'A').ok).toBe(false);
+  });
+
+  it('打坐会攒修为进度', () => {
+    const w = world({ ...calm, tribulation: { progressPerHour: 2 } });
+    addHouse(w, { id: 'A' });
+    hours(w, 10);
+    collectMeditation(w, 'A');
+    expect(getHouse(w, 'A').cultivationProgress).toBe(20);
+  });
+
+  it('成功：境界 +1，扣掉这一级的进度，掉诡心', () => {
+    const { w, a } = ready({ tribulation: { bossBaseStrength: 0, bossStrengthPerRealm: 0, heartsReward: 2 } });
+    const r = attemptTribulation(w, 'A');
+    expect(r.ok && r.value.success).toBe(true);
+    expect(a.realm).toBe(2);
+    expect(a.ghostHearts).toBe(2);
+    expect(a.cultivationProgress).toBe(1e6 - w.config.tribulation.progressBase);
+  });
+
+  it('失败：境界不掉，按门被砸破处理，进入劫后余生，冷却期间不能再试', () => {
+    const { w, a } = ready({ tribulation: { bossBaseStrength: 1e9, cooldownDays: 3 } });
+    const r = attemptTribulation(w, 'A');
+    expect(r.ok && r.value.success).toBe(false);
+    expect(a.realm).toBe(1);
+    expect(a.cultivationProgress).toBe(1e6);
+    expect(a.graceActionsLeft).toBe(w.config.breach.graceActions);
+    expect(w.events.some((e) => e.type === 'breach')).toBe(true);
+    expect(attemptTribulation(w, 'A').ok).toBe(false);
+    hours(w, 3 * DAY);
+    expect(canAttemptTribulation(w, 'A').ok).toBe(true);
+  });
+
+  it('破境丹用诡心炼，渡劫时会吃掉一颗', () => {
+    const { w, a } = ready();
+    a.ghostHearts = 3;
+    expect(brewBreakthroughPill(w, 'A').ok).toBe(true);
+    expect(a.breakthroughPills).toBe(1);
+    attemptTribulation(w, 'A');
+    expect(a.breakthroughPills).toBe(0);
   });
 });
 
