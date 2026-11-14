@@ -1,8 +1,9 @@
 /**
  * 所有可调数值。
  *
- * 方案 v2 “待定数值”表里的每一项都在这里。默认值只是占位，
- * 用来让规则和模拟器先跑起来；真正的数值要靠模拟器跑出的数据来定。
+ * 方案 v2 “待定数值”表里的每一项都在这里。
+ * 已按模拟校准的：成长节奏（一对认真的好友约 90 天到金缕、约 24 天结嫡传）、
+ * 怨丝还原比例（< 1:1）、多对象难度。其余仍是占位，要继续用模拟器调。
  * 注释里的 #N 对应 v2 文档“决定记录”的编号。
  */
 export interface GameConfig {
@@ -123,12 +124,15 @@ export interface GameConfig {
 
   /** #14 怨丝变回情丝，感化 */
   conversion: {
-    /** 打散怨灵时，情丝 = 怨丝 × (base + perChunk × 怨灵大小 / spiritChunk)：怨灵越强还原越多 */
+    /**
+     * 打散怨灵时，情丝 = 怨丝 × (base + perChunk × 怨灵大小 / spiritChunk)：怨灵越强还原越多。
+     * 比例必须 < 1，否则生怨反而“赚”，多对象会把怨丝当燃料（模拟发现的问题）。
+     */
     defeatReturnBase: number;
     defeatReturnPerChunk: number;
     /** 守宅两人之间的红线浓度达到多少可以感化 */
     purifyThreshold: number;
-    /** 感化时，情丝 = 怨丝 × 本值（比打散多） */
+    /** 感化时，情丝 = 怨丝 × 本值（比打散多，但不超过 1） */
     purifyReturn: number;
     /** 被感化的怨灵帮你守几次门 */
     purifiedGuardKnocks: number;
@@ -155,6 +159,8 @@ export interface GameConfig {
   economy: {
     meditationPerHour: number;
     formationUpgradeBaseCost: number;
+    /** 升级花费 = base × 当前等级^exponent */
+    formationCostExponent: number;
     repairCostPerDamage: number;
     /** 第一版最简炼丹：疗伤丹要几颗诡心 */
     healingPillHearts: number;
@@ -170,7 +176,7 @@ export interface GameConfig {
 
 export const defaultConfig: GameConfig = {
   grudge: { dailyCap: 30 },
-  thread: { interactionGain: 3, goldenThreshold: 200, diminishing: 0.5 },
+  thread: { interactionGain: 1.7, goldenThreshold: 200, diminishing: 0.5 },
   npc: { replyHours: 12, requestChancePerDay: 0.5 },
   matching: { strangerRealmGate: 3 },
   cut: { toGrudgeRatio: 0.5, reconcileWindowDays: 7, reconcileBonus: 1.2 },
@@ -214,23 +220,24 @@ export const defaultConfig: GameConfig = {
     graceActions: 5,
   },
   conversion: {
-    defeatReturnBase: 1,
-    defeatReturnPerChunk: 0.5,
+    defeatReturnBase: 0.1,
+    defeatReturnPerChunk: 0.2,
     purifyThreshold: 60,
-    purifyReturn: 2,
+    purifyReturn: 0.5,
     purifiedGuardKnocks: 3,
     wardPerStrand: 0.5,
   },
   family: {
-    memberStrandHours: 50 * 24 * 10,
+    memberStrandHours: 30000,
     maxMembers: 12,
     memberStartCultivation: 1,
     memberCultivationPerDay: 0.5,
   },
-  heir: { strandThreshold: 80, consumeRatio: 0.4 },
+  heir: { strandThreshold: 60, consumeRatio: 0.4 },
   economy: {
     meditationPerHour: 2,
     formationUpgradeBaseCost: 50,
+    formationCostExponent: 2,
     repairCostPerDamage: 20,
     healingPillHearts: 2,
   },

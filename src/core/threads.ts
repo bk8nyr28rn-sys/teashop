@@ -26,9 +26,8 @@ export function isBlockedBetween(world: World, x: HouseId, y: HouseId): boolean 
 
 /** 两家之间还在的线（active 或可复合的 cut） */
 export function threadBetween(world: World, x: HouseId, y: HouseId): Thread | null {
-  for (const t of world.threads.values()) {
-    if (t.state === 'severed') continue;
-    if ((t.a === x && t.b === y) || (t.a === y && t.b === x)) return t;
+  for (const t of threadsOf(world, x, false)) {
+    if (t.state !== 'severed' && (t.a === y || t.b === y)) return t;
   }
   return null;
 }
@@ -80,6 +79,11 @@ export function tieThread(world: World, a: HouseId, partner: Partner): Result<Th
     createdAt: world.hour,
   };
   world.threads.set(thread.id, thread);
+  for (const side of b ? [a, b] : [a]) {
+    const list = world.threadsByHouse.get(side);
+    if (list) list.push(thread.id);
+    else world.threadsByHouse.set(side, [thread.id]);
+  }
   return { ok: true, value: thread };
 }
 
@@ -181,8 +185,8 @@ export function blockHouse(world: World, by: HouseId, other: HouseId): Result {
   getHouse(world, other);
   if (!house.blocked.includes(other)) house.blocked.push(other);
 
-  for (const t of world.threads.values()) {
-    const between = (t.a === by && t.b === other) || (t.a === other && t.b === by);
+  for (const t of threadsOf(world, by, false)) {
+    const between = t.a === other || t.b === other;
     if (!between || t.state === 'severed') continue;
     t.strands = 0;
     t.state = 'severed';

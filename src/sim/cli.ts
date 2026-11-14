@@ -69,6 +69,9 @@ function table(rows: ArchetypeReport[]): string {
     ['族人', (r) => f1(r.membersAvg)],
     ['嫡传/人', (r) => f2(r.heirsPerPlayer)],
     ['阵法等级', (r) => f1(r.formationAvg)],
+    ['金缕占比', (r) => pct(r.goldenShare)],
+    ['金缕中位天', (r) => (r.goldenDayMedian === null ? '—' : f1(r.goldenDayMedian))],
+    ['嫡传中位天', (r) => (r.heirDayMedian === null ? '—' : f1(r.heirDayMedian))],
   ];
   const lines = [
     `| ${cols.map((c) => c[0]).join(' | ')} |`,

@@ -11,6 +11,7 @@ export function createWorld(
     hour: 0,
     houses: new Map(),
     threads: new Map(),
+    threadsByHouse: new Map(),
     heirs: new Map(),
     config: mergeConfig(opts.config),
     rng: new Rng(opts.seed ?? 1),
@@ -82,9 +83,9 @@ export const weekdayOf = (hour: number): number => dayOf(hour) % 7;
 /** 一个家族的所有红线（默认只算 active 的） */
 export function threadsOf(world: World, houseId: HouseId, onlyActive = true): Thread[] {
   const out: Thread[] = [];
-  for (const t of world.threads.values()) {
-    if (t.a !== houseId && t.b !== houseId) continue;
-    if (onlyActive && t.state !== 'active') continue;
+  for (const id of world.threadsByHouse.get(houseId) ?? []) {
+    const t = world.threads.get(id);
+    if (!t || (onlyActive && t.state !== 'active')) continue;
     out.push(t);
   }
   return out;

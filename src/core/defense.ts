@@ -138,7 +138,8 @@ export function collectMeditation(world: World, houseId: HouseId): number {
 }
 
 export function formationUpgradeCost(world: World, house: House): number {
-  return world.config.economy.formationUpgradeBaseCost * house.formationLevel;
+  const e = world.config.economy;
+  return e.formationUpgradeBaseCost * Math.pow(house.formationLevel, e.formationCostExponent);
 }
 
 export function upgradeFormation(world: World, houseId: HouseId): Result {

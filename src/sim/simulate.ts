@@ -44,6 +44,11 @@ export interface ArchetypeReport {
   heirsPerPlayer: number;
   stonesAvg: number;
   formationAvg: number;
+  /** 达到金缕的玩家占比，以及达到时是第几天（中位数，没人达到为 null） */
+  goldenShare: number;
+  goldenDayMedian: number | null;
+  /** 结出第一位嫡传是第几天（中位数） */
+  heirDayMedian: number | null;
 }
 
 interface Counters {
@@ -57,6 +62,8 @@ interface Counters {
   multiBreachAbsences: number;
   wasOnline: boolean;
   grudgeHistory: number[];
+  goldenHour: number | null;
+  heirHour: number | null;
 }
 
 export const DEFAULT_SIM: SimOptions = {
@@ -115,6 +122,8 @@ function emptyCounters(): Counters {
     multiBreachAbsences: 0,
     wasOnline: false,
     grudgeHistory: [],
+    goldenHour: null,
+    heirHour: null,
   };
 }
 
@@ -165,7 +174,16 @@ function count(e: GameEvent, counters: Map<string, Counters>, world: World): voi
       break;
     case 'heirBorn': {
       const heir = world.heirs.get(e.heir)!;
-      for (const p of heir.parents) counters.get(p)!.heirs++;
+      for (const p of heir.parents) {
+        const c = counters.get(p)!;
+        c.heirs++;
+        c.heirHour ??= e.hour;
+      }
+      break;
+    }
+    case 'golden': {
+      const t = world.threads.get(e.thread)!;
+      for (const p of [t.a, t.b]) if (p) counters.get(p)!.goldenHour ??= e.hour;
       break;
     }
   }
@@ -205,5 +223,15 @@ function report(
     heirsPerPlayer: sum(cs.map((c) => c.heirs)) / n,
     stonesAvg: sum(houses.map((h) => h.stones)) / n,
     formationAvg: sum(houses.map((h) => h.formationLevel)) / n,
+    goldenShare: cs.filter((c) => c.goldenHour !== null).length / n,
+    goldenDayMedian: medianDay(cs.map((c) => c.goldenHour)),
+    heirDayMedian: medianDay(cs.map((c) => c.heirHour)),
   };
+}
+
+/** 只在超过一半的人达到时才给中位数，否则返回 null（“多数人没达到”） */
+function medianDay(hours: (number | null)[]): number | null {
+  const sorted = hours.map((h) => (h === null ? Infinity : h)).sort((x, y) => x - y);
+  const mid = sorted[Math.floor(sorted.length / 2)];
+  return mid === undefined || mid === Infinity ? null : mid / 24;
 }

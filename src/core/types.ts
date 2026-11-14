@@ -130,6 +130,8 @@ export interface World {
   hour: number;
   houses: Map<HouseId, House>;
   threads: Map<ThreadId, Thread>;
+  /** 索引：每家参与的红线 id（含已剪、已拉黑的） */
+  threadsByHouse: Map<HouseId, ThreadId[]>;
   heirs: Map<HeirId, Heir>;
   config: GameConfig;
   rng: Rng;
