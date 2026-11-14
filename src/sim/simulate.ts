@@ -1,0 +1,209 @@
+import {
+  addHouse,
+  advanceHour,
+  createWorld,
+  getHouse,
+  threadsOf,
+  tieThread,
+  type DeepPartial,
+  type GameConfig,
+  type GameEvent,
+  type World,
+} from '../core';
+import { PROFILES, isOnline, playSession, startOfDay, type Agent, type Archetype } from './agents';
+
+export interface SimOptions {
+  /** 每种玩家类型模拟多少人（真人搭档类型会两两配对，取偶数） */
+  playersPerArchetype: number;
+  days: number;
+  seed: number;
+  archetypes: Archetype[];
+  config?: DeepPartial<GameConfig>;
+  /** 怨丝连续 7 天都不低于这个值，算“陷在恶性循环里” */
+  spiralGrudge: number;
+}
+
+export interface ArchetypeReport {
+  archetype: Archetype;
+  label: string;
+  players: number;
+  knocksPerWeek: number;
+  breachesPerWeek: number;
+  /** 离线时被砸破占全部砸破的比例 */
+  offlineBreachShare: number;
+  /** 一次离线期间被砸破两次及以上的次数（应当为 0） */
+  multiBreachAbsences: number;
+  purifiesPerWeek: number;
+  grudgeAvg: number;
+  grudgeP90: number;
+  /** 每人每天因每日上限散掉的怨丝 */
+  grudgeDissipatedPerDay: number;
+  spiralShare: number;
+  strandsAvg: number;
+  membersAvg: number;
+  heirsPerPlayer: number;
+  stonesAvg: number;
+  formationAvg: number;
+}
+
+interface Counters {
+  knocks: number;
+  breaches: number;
+  offlineBreaches: number;
+  purifies: number;
+  dissipated: number;
+  heirs: number;
+  breachesThisAbsence: number;
+  multiBreachAbsences: number;
+  wasOnline: boolean;
+  grudgeHistory: number[];
+}
+
+export const DEFAULT_SIM: SimOptions = {
+  playersPerArchetype: 200,
+  days: 30,
+  seed: 1,
+  archetypes: ['solo', 'couple', 'busy', 'poly', 'minor'],
+  spiralGrudge: 40,
+};
+
+export function simulate(opts: Partial<SimOptions> = {}): ArchetypeReport[] {
+  const o: SimOptions = { ...DEFAULT_SIM, ...opts };
+  const world = createWorld({ seed: o.seed, config: o.config, recordEvents: false });
+  const agents = createAgents(world, o);
+  const counters = new Map<string, Counters>(agents.map((a) => [a.houseId, emptyCounters()]));
+
+  world.listener = (e) => count(e, counters, world);
+
+  const hours = o.days * 24;
+  for (let h = 0; h < hours; h++) {
+    if (world.hour % 24 === 0) for (const a of agents) startOfDay(world, a);
+
+    const online = new Set<string>();
+    for (const a of agents) if (isOnline(world, a)) online.add(a.houseId);
+
+    for (const a of agents) {
+      const c = counters.get(a.houseId)!;
+      const on = online.has(a.houseId);
+      if (on && !c.wasOnline) {
+        if (c.breachesThisAbsence >= 2) c.multiBreachAbsences++;
+        c.breachesThisAbsence = 0;
+      }
+      c.wasOnline = on;
+      if (on) playSession(world, a);
+    }
+
+    advanceHour(world, (house) => online.has(house.id));
+
+    if (world.hour % 24 === 0) {
+      for (const a of agents) counters.get(a.houseId)!.grudgeHistory.push(getHouse(world, a.houseId).grudge);
+    }
+  }
+
+  return o.archetypes.map((arch) => report(world, arch, agents.filter((a) => a.archetype === arch), counters, o));
+}
+
+function emptyCounters(): Counters {
+  return {
+    knocks: 0,
+    breaches: 0,
+    offlineBreaches: 0,
+    purifies: 0,
+    dissipated: 0,
+    heirs: 0,
+    breachesThisAbsence: 0,
+    multiBreachAbsences: 0,
+    wasOnline: false,
+    grudgeHistory: [],
+  };
+}
+
+function createAgents(world: World, o: SimOptions): Agent[] {
+  const agents: Agent[] = [];
+  for (const arch of o.archetypes) {
+    const p = PROFILES[arch];
+    const n = p.partner === 'friend' ? o.playersPerArchetype - (o.playersPerArchetype % 2) : o.playersPerArchetype;
+    const group: Agent[] = [];
+    for (let i = 0; i < n; i++) {
+      const house = addHouse(world, {
+        id: `${arch}-${i}`,
+        openness: p.openness,
+        isMinor: p.isMinor,
+        traits: [world.rng.pick(['文武生', '小生', '正印花旦', '二帮花旦', '丑生', '武生'])],
+      });
+      group.push({ houseId: house.id, archetype: arch, profile: p, activeToday: true });
+    }
+    for (let i = 0; i < group.length; i++) {
+      const me = group[i]!;
+      if (p.partner === 'npc') tieThread(world, me.houseId, { kind: 'npc', name: '散修' });
+      else if (i % 2 === 0) tieThread(world, me.houseId, { kind: 'friend', house: group[i + 1]!.houseId });
+    }
+    agents.push(...group);
+  }
+  return agents;
+}
+
+function count(e: GameEvent, counters: Map<string, Counters>, world: World): void {
+  switch (e.type) {
+    case 'knock':
+      counters.get(e.house)!.knocks++;
+      break;
+    case 'breach': {
+      const c = counters.get(e.house)!;
+      c.breaches++;
+      if (!e.online) {
+        c.offlineBreaches++;
+        c.breachesThisAbsence++;
+      }
+      break;
+    }
+    case 'purified':
+      counters.get(e.house)!.purifies++;
+      break;
+    case 'grudgeAdded':
+      counters.get(e.house)!.dissipated += e.dissipated;
+      break;
+    case 'heirBorn': {
+      const heir = world.heirs.get(e.heir)!;
+      for (const p of heir.parents) counters.get(p)!.heirs++;
+      break;
+    }
+  }
+}
+
+function report(
+  world: World,
+  archetype: Archetype,
+  agents: Agent[],
+  counters: Map<string, Counters>,
+  o: SimOptions,
+): ArchetypeReport {
+  const n = Math.max(1, agents.length);
+  const weeks = o.days / 7;
+  const cs = agents.map((a) => counters.get(a.houseId)!);
+  const houses = agents.map((a) => getHouse(world, a.houseId));
+  const sum = (xs: number[]) => xs.reduce((s, x) => s + x, 0);
+  const grudges = houses.map((h) => h.grudge).sort((x, y) => x - y);
+  const breaches = sum(cs.map((c) => c.breaches));
+  const strands = houses.flatMap((h) => threadsOf(world, h.id).map((t) => t.strands));
+
+  return {
+    archetype,
+    label: PROFILES[archetype].label,
+    players: agents.length,
+    knocksPerWeek: sum(cs.map((c) => c.knocks)) / n / weeks,
+    breachesPerWeek: breaches / n / weeks,
+    offlineBreachShare: breaches === 0 ? 0 : sum(cs.map((c) => c.offlineBreaches)) / breaches,
+    multiBreachAbsences: sum(cs.map((c) => c.multiBreachAbsences + (c.breachesThisAbsence >= 2 ? 1 : 0))),
+    purifiesPerWeek: sum(cs.map((c) => c.purifies)) / n / weeks,
+    grudgeAvg: sum(grudges) / n,
+    grudgeP90: grudges[Math.floor(grudges.length * 0.9)] ?? 0,
+    grudgeDissipatedPerDay: sum(cs.map((c) => c.dissipated)) / n / o.days,
+    spiralShare: cs.filter((c) => c.grudgeHistory.length >= 7 && c.grudgeHistory.slice(-7).every((g) => g >= o.spiralGrudge)).length / n,
+    strandsAvg: strands.length ? sum(strands) / strands.length : 0,
+    membersAvg: sum(houses.map((h) => h.members.length)) / n,
+    heirsPerPlayer: sum(cs.map((c) => c.heirs)) / n,
+    stonesAvg: sum(houses.map((h) => h.stones)) / n,
+    formationAvg: sum(houses.map((h) => h.formationLevel)) / n,
+  };
+}

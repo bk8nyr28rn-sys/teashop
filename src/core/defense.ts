@@ -1,0 +1,178 @@
+import { returnStrands } from './threads';
+import type { GhostKind, House, HouseId, Result, Thread, World } from './types';
+import { emit, fail, getHouse, isInRetreat, ok, spendAction, threadsOf } from './world';
+
+/** 护宅大阵（门）当前的强度 */
+export function doorPower(world: World, house: House): number {
+  const d = world.config.door;
+  let cultivation = 0;
+  for (const m of house.members) if (m.injuredUntil <= world.hour) cultivation += m.cultivation;
+  let strands = 0;
+  for (const t of threadsOf(world, house.id)) strands += t.strands;
+  const formation = Math.max(0, house.formationLevel - house.formationDamage);
+  return (
+    d.base +
+    house.realm * d.perRealm +
+    cultivation * d.perMemberCultivation +
+    strands * d.perStrand +
+    formation * d.perFormationLevel +
+    house.ward
+  );
+}
+
+/** #7 每次守宅最多一位搭档来帮：选红线最浓的那根 */
+export function pickHelper(world: World, houseId: HouseId): Thread | null {
+  let best: Thread | null = null;
+  for (const t of threadsOf(world, houseId)) if (!best || t.strands > best.strands) best = t;
+  return best && best.strands > 0 ? best : null;
+}
+
+/**
+ * #11 这一小时有没有鬼来砸门（在线、离线都可能）。
+ * 闭关期间（#5 #21）和劫后余生期间（#8）不来。一小时最多一次，怨灵优先。
+ */
+export function rollKnock(world: World, house: House): GhostKind | null {
+  if (isInRetreat(world, house) || house.graceActionsLeft > 0) return null;
+  const g = world.config.ghosts;
+  if (house.grudge > 0) {
+    const p = Math.min(g.spiritMaxPerHour, house.grudge * g.spiritPerHourPerGrudge);
+    if (world.rng.chance(p)) return 'spirit';
+  }
+  return world.rng.chance(g.wildPerHour) ? 'wild' : null;
+}
+
+/** 结算一次砸门。离线时由符阵、族人和搭档快照自动守（#11） */
+export function resolveKnock(world: World, houseId: HouseId, kind: GhostKind, online: boolean): void {
+  const house = getHouse(world, houseId);
+  const g = world.config.ghosts;
+  const c = world.config.conversion;
+  const omen = kind === 'spirit' && house.grudge >= g.omenGrudge;
+  emit(world, { type: 'knock', hour: world.hour, house: houseId, kind, online, omen });
+
+  // 怨灵从怨丝池里带走一块怨丝
+  const chunk = kind === 'spirit' ? Math.min(house.grudge, g.spiritChunk) : 0;
+  house.grudge -= chunk;
+  const helper = pickHelper(world, houseId);
+
+  // 被感化过的怨灵留下来帮忙守门
+  if (house.guardianKnocks > 0) {
+    house.guardianKnocks--;
+    if (kind === 'wild') house.ghostHearts++;
+    else returnStrands(world, houseId, chunk * defeatRatio(world, chunk), helper);
+    emit(world, { type: 'guarded', hour: world.hour, house: houseId, kind });
+    return;
+  }
+
+  // 感化：守宅的两人之间红线够浓，不打也能赢；怨丝化回情丝，比打散多，但不掉诡心
+  if (kind === 'spirit' && helper && helper.strands >= c.purifyThreshold) {
+    const returned = chunk * c.purifyReturn;
+    returnStrands(world, houseId, returned, helper);
+    house.guardianKnocks += c.purifiedGuardKnocks;
+    emit(world, { type: 'purified', hour: world.hour, house: houseId, helper: helper.id, strandsReturned: returned });
+    return;
+  }
+
+  const strength =
+    kind === 'wild'
+      ? g.wildBaseStrength + house.realm * g.wildStrengthPerRealm
+      : g.spiritBaseStrength + chunk * g.spiritStrengthPerGrudge;
+  const power =
+    doorPower(world, house) +
+    (helper ? helper.strands * world.config.door.helperPerStrand : 0) +
+    (omen && online ? g.omenPrepBonus : 0);
+
+  if (world.rng.chance(power / (power + strength))) {
+    let returned = 0;
+    if (kind === 'wild') {
+      house.ghostHearts++;
+    } else {
+      returned = chunk * defeatRatio(world, chunk);
+      returnStrands(world, houseId, returned, helper);
+    }
+    emit(world, { type: 'defended', hour: world.hour, house: houseId, kind, helper: helper?.id ?? null, strandsReturned: returned });
+    return;
+  }
+
+  // 输了：怨丝回到池子里（没能转回情丝），门被砸破
+  house.grudge += chunk;
+  applyBreach(world, house, kind, online);
+}
+
+/** 怨灵越强，打散后还原得越多 */
+function defeatRatio(world: World, chunk: number): number {
+  const c = world.config.conversion;
+  return c.defeatReturnBase + (c.defeatReturnPerChunk * chunk) / world.config.ghosts.spiritChunk;
+}
+
+/** #8 门被砸破：损灵石（有上限）+ 一位族人疗伤 + 阵法受损 + 族人可能掉修为；然后进入劫后余生 */
+export function applyBreach(world: World, house: House, kind: GhostKind, online: boolean): void {
+  const b = world.config.breach;
+  const stonesLost = Math.min(b.stoneLossCap, Math.floor(house.stones * b.stoneLossRatio));
+  house.stones -= stonesLost;
+
+  const healthy = house.members.filter((m) => m.injuredUntil <= world.hour);
+  if (healthy.length > 0) world.rng.pick(healthy).injuredUntil = world.hour + b.injuryDays * 24;
+
+  house.formationDamage = Math.min(house.formationLevel, house.formationDamage + b.formationDamage);
+
+  if (house.members.length > 0 && world.rng.chance(b.cultivationLossChance)) {
+    const m = world.rng.pick(house.members);
+    m.cultivation = Math.max(0, m.cultivation - b.cultivationLoss);
+  }
+  // 当家人（house.realm）永远不掉修为，族人不会永久死亡
+  house.graceActionsLeft = b.graceActions;
+  emit(world, { type: 'breach', hour: world.hour, house: house.id, kind, online, stonesLost });
+}
+
+// ---- 玩家行动（每次都算一次行动，劫后余生按它倒数） ----
+
+/** 收打坐产出的灵石 */
+export function collectMeditation(world: World, houseId: HouseId): number {
+  const house = getHouse(world, houseId);
+  spendAction(house);
+  const gained = (world.hour - house.lastMeditationCollect) * world.config.economy.meditationPerHour;
+  house.stones += gained;
+  house.lastMeditationCollect = world.hour;
+  return gained;
+}
+
+export function formationUpgradeCost(world: World, house: House): number {
+  return world.config.economy.formationUpgradeBaseCost * house.formationLevel;
+}
+
+export function upgradeFormation(world: World, houseId: HouseId): Result {
+  const house = getHouse(world, houseId);
+  if (house.formationDamage > 0) return fail('先把阵法修好');
+  const cost = formationUpgradeCost(world, house);
+  if (house.stones < cost) return fail('灵石不够');
+  spendAction(house);
+  house.stones -= cost;
+  house.formationLevel++;
+  return ok();
+}
+
+/** 修阵法，灵石不够时能修多少修多少 */
+export function repairFormation(world: World, houseId: HouseId): Result<number> {
+  const house = getHouse(world, houseId);
+  if (house.formationDamage <= 0) return fail('阵法没有受损');
+  const per = world.config.economy.repairCostPerDamage;
+  const fixed = Math.min(house.formationDamage, Math.floor(house.stones / per));
+  if (fixed <= 0) return fail('灵石不够');
+  spendAction(house);
+  house.stones -= fixed * per;
+  house.formationDamage -= fixed;
+  return { ok: true, value: fixed };
+}
+
+/** 第一版最简炼丹：诡心炼成疗伤丹，让一位疗伤中的族人立刻恢复 */
+export function brewHealingPill(world: World, houseId: HouseId): Result {
+  const house = getHouse(world, houseId);
+  const cost = world.config.economy.healingPillHearts;
+  const injured = house.members.find((m) => m.injuredUntil > world.hour);
+  if (!injured) return fail('没有族人在疗伤');
+  if (house.ghostHearts < cost) return fail('诡心不够');
+  spendAction(house);
+  house.ghostHearts -= cost;
+  injured.injuredUntil = world.hour;
+  return ok();
+}

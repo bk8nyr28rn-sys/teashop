@@ -1,0 +1,26 @@
+{
+  "name": "teashop",
+  "version": "1.0.0",
+  "description": "融合玩法（红线 × 守宅 × 修仙家族）的逻辑核心与数值模拟器",
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.sim.json",
+    "sim": "tsx src/sim/cli.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bk8nyr28rn-sys/teashop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/bk8nyr28rn-sys/teashop/issues"
+  },
+  "homepage": "https://github.com/bk8nyr28rn-sys/teashop#readme",
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  },
+  "type": "module",
+  "private": true
+}
