@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>鬼</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 100%; aspect-ratio: 1 / 1; position: relative">
+  <svg viewBox="0 0 120 120" width="100%" height="100%" role="img" aria-label="{{label}}" style="display: block; overflow: visible">
+    <path d="M30 98 Q22 108 30 116 Q38 110 34 102" fill="none" stroke="#F0525A" stroke-width="2.5" stroke-linecap="round" opacity="{{threadOpacity}}"></path>
+    <path d="M60 104 Q54 114 62 120" fill="none" stroke="#F0525A" stroke-width="2.5" stroke-linecap="round" opacity="{{threadOpacity}}"></path>
+    <path d="M90 98 Q100 106 94 116" fill="none" stroke="#F0525A" stroke-width="2.5" stroke-linecap="round" opacity="{{threadOpacity}}"></path>
+    <path d="M20 62 Q20 18 60 18 Q100 18 100 62 L100 100 Q92 92 84 100 Q76 108 68 100 Q60 92 52 100 Q44 108 36 100 Q28 92 20 100 Z" fill="{{body}}"></path>
+    <path d="M20 66 Q8 70 10 82 Q18 80 22 74" fill="{{body}}"></path>
+    <path d="M100 66 Q112 70 110 82 Q102 80 98 74" fill="{{body}}"></path>
+    <ellipse cx="46" cy="58" rx="6" ry="8" fill="#2B2233"></ellipse>
+    <ellipse cx="74" cy="58" rx="6" ry="8" fill="#2B2233"></ellipse>
+    <circle cx="48" cy="55" r="2" fill="#FFFFFF"></circle>
+    <circle cx="76" cy="55" r="2" fill="#FFFFFF"></circle>
+    <ellipse cx="38" cy="70" rx="6" ry="3.5" fill="#FF8FA3" opacity="0.8"></ellipse>
+    <ellipse cx="82" cy="70" rx="6" ry="3.5" fill="#FF8FA3" opacity="0.8"></ellipse>
+    <ellipse cx="60" cy="74" rx="5" ry="6" fill="#2B2233"></ellipse>
+    <path d="M44 30 L52 38 M76 30 L68 38" stroke="#2B2233" stroke-width="3" stroke-linecap="round" opacity="{{browOpacity}}"></path>
+  </svg>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"kind":{"editor":"enum","default":"spirit","options":["spirit","wild"]},"$preview":{"width":120,"height":120}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const spirit = (this.props.kind ?? 'spirit') === 'spirit';
+    return {
+      body: spirit ? '#9B8CFF' : '#E9ECFF',
+      threadOpacity: spirit ? 1 : 0,
+      browOpacity: spirit ? 1 : 0,
+      label: spirit ? '怨灵：由怨丝凝成，拖着红色的怨丝' : '野鬼',
+    };
+  }
+}
+</script>
+</body>
+</html>

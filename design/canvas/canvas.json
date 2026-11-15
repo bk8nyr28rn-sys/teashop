@@ -1,0 +1,117 @@
+{
+  "v": 3,
+  "createdOnFiles": {
+    "at": "2026-11-14T06:03:46.539Z",
+    "v": 1
+  },
+  "title": "红线守宅竖屏设计稿",
+  "launch": {
+    "view": "canvas"
+  },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": {
+      "x": 0,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "宅院（主界面）",
+      "is_interactive": true
+    },
+    "Knock.dc.html": {
+      "x": 470,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "鬼来砸门"
+    },
+    "Threads.dc.html": {
+      "x": 940,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "红线",
+      "is_interactive": true
+    },
+    "BigInteract.dc.html": {
+      "x": 1410,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "结伴历练（大互动）"
+    },
+    "Family.dc.html": {
+      "x": 1880,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "家族与嫡传",
+      "is_interactive": true
+    },
+    "Tribulation.dc.html": {
+      "x": 2350,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "渡劫",
+      "is_interactive": true
+    },
+    "Chibi.dc.html": {
+      "x": 0,
+      "y": 964,
+      "w": 120,
+      "h": 150,
+      "title": "组件：Q 版角色"
+    },
+    "Ghost.dc.html": {
+      "x": 200,
+      "y": 964,
+      "w": 120,
+      "h": 120,
+      "title": "组件：鬼"
+    },
+    "Avatar.dc.html": {
+      "x": 2820,
+      "y": 0,
+      "w": 390,
+      "h": 844,
+      "title": "捏形象"
+    }
+  },
+  "order": [
+    "Main.dc.html",
+    "Knock.dc.html",
+    "Threads.dc.html",
+    "BigInteract.dc.html",
+    "Family.dc.html",
+    "Tribulation.dc.html",
+    "Avatar.dc.html",
+    "Chibi.dc.html",
+    "Ghost.dc.html"
+  ],
+  "notes": {
+    "title": {
+      "x": 0,
+      "y": -300,
+      "text": "红线守宅 · 竖屏设计稿（Q 版修仙，戏曲点缀）",
+      "kind": "title1",
+      "maxW": 3210
+    },
+    "about": {
+      "x": -480,
+      "y": 0,
+      "w": 400,
+      "fill": "orange",
+      "text": "怎么看：每块画板是一个手机屏幕（390×844）。宅院、红线、家族、渡劫四块的底部导航可以点（右上角 Play）。\n\n角色和鬼是两个共用组件（下面那一行），改一处所有屏幕都会变。画面是用代码画的占位，正式美术照这个布局替换。\n\n规则全部来自逻辑核心，屏幕上的数字都是真实规则下会出现的值。"
+    },
+    "direction": {
+      "x": -480,
+      "y": 600,
+      "w": 400,
+      "fill": "red",
+      "text": "方向（11 月 14 日更新）\n\n① 始终以玩得爽为目的：赢了、升级了、族人诞生了，都要有大字和数字的即时反馈。\n\n② 画面以 Q 版修仙小院为主。戏曲只做点缀：行当当性格标签、吵架“变脸”、敲门的咚咚声、两款戏曲头饰、喜事的贺词。\n\n和可玩原型不一致时，以原型为准。"
+    }
+  },
+  "designSystems": [],
+  "attachments": {}
+}

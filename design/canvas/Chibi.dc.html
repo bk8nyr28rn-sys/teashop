@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Q 版角色</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="width: 100%; aspect-ratio: 120 / 150; position: relative">
+  <svg viewBox="0 0 120 150" width="100%" height="100%" role="img" aria-label="Q 版戏曲角色" style="display: block; overflow: visible">
+    <ellipse cx="60" cy="144" rx="34" ry="5" fill="#000000" opacity="0.18"></ellipse>
+    <path d="M44 26 Q34 6 10 8" fill="none" stroke="#E08A3C" stroke-width="3" stroke-linecap="round" opacity="{{featherOpacity}}"></path>
+    <path d="M76 26 Q86 6 110 8" fill="none" stroke="#E08A3C" stroke-width="3" stroke-linecap="round" opacity="{{featherOpacity}}"></path>
+    <path d="M30 98 Q14 110 10 134 Q20 138 27 129 Q31 114 37 106 Z" fill="#FFFFFF"></path>
+    <path d="M90 98 Q106 110 110 134 Q100 138 93 129 Q89 114 83 106 Z" fill="#FFFFFF"></path>
+    <path d="M32 92 Q60 80 88 92 L98 140 Q60 148 22 140 Z" fill="{{robe}}"></path>
+    <path d="M46 88 L60 104 L74 88" fill="none" stroke="{{trim}}" stroke-width="4" stroke-linejoin="round"></path>
+    <rect x="34" y="114" width="52" height="6" rx="3" fill="{{trim}}"></rect>
+    <circle cx="60" cy="56" r="34" fill="{{skin}}"></circle>
+    <circle cx="60" cy="20" r="12" fill="{{hair}}" opacity="{{bunOpacity}}"></circle>
+    <circle cx="60" cy="21" r="10" fill="{{hair}}" opacity="{{guanOpacity}}"></circle>
+    <path d="M50 24 L52 8 L68 8 L70 24 Z" fill="{{trim}}" opacity="{{guanOpacity}}"></path>
+    <circle cx="60" cy="15" r="3" fill="#7FE0FF" opacity="{{guanOpacity}}"></circle>
+    <path d="M44 17 H76" stroke="{{trim}}" stroke-width="3" stroke-linecap="round" opacity="{{guanOpacity}}"></path>
+    <path d="M48 16 L74 22" stroke="{{trim}}" stroke-width="3" stroke-linecap="round" opacity="{{bunOpacity}}"></path>
+    <path d="M26 56 Q27 21 60 21 Q93 21 94 56 Q86 37 60 37 Q34 37 26 56 Z" fill="{{hair}}"></path>
+    <path d="M30 32 L38 13 L50 25 L60 8 L70 25 L82 13 L90 32 Q60 23 30 32 Z" fill="{{trim}}" opacity="{{crownOpacity}}"></path>
+    <circle cx="38" cy="13" r="5" fill="#F0525A" opacity="{{crownOpacity}}"></circle>
+    <circle cx="60" cy="8" r="5" fill="#F0525A" opacity="{{crownOpacity}}"></circle>
+    <circle cx="82" cy="13" r="5" fill="#F0525A" opacity="{{crownOpacity}}"></circle>
+    <path d="M34 34 Q60 24 86 34 L84 40 Q60 31 36 40 Z" fill="{{trim}}" opacity="{{featherOpacity}}"></path>
+    <circle cx="60" cy="30" r="4" fill="#F0525A" opacity="{{featherOpacity}}"></circle>
+    <ellipse cx="46" cy="59" rx="9" ry="7" fill="#FF6B6B" opacity="0.3"></ellipse>
+    <ellipse cx="74" cy="59" rx="9" ry="7" fill="#FF6B6B" opacity="0.3"></ellipse>
+    <path d="M38 48 L52 52" stroke="#2B2233" stroke-width="3" stroke-linecap="round" opacity="{{browOpacity}}"></path>
+    <path d="M82 48 L68 52" stroke="#2B2233" stroke-width="3" stroke-linecap="round" opacity="{{browOpacity}}"></path>
+    <path d="{{eyeL}}" fill="{{eyeFill}}" stroke="#2B2233" stroke-width="3" stroke-linecap="round"></path>
+    <path d="{{eyeR}}" fill="{{eyeFill}}" stroke="#2B2233" stroke-width="3" stroke-linecap="round"></path>
+    <ellipse cx="41" cy="68" rx="7" ry="4" fill="#FF8FA3" opacity="0.75"></ellipse>
+    <ellipse cx="79" cy="68" rx="7" ry="4" fill="#FF8FA3" opacity="0.75"></ellipse>
+    <path d="{{mouth}}" fill="none" stroke="#9C3D46" stroke-width="2.6" stroke-linecap="round"></path>
+    <path d="M77 64 Q74 70 77 73 Q80 70 77 64 Z" fill="#7FC8FF" opacity="{{tearOpacity}}"></path>
+  </svg>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"robe":{"editor":"color","default":"#F0525A","options":["#F0525A","#52D6A6","#7FA8FF","#9B8CFF"]},"trim":{"editor":"color","default":"#FFC24B"},"headdress":{"editor":"enum","default":"bun","options":["bun","guan","plain","feather","crown"]},"skin":{"editor":"color","default":"#FFE4D6","options":["#FFE4D6","#F6CFB4","#D9A27E","#A8754F"]},"hair":{"editor":"color","default":"#2B2233","options":["#2B2233","#5A3A2E","#9A9DB8","#B4432F"]},"mood":{"editor":"enum","default":"calm","options":["calm","happy","sad","angry"]},"$preview":{"width":120,"height":150}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const head = this.props.headdress ?? 'bun';
+    const mood = this.props.mood ?? 'calm';
+    const dotL = 'M44 58 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0';
+    const dotR = 'M70 58 a3 3 0 1 0 6 0 a3 3 0 1 0 -6 0';
+    const arcL = 'M41 60 Q47 53 53 60';
+    const arcR = 'M67 60 Q73 53 79 60';
+    const happy = mood === 'happy';
+    const mouths = {
+      calm: 'M55 75 Q60 78 65 75',
+      happy: 'M53 73 Q60 81 67 73',
+      sad: 'M54 78 Q60 72 66 78',
+      angry: 'M54 77 L66 77',
+    };
+    return {
+      robe: this.props.robe ?? '#F0525A',
+      trim: this.props.trim ?? '#FFC24B',
+      featherOpacity: head === 'feather' ? 1 : 0,
+      crownOpacity: head === 'crown' ? 1 : 0,
+      bunOpacity: head === 'bun' ? 1 : 0,
+      guanOpacity: head === 'guan' ? 1 : 0,
+      skin: this.props.skin ?? '#FFE4D6',
+      hair: this.props.hair ?? '#2B2233',
+      browOpacity: mood === 'angry' ? 1 : 0,
+      tearOpacity: mood === 'sad' ? 1 : 0,
+      eyeL: happy ? arcL : dotL,
+      eyeR: happy ? arcR : dotR,
+      eyeFill: happy ? 'none' : '#2B2233',
+      mouth: mouths[mood] ?? mouths.calm,
+    };
+  }
+}
+</script>
+</body>
+</html>

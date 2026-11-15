@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>大互动押注</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&amp;family=Noto+Sans+SC:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#FFC24B}a:hover{color:#FFD67F}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; overflow: hidden; background: #15173A; color: #FFFFFF; font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; font-size: 14px">
+
+  <div style="position: absolute; left: 0; top: 0; width: 390px; height: 330px">
+    <svg width="390" height="330" viewBox="0 0 390 330" aria-hidden="true" style="position: absolute; left: 0; top: 0">
+      <rect x="0" y="0" width="390" height="330" fill="#1B1D45"></rect>
+      <path d="M0 250 L70 150 L130 220 L195 120 L262 226 L320 160 L390 252 V330 H0 Z" fill="#262960"></path>
+      <ellipse cx="195" cy="168" rx="54" ry="64" fill="#7FE0FF" opacity="0.18"></ellipse>
+      <ellipse cx="195" cy="168" rx="40" ry="50" fill="none" stroke="#7FE0FF" stroke-width="3" stroke-dasharray="6 6"></ellipse>
+      <rect x="0" y="252" width="390" height="78" fill="#3D4285"></rect>
+      <path d="M0 252 H390" stroke="#5B61B0" stroke-width="3"></path>
+      <circle cx="330" cy="70" r="20" fill="#FFF2C4" opacity="0.9"></circle>
+    </svg>
+    <div style="position: absolute; left: 112px; top: 150px; width: 82px">
+      <dc-import name="Chibi" robe="#F0525A" trim="#FFC24B" headdress="bun" mood="happy" hint-size="82px,102px"></dc-import>
+    </div>
+    <div style="position: absolute; left: 198px; top: 156px; width: 76px">
+      <dc-import name="Chibi" robe="#52D6A6" trim="#FFC24B" headdress="bun" mood="happy" hint-size="76px,95px"></dc-import>
+    </div>
+    <div style="position: absolute; left: 0; right: 0; top: 14px; display: flex; justify-content: space-between; padding: 0 16px; box-sizing: border-box">
+      <a href="Threads.dc.html" aria-label="返回红线" style="width: 44px; height: 44px; border-radius: 999px; background: #2A2D5E; display: flex; align-items: center; justify-content: center">
+        <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5 L8 12 L15 19" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      </a>
+      <span style="align-self: center; display: flex; align-items: center; gap: 6px; background: #2A2D5E; border-radius: 999px; padding: 6px 12px; font-size: 12px">
+        <span style="width: 8px; height: 8px; border-radius: 999px; background: #52D6A6"></span>阿青在线
+      </span>
+    </div>
+  </div>
+
+  <section aria-labelledby="big-title" style="position: absolute; left: 0; right: 0; bottom: 0; height: 530px; box-sizing: border-box; background: #2A2D5E; border-radius: 24px 24px 0 0; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+    <div style="display: flex; flex-direction: column; gap: 4px">
+      <h1 id="big-title" style="margin: 0; font-family: 'ZCOOL KuaiLe', sans-serif; font-weight: 400; font-size: 26px">和阿青结伴历练</h1>
+      <p style="margin: 0; font-size: 12.5px; color: #B9BCE8; line-height: 1.6">押上灵石当盘缠，一起闯一趟秘境。成了，盘缠全部化成情丝；失手，盘缠随机折损一半到全部，红线不变。</p>
+    </div>
+
+    <fieldset style="border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px">
+      <legend style="font-size: 13px; color: #B9BCE8; padding: 0; margin-bottom: 8px">押多少灵石（手头 186）</legend>
+      <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px">
+        <button type="button" style="min-height: 52px; border: 2px solid #4A4F8F; border-radius: 14px; background: transparent; color: #FFFFFF; font-family: 'ZCOOL KuaiLe', sans-serif; font-size: 20px">20</button>
+        <button type="button" style="min-height: 52px; border: 2px solid #4A4F8F; border-radius: 14px; background: transparent; color: #FFFFFF; font-family: 'ZCOOL KuaiLe', sans-serif; font-size: 20px">50</button>
+        <button type="button" aria-pressed="true" style="min-height: 52px; border: 2px solid #FFC24B; border-radius: 14px; background: #FFC24B; color: #1E2048; font-family: 'ZCOOL KuaiLe', sans-serif; font-size: 20px">100</button>
+        <button type="button" disabled style="min-height: 52px; border: 2px solid #353A75; border-radius: 14px; background: transparent; color: #6B6FA8; font-family: 'ZCOOL KuaiLe', sans-serif; font-size: 20px">200</button>
+      </div>
+    </fieldset>
+
+    <div style="background: #1E2048; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+      <div style="display: flex; justify-content: space-between; align-items: center">
+        <span style="font-size: 13px; color: #B9BCE8">成功率</span>
+        <span style="font-family: 'ZCOOL KuaiLe', sans-serif; font-size: 22px; color: #52D6A6">65%</span>
+      </div>
+      <div style="position: relative; height: 10px; border-radius: 999px; background: #353A75; overflow: hidden">
+        <div style="position: absolute; left: 0; top: 0; bottom: 0; width: 50%; background: #52D6A6"></div>
+        <div style="position: absolute; left: 50%; top: 0; bottom: 0; width: 15%; background: #A6F0D3"></div>
+      </div>
+      <span style="font-size: 11.5px; color: #B9BCE8">基础 50% · 阿青同时在场 +15%</span>
+      <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px">
+        <div style="border-radius: 12px; background: #2A2D5E; padding: 10px; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 12px; color: #52D6A6">成了</span>
+          <span style="font-weight: 700">情丝 +5.5</span>
+          <span style="font-size: 11px; color: #B9BCE8">100 灵石全部化成情丝</span>
+        </div>
+        <div style="border-radius: 12px; background: #2A2D5E; padding: 10px; display: flex; flex-direction: column; gap: 2px">
+          <span style="font-size: 12px; color: #FF9A6B">失手</span>
+          <span style="font-weight: 700">损失 50–100 灵石</span>
+          <span style="font-size: 11px; color: #B9BCE8">剩下的退回，红线不变</span>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin: 0; font-size: 11.5px; color: #B9BCE8; line-height: 1.6">你的其他红线会因此吃醋（大互动吃醋是平时的 1.5 倍）。</p>
+
+    <button type="button" style="margin-top: auto; min-height: 56px; border: 0; border-radius: 16px; background: #F0525A; color: #FFFFFF; font-family: 'ZCOOL KuaiLe', sans-serif; font-size: 24px; letter-spacing: 0.2em">出发</button>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
