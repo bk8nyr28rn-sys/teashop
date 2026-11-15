@@ -916,8 +916,8 @@ describe('#9 #10 #6 #15 族人与嫡传', () => {
 
   it('嫡传需要浓度门槛 + 双方签署；消耗浓度，灵根按消耗前算', () => {
     const w = world({ heir: { strandThreshold: 80, consumeRatio: 0.4 } });
-    addHouse(w, { id: 'A', traits: ['武生'] });
-    addHouse(w, { id: 'B', traits: ['花旦', '武生'] });
+    addHouse(w, { id: 'A', traits: ['剑修'] });
+    addHouse(w, { id: 'B', traits: ['丹修', '剑修'] });
     const t = tie(w, 'A', 'B');
     t.strands = 100;
     signHeir(w, 'A', t.id);
@@ -928,7 +928,7 @@ describe('#9 #10 #6 #15 族人与嫡传', () => {
     if (!r.ok) return;
     expect(r.value.spiritualRoot).toBe(100);
     expect(t.strands).toBeCloseTo(60);
-    expect(r.value.traitKinds.sort()).toEqual(['武生', '花旦'].sort());
+    expect(r.value.traitKinds.sort()).toEqual(['剑修', '丹修'].sort());
     expect(createHeir(w, t.id).ok).toBe(false);
   });
 
@@ -983,15 +983,15 @@ describe('#9 #10 #6 #15 族人与嫡传', () => {
 });
 
 describe('OC 资料与形象', () => {
-  it('可以改名字、性别、行当和形象；名字要 1–8 个字', () => {
+  it('可以改名字、性别、道途和形象；名字要 1–8 个字', () => {
     const w = world();
     addHouse(w, { id: 'A' });
-    const look = { robe: '#F0525A', trim: '#FFC24B', headdress: 'crown' as const, skin: '#FFE4D6', hair: '#2B2233' };
-    expect(updateProfile(w, 'A', { name: '  小满 ', gender: 'unsaid', traits: ['丑生'], appearance: look }).ok).toBe(true);
+    const look = { robe: '#F0525A', trim: '#FFC24B', headdress: 'twin' as const, skin: '#FFE4D6', hair: '#2B2233' };
+    expect(updateProfile(w, 'A', { name: '  小满 ', gender: 'unsaid', traits: ['器修'], appearance: look }).ok).toBe(true);
     const a = getHouse(w, 'A');
     expect(a.name).toBe('小满');
     expect(a.gender).toBe('unsaid');
-    expect(a.traits).toEqual(['丑生']);
+    expect(a.traits).toEqual(['器修']);
     expect(a.appearance).toEqual(look);
     expect(updateProfile(w, 'A', { name: '' }).ok).toBe(false);
     expect(updateProfile(w, 'A', { name: '一二三四五六七八九' }).ok).toBe(false);

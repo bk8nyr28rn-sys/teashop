@@ -42,6 +42,7 @@ import {
   type World,
 } from '../core';
 import { PROFILES, isOnline, playSession, startOfDay, type Agent } from '../sim/agents';
+import { migrateLook, migrateTraits } from './art';
 
 export const ME = 'me';
 export const QING = 'qing';
@@ -109,7 +110,7 @@ const MAX_CATCHUP_HOURS = 14 * 24;
 const SESSION_GAP_HOURS = 6;
 
 const QING_LOOK: Appearance = { robe: '#52D6A6', trim: '#FFC24B', headdress: 'bun', skin: '#FFE4D6', hair: '#2B2233' };
-const BAILU_LOOK: Appearance = { robe: '#7FA8FF', trim: '#E9ECFF', headdress: 'crown', skin: '#F6CFB4', hair: '#2B2233' };
+const BAILU_LOOK: Appearance = { robe: '#7FA8FF', trim: '#E9ECFF', headdress: 'twin', skin: '#F6CFB4', hair: '#2B2233' };
 
 export class Game {
   world: World;
@@ -528,6 +529,7 @@ export class Game {
       if (!raw) return null;
       const data = JSON.parse(raw) as Saved;
       const world = deserializeWorld(data.world);
+      migrateWorld(world);
       this.log = data.log ?? [];
       this.lastCheckInHour = data.lastCheckInHour ?? -Infinity;
       return { ...data, world };
@@ -537,11 +539,20 @@ export class Game {
   }
 }
 
+/** 旧存档里的戏曲头饰和行当标签，读档时换成修仙款 */
+function migrateWorld(w: World): void {
+  for (const h of w.houses.values()) {
+    if (h.appearance) h.appearance = migrateLook(h.appearance);
+    h.traits = migrateTraits(h.traits);
+  }
+  for (const heir of w.heirs.values()) heir.traitKinds = migrateTraits(heir.traitKinds);
+}
+
 function newWorld(): World {
   const w = createWorld({ seed: Math.floor(Math.random() * 1e9), recordEvents: false });
-  addHouse(w, { id: ME, name: '你', stones: 120, traits: ['文武生'] });
-  addHouse(w, { id: QING, name: '阿青', openness: 'devoted', traits: ['正印花旦'], appearance: QING_LOOK });
-  addHouse(w, { id: BAILU, name: '白露', realm: 3, traits: ['武生'], appearance: BAILU_LOOK });
+  addHouse(w, { id: ME, name: '你', stones: 120, traits: ['剑修'] });
+  addHouse(w, { id: QING, name: '阿青', openness: 'devoted', traits: ['丹修'], appearance: QING_LOOK });
+  addHouse(w, { id: BAILU, name: '白露', realm: 3, traits: ['御兽'], appearance: BAILU_LOOK });
   const t = tieThread(w, ME, { kind: 'friend', house: QING });
   if (t.ok) addStrands(w, t.value, 12);
   return w;

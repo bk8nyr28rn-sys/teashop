@@ -183,7 +183,7 @@ export function interact(world: World, by: HouseId, threadId: ThreadId, opts: { 
   return ok();
 }
 
-/** 开始一场争执：一部分浓度散成怨丝（两边各生），头像变脸 */
+/** 开始一场争执：一部分浓度散成怨丝（两边各生），头像换成生气的表情 */
 export function startQuarrel(world: World, thread: Thread, cause: 'misunderstanding' | 'risky'): void {
   if (thread.quarrel || thread.state !== 'active') return;
   const qc = world.config.quarrel;

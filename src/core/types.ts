@@ -17,12 +17,12 @@ export type GhostKind = 'wild' | 'spirit';
 export interface Appearance {
   robe: string;
   trim: string;
-  headdress: 'bun' | 'guan' | 'plain' | 'feather' | 'crown';
+  headdress: 'bun' | 'guan' | 'plain' | 'twin' | 'ribbon';
   skin: string;
   hair: string;
 }
 
-/** OC 的性别：随时可改，和行当、头饰都不挂钩 */
+/** OC 的性别：随时可改，和道途、发型都不挂钩 */
 export type Gender = 'male' | 'female' | 'other' | 'unsaid';
 
 /** 族人：由某根红线结出，记录父母（#9） */

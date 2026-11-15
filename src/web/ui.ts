@@ -22,7 +22,7 @@ import {
   type Thread,
   type World,
 } from '../core';
-import { DEFAULT_LOOK, HAIRS, HEADDRESSES, ROBES, ROLES, SKINS, TRIMS, chibi, ghost, npcLook, type Mood, type Swatch } from './art';
+import { DEFAULT_LOOK, HAIRS, HEADDRESSES, PATHS, ROBES, SKINS, TRIMS, chibi, ghost, npcLook, type Mood, type Swatch } from './art';
 import { Game, ME, SPEEDS, SPEED_LABEL, type Speed } from './game';
 
 export const REGIONS = ['hud', 'scene', 'fx', 'panel', 'nav', 'banner', 'toast', 'sheet'] as const;
@@ -105,9 +105,9 @@ function partnerMood(w: World, t: Thread): Mood {
   return 'calm';
 }
 
-function myLook(game: Game): { look: Appearance; clown: boolean } {
+function myLook(game: Game): { look: Appearance } {
   const me = game.world.houses.get(ME)!;
-  return { look: me.appearance ?? DEFAULT_LOOK, clown: me.traits.includes('丑生') };
+  return { look: me.appearance ?? DEFAULT_LOOK };
 }
 
 /** 族人的样子取自父母双方：衣色随搭档，镶边随你（孩子是两个人的结晶） */
@@ -140,7 +140,7 @@ function openAvatar(game: Game, first: boolean): void {
     name,
     initialName: name,
     gender: me.gender ?? 'unsaid',
-    role: me.traits[0] ?? ROLES[0]!,
+    role: PATHS.includes(me.traits[0] ?? '') ? me.traits[0]! : PATHS[0]!,
     look: { ...(me.appearance ?? DEFAULT_LOOK) },
   };
   ui.sheet = { type: 'avatar', first };
@@ -175,7 +175,7 @@ export function render(game: Game): Frame {
 function hud(game: Game): string {
   const w = game.world;
   const me = w.houses.get(ME)!;
-  const { look, clown } = myLook(game);
+  const { look } = myLook(game);
   const day = Math.floor(w.hour / HOURS_PER_DAY);
   const res = (icon: string, value: string, label: string, cls = '') =>
     `<div class="res ${cls}"><span>${icon}${label}</span><b class="num">${value}</b></div>`;
@@ -186,7 +186,7 @@ function hud(game: Game): string {
     turbo: '<path d="M1 5l7 7-7 7ZM9 5l7 7-7 7ZM17 5l6 7-6 7Z" fill="currentColor"/>',
   }[game.speed];
   return `<div class="hud-row gutter">
-    <button id="btn-avatar" class="me-btn" data-act="avatar" aria-label="设置形象">${chibi(look, 'calm', 'class="portrait"', { portrait: true, clown })}</button>
+    <button id="btn-avatar" class="me-btn" data-act="avatar" aria-label="设置形象">${chibi(look, 'calm', 'class="portrait"', { portrait: true })}</button>
     <div class="who"><b>${esc(me.name)}</b><span class="num">境界 ${me.realm} · 第 ${day + 1} 天 ${WEEKDAYS[day % 7]} ${String(w.hour % 24).padStart(2, '0')}:00</span></div>
     <button id="btn-speed" class="chip-btn" data-act="speed-cycle" aria-label="时间流速：${SPEED_LABEL[game.speed]}，点按切换">${ic(speedIcon)}${SPEED_LABEL[game.speed]}</button>
     <button id="btn-settings" class="icon-btn" data-act="settings" aria-label="设置">${I.gear}</button>
@@ -214,7 +214,7 @@ function homeScene(game: Game): string {
   const ring = safe ? '#52D6A6' : damaged ? '#FF9A6B' : '#FFC24B';
   const threads = sortedThreads(game);
   const top = threads[0];
-  const { look, clown } = myLook(game);
+  const { look } = myLook(game);
   const mood: Mood = knock ? (knock.outcome === 'breach' ? 'sad' : 'happy') : threads.some((t) => t.quarrel) ? 'sad' : 'calm';
 
   const celestial =
@@ -295,7 +295,7 @@ function homeScene(game: Game): string {
     ${line}
     ${members}
     <ellipse cx="150" cy="274" rx="30" ry="7" fill="#9B8CFF"/>
-    <g class="tap bob" data-act="avatar">${chibi(look, mood, 'x="112" y="180" width="76" height="95"', { clown })}</g>
+    <g class="tap bob" data-act="avatar">${chibi(look, mood, 'x="112" y="180" width="76" height="95"')}</g>
     ${pile}
     ${pill}
   </svg>`;
@@ -303,7 +303,7 @@ function homeScene(game: Game): string {
 
 function tribScene(game: Game): string {
   const w = game.world;
-  const { look, clown } = myLook(game);
+  const { look } = myLook(game);
   const odds = tribulationOdds(w, ME, { usePill: ui.usePill });
   const helper = odds.helper ? partnerOf(game, odds.helper) : null;
   return `<svg class="scene-svg" viewBox="0 0 390 240" role="img" aria-label="渡劫">
@@ -314,7 +314,7 @@ function tribScene(game: Game): string {
     <rect x="262" y="44" width="112" height="24" rx="12" fill="#2A2D5E" stroke="#E9ECFF" stroke-width="1.500"/>
     <text x="318" y="61" text-anchor="middle" font-size="12" fill="#FFFFFF">大鬼 · 战力 ${fmt(odds.strength)}</text>
     ${helper ? `<g opacity="0.8">${chibi(helper.look, 'calm', 'x="96" y="142" width="58" height="72.500"')}</g>` : ''}
-    <g class="bob">${chibi(look, 'angry', 'x="157" y="122" width="76" height="95"', { clown })}</g>
+    <g class="bob">${chibi(look, 'angry', 'x="157" y="122" width="76" height="95"')}</g>
   </svg>`;
 }
 
@@ -727,18 +727,18 @@ function avatarSheet(game: Game, first: boolean, head: Head): string {
       .join('')}</div></fieldset>`;
   return `${head(first ? '先捏一个你的 OC' : '设置形象')}
     <div class="sheet-body gutter stack" id="avatar-scroll" data-keep-scroll>
-      <div class="avatar-stage">${chibi(d.look, 'happy', 'class="avatar-big"', { clown: d.role === '丑生', label: '形象预览' })}</div>
+      <div class="avatar-stage">${chibi(d.look, 'happy', 'class="avatar-big"', { label: '形象预览' })}</div>
       <label for="oc-name">名字</label>
       <input id="oc-name" maxlength="8" value="${esc(d.initialName)}" placeholder="1–8 个字" autocomplete="off">
       ${group('性别', 'gender', GENDERS, d.gender)}
-      <p class="hint">性别随时可改，和发型、行当都不挂钩。</p>
+      <p class="hint">性别随时可改，和发型、道途都不挂钩。</p>
       ${group('发型', 'headdress', HEADDRESSES, d.look.headdress)}
       ${swatches('衣色', 'robe', ROBES, d.look.robe)}
       ${swatches('镶边', 'trim', TRIMS, d.look.trim)}
       ${swatches('肤色', 'skin', SKINS, d.look.skin)}
       ${swatches('发色', 'hair', HAIRS, d.look.hair)}
-      ${group('行当（性格标签）', 'role', ROLES.map((r) => ({ id: r, n: r })), d.role)}
-      <p class="hint">行当只是 OC 的性格标签，嫡传会继承双方的行当。</p>
+      ${group('道途（身份标签）', 'role', PATHS.map((r) => ({ id: r, n: r })), d.role)}
+      <p class="hint">道途只是标签，不影响任何数值；嫡传会继承双方的道途。</p>
     </div>
     <footer class="sheet-foot gutter"><button id="avatar-save" class="btn primary huge" data-act="avatar-save">${first ? '开始' : '保存'}</button></footer>`;
 }
@@ -757,11 +757,11 @@ function bigSheet(game: Game, threadId: string, head: Head): string {
   const gain = stake * b.strandsPerStone * (1 + b.successEdge) * (t.b ? 1 : w.config.npc.investMultiplier);
   const result = game.activeBig(threadId);
   const jealous = threadsOf(w, ME).some((x) => x.id !== threadId && x.tier > 0);
-  const { look, clown } = myLook(game);
+  const { look } = myLook(game);
   return `${head(`和${p.name}结伴历练`)}
     <div class="sheet-body gutter stack">
       <div class="duo${result ? (result.success ? ' win' : ' lose') : ''}">
-        ${chibi(look, result ? (result.success ? 'happy' : 'sad') : 'calm', 'class="duo-svg"', { clown })}
+        ${chibi(look, result ? (result.success ? 'happy' : 'sad') : 'calm', 'class="duo-svg"')}
         ${chibi(p.look, result ? (result.success ? 'happy' : 'sad') : partnerMood(w, t), 'class="duo-svg"')}
         ${result ? `<div class="result ${result.success ? 'ok' : 'bad'}"><b>${result.success ? '满载而归！' : '铩羽而归…'}</b><span>${result.success ? `情丝 +${fmt(result.strands)}` : `折了 ${result.lost} 灵石`}</span></div>` : ''}
       </div>

@@ -172,7 +172,7 @@ function createAgents(world: World, o: SimOptions): Agent[] {
         id: `${arch}-${i}`,
         openness: p.openness,
         isMinor: p.isMinor,
-        traits: [world.rng.pick(['文武生', '小生', '正印花旦', '二帮花旦', '丑生', '武生'])],
+        traits: [world.rng.pick(['剑修', '丹修', '符修', '阵修', '器修', '御兽'])],
       });
       group.push({ houseId: house.id, archetype: arch, profile: p, activeToday: true, loveBudget: 0 });
     }

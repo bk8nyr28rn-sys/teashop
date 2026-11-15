@@ -152,7 +152,7 @@ export function isThreadFrozen(world: World, thread: Thread): boolean {
 }
 
 /**
- * 修改 OC 的资料：名字、性别、行当（特质）、形象。随时可改。
+ * 修改 OC 的资料：名字、性别、道途（特质，只是标签）、形象。随时可改。
  * 名字是玩家自己输入的文字，联网后别人看得到，上线前要接敏感词审核。
  */
 export function updateProfile(

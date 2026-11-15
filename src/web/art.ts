@@ -39,16 +39,27 @@ export const HAIRS: Swatch[] = [
   { c: '#9A9DB8', n: '霜银' },
   { c: '#B4432F', n: '赭红' },
 ];
-/** 发型以修仙为主；翎子和凤冠是两个戏曲款（点缀） */
+/** 发型全部是修仙风格（形象里不放戏曲元素） */
 export const HEADDRESSES: { id: Appearance['headdress']; n: string }[] = [
   { id: 'bun', n: '发髻' },
   { id: 'guan', n: '玉冠' },
   { id: 'plain', n: '披发' },
-  { id: 'feather', n: '翎子 · 戏曲款' },
-  { id: 'crown', n: '凤冠 · 戏曲款' },
+  { id: 'twin', n: '双髻' },
+  { id: 'ribbon', n: '仙带' },
 ];
-/** 行当取自粤剧六柱制，只当作 OC 的性格标签，和性别脱钩 */
-export const ROLES = ['文武生', '小生', '正印花旦', '二帮花旦', '丑生', '武生'];
+/** 道途：OC 的身份标签，只是标签，不影响任何数值；和性别脱钩 */
+export const PATHS = ['剑修', '丹修', '符修', '阵修', '器修', '御兽'];
+
+/** 旧存档兼容：以前的两款戏曲头饰换成修仙款，旧的行当标签换成道途 */
+const LEGACY_HEADDRESS: Record<string, Appearance['headdress']> = { feather: 'ribbon', crown: 'twin' };
+const LEGACY_TRAIT: Record<string, string> = { 文武生: '剑修', 小生: '符修', 正印花旦: '丹修', 二帮花旦: '阵修', 丑生: '器修', 武生: '御兽' };
+export function migrateLook(look: Appearance): Appearance {
+  const hd = LEGACY_HEADDRESS[look.headdress as string];
+  return hd ? { ...look, headdress: hd } : look;
+}
+export function migrateTraits(traits: string[]): string[] {
+  return [...new Set(traits.map((t) => LEGACY_TRAIT[t] ?? t))];
+}
 
 export const DEFAULT_LOOK: Appearance = { robe: '#F0525A', trim: '#FFC24B', headdress: 'bun', skin: '#FFE4D6', hair: '#2B2233' };
 
@@ -56,13 +67,13 @@ const INK = '#2B2233';
 
 /**
  * Q 版角色。attrs 原样写进 <svg> 标签（class，或嵌套时的 x / y / width / height）。
- * portrait：只取头像；clown：丑生的“豆腐块”白鼻。
+ * portrait：只取头像。
  */
 export function chibi(
   look: Appearance,
   mood: Mood,
   attrs: string,
-  opts: { portrait?: boolean; clown?: boolean; label?: string } = {},
+  opts: { portrait?: boolean; label?: string } = {},
 ): string {
   const { robe, trim, skin, hair, headdress } = look;
   const happy = mood === 'happy';
@@ -80,8 +91,9 @@ export function chibi(
 
   return `<svg ${attrs} viewBox="${viewBox}" ${a11y}>
 ${opts.portrait ? '' : '<ellipse cx="60" cy="144" rx="34" ry="5" fill="#000" opacity="0.18"/>'}
-${headdress === 'feather' ? '<path d="M44 26 Q34 6 10 8 M76 26 Q86 6 110 8" fill="none" stroke="#E08A3C" stroke-width="3" stroke-linecap="round"/>' : ''}
-<path d="M30 98 Q14 110 10 134 Q20 138 27 129 Q31 114 37 106 Z M90 98 Q106 110 110 134 Q100 138 93 129 Q89 114 83 106 Z" fill="#FFFFFF"/>
+${headdress === 'ribbon' ? `<path d="M50 26 Q30 30 16 52 Q24 54 30 48 Q40 34 52 30 Z M70 26 Q90 30 104 52 Q96 54 90 48 Q80 34 68 30 Z" fill="${trim}" opacity="0.85"/>` : ''}
+<path d="M32 96 Q14 108 12 128 Q22 134 30 126 Q33 112 38 104 Z M88 96 Q106 108 108 128 Q98 134 90 126 Q87 112 82 104 Z" fill="${robe}"/>
+<path d="M13 127 Q22 133 30 125 M107 127 Q98 133 90 125" fill="none" stroke="${trim}" stroke-width="3" stroke-linecap="round"/>
 <path d="M32 92 Q60 80 88 92 L98 140 Q60 148 22 140 Z" fill="${robe}"/>
 <path d="M46 88 L60 104 L74 88" fill="none" stroke="${trim}" stroke-width="4" stroke-linejoin="round"/>
 <rect x="34" y="114" width="52" height="6" rx="3" fill="${trim}"/>
@@ -89,13 +101,11 @@ ${headdress === 'feather' ? '<path d="M44 26 Q34 6 10 8 M76 26 Q86 6 110 8" fill
 ${headdress === 'bun' ? `<circle cx="60" cy="20" r="12" fill="${hair}"/><path d="M48 16 L74 22" stroke="${trim}" stroke-width="3" stroke-linecap="round"/>` : ''}
 ${headdress === 'guan' ? `<circle cx="60" cy="21" r="10" fill="${hair}"/><path d="M50 24 L52 8 L68 8 L70 24 Z" fill="${trim}"/><circle cx="60" cy="15" r="3" fill="#7FE0FF"/><path d="M44 17 H76" stroke="${trim}" stroke-width="3" stroke-linecap="round"/>` : ''}
 <path d="M26 56 Q27 21 60 21 Q93 21 94 56 Q86 37 60 37 Q34 37 26 56 Z" fill="${hair}"/>
-${headdress === 'crown' ? `<path d="M30 32 L38 13 L50 25 L60 8 L70 25 L82 13 L90 32 Q60 23 30 32 Z" fill="${trim}"/><circle cx="38" cy="13" r="5" fill="#F0525A"/><circle cx="60" cy="8" r="5" fill="#F0525A"/><circle cx="82" cy="13" r="5" fill="#F0525A"/>` : ''}
-${headdress === 'feather' ? `<path d="M34 34 Q60 24 86 34 L84 40 Q60 31 36 40 Z" fill="${trim}"/><circle cx="60" cy="30" r="4" fill="#F0525A"/>` : ''}
-<ellipse cx="46" cy="59" rx="9" ry="7" fill="#FF6B6B" opacity="0.3"/><ellipse cx="74" cy="59" rx="9" ry="7" fill="#FF6B6B" opacity="0.3"/>
+${headdress === 'twin' ? `<circle cx="34" cy="26" r="11" fill="${hair}"/><circle cx="86" cy="26" r="11" fill="${hair}"/><path d="M28 32 Q34 37 40 32 M80 32 Q86 37 92 32" fill="none" stroke="${trim}" stroke-width="3" stroke-linecap="round"/>` : ''}
+${headdress === 'ribbon' ? `<path d="M30 36 Q60 26 90 36" fill="none" stroke="${trim}" stroke-width="4" stroke-linecap="round"/>` : ''}
 ${mood === 'angry' ? `<path d="M38 48 L52 52 M82 48 L68 52" stroke="${INK}" stroke-width="3" stroke-linecap="round"/>` : ''}
 ${eyes}
 <ellipse cx="41" cy="68" rx="7" ry="4" fill="#FF8FA3" opacity="0.75"/><ellipse cx="79" cy="68" rx="7" ry="4" fill="#FF8FA3" opacity="0.75"/>
-${opts.clown ? '<rect x="53" y="59" width="14" height="10" rx="4" fill="#FFFFFF"/>' : ''}
 <path d="${mouth}" fill="none" stroke="#9C3D46" stroke-width="2.6" stroke-linecap="round"/>
 ${mood === 'sad' ? '<path d="M77 64 Q74 70 77 73 Q80 70 77 64 Z" fill="#7FC8FF"/>' : ''}
 </svg>`;
