@@ -1,9 +1,11 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>红线守宅原型</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&family=Noto+Sans+SC:wght@400;700&display=swap">
+<!--__FONT_LICENSES__-->
 <style>
+/*__FONTS__*/
 /* 布局：竖屏一栏。顶栏（资源）＋ 可滚动的中间（场景在上、卡片在下）＋ 底部四个导航。单一夜色主题。 */
 :root {
   --bg: #1E2048;      /* 夜色，页面底 */
@@ -24,7 +26,7 @@
   color-scheme: dark;
 }
 html, body { height: 100%; }
-body { background: var(--deep); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
+body { margin: 0; background: var(--deep); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.5; }
 h1, h2, p { margin: 0; }
 button { font: inherit; color: inherit; cursor: pointer; }
 button:disabled { cursor: not-allowed; }

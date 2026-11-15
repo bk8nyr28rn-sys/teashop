@@ -15,7 +15,7 @@
 
 ```bash
 npm ci               # 装依赖（只有开发依赖：typescript、vitest、tsx、esbuild、@types/node）
-npm test             # 单元测试，当前 83 个全部通过
+npm test             # 单元测试，当前 84 个全部通过
 npm run typecheck    # 两次类型检查：核心用不含 DOM 和 Node 的配置单独检查
 npm run sim          # 数值模拟：6 类玩家 × 200 人 × 30 天，约 1 秒
 npm run sim -- --days 120 --players 300 --set big.strandsPerStone=0.04
@@ -107,8 +107,8 @@ design/      设计稿画布的源文件（.dc.html 是 HTML + 一段组件脚�
 
 | 项目 | 说明 |
 | --- | --- |
-| 字体 | 原型从谷歌字体加载，国内大概率加载不出来；Cocos 版要打包字体文件 |
-| 每日怨丝上限 | 正常玩法里几乎不触发（每人每天散掉约 0.01），需要极端场景测试，可能根本不需要 |
+| 字体 | 网页原型已将 ZCOOL KuaiLe / Noto Sans SC 的 WOFF2 用字子集内嵌到 HTML，离线可用；新增文案后按 `assets/fonts/README.md` 刷新子集；Cocos 版仍需接入本地字体 |
+| 每日怨丝上限 | 正常玩法里几乎不触发（每人每天散掉约 0.01）；已补充默认上限下同日连续 1000 次大额灌入测试，核对入池量、超额散掉与次日无积压；规则和数值不变 |
 | 嫡传“成年” | 哪个境界算成年还没定；`heirAdulthoodChoice` 需要调用方决定何时调用 |
 | 第二版内容 | 大富翁、完整归属争取期、陌生人匹配、低价卡，都还没做 |
 | 服务器 | 没有。真人之间的线、离线结算现在都在浏览器本地模拟；方案未定（微信云开发 / 自建） |

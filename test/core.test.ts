@@ -73,6 +73,39 @@ const calm: DeepPartial<GameConfig> = {
 };
 
 describe('#12 每日怨丝上限', () => {
+  it('同日连续 1000 次大额灌入也只接收当日额度，超额全部散掉且不延后入池', () => {
+    const w = world(calm);
+    addHouse(w, { id: 'A' });
+    const house = getHouse(w, 'A');
+    const cap = w.config.grudge.dailyCap;
+    const sources = ['neglect', 'strain', 'jealousy', 'quarrel', 'cut', 'spiritLost'] as const;
+    const burst = cap * 1000;
+    const count = 1000;
+    expect(addGrudge(w, 'A', cap / 2, 'other')).toBe(cap / 2);
+    for (let i = 0; i < count; i++) {
+      const source = sources[i % sources.length]!;
+      const expected = i === 0 ? cap / 2 : 0;
+      expect(addGrudge(w, 'A', burst, source)).toBe(expected);
+      expect(house.grudge).toBe(cap);
+      expect(house.grudgeToday).toBe(cap);
+      expect(w.events[w.events.length - 1]).toMatchObject({
+        type: 'grudgeAdded', house: 'A', hour: 0, source,
+        amount: expected, dissipated: burst - expected,
+      });
+    }
+    const events = w.events.filter(e => e.type === 'grudgeAdded');
+    expect(events).toHaveLength(count + 1);
+    expect(events.reduce((sum, e) => sum + e.amount, 0)).toBe(cap);
+    expect(events.reduce((sum, e) => sum + e.dissipated, 0)).toBe(count * burst - cap / 2);
+    // 新一天只重置额度；已经散掉的巨量怨丝不能重新进入池子。
+    hours(w, DAY + 1);
+    expect(house.grudgeToday).toBe(0);
+    expect(house.grudge).toBe(cap);
+    expect(addGrudge(w, 'A', cap, 'other')).toBe(cap);
+    expect(house.grudgeToday).toBe(cap);
+    expect(house.grudge).toBe(cap * 2);
+  });
+
   it('超出上限的部分直接散掉，第二天重新计算', () => {
     const w = world({ ...calm, grudge: { dailyCap: 30 } });
     addHouse(w, { id: 'A' });
