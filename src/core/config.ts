@@ -7,6 +7,9 @@
  * 其余仍是占位，要继续用模拟器调。
  * 注释里的 #N 对应 v2 文档“决定记录”的编号。
  */
+/** 守夜时的守卫类型（道途）。孩子的道途决定 TA 守夜时怎么出手 */
+export const GUARD_PATHS = ['剑修', '丹修', '符修', '阵修', '器修', '御兽'] as const;
+
 export interface GameConfig {
   /** #12 每天新生的怨丝上限，超出的部分直接散掉 */
   grudge: {
@@ -183,6 +186,10 @@ export interface GameConfig {
     practiceStrength: number;
     tierGrowth: number[];
     memberRatios: number[];
+    /** 开局收养几个孩子（保底：一个人也能守夜） */
+    adoptedKids: number;
+    /** 收养孩子的资质（红线结出的孩子按出生时的浓度算，通常更高） */
+    adoptedRoot: number;
   };
 
   /** #11 #13 鬼 */
@@ -254,6 +261,53 @@ export interface GameConfig {
     maxMembers: number;
     memberStartCultivation: number;
     memberCultivationPerDay: number;
+  };
+
+  /** 守夜局：主动开的实时塔防。孩子是守卫，当家人自己也能出手 */
+  raid: {
+    waves: number;
+    /** 第一波开始前的准备时间、每波之间的间隔、每波出怪的时长（秒） */
+    prepSeconds: number;
+    waveGap: number;
+    spawnSpan: number;
+    /** 门的血量 = doorBase + 大阵 × doorPerPower */
+    doorBase: number;
+    doorPerPower: number;
+    /** 灵气：局内货币。开局多少、每秒自然涨多少 */
+    startQi: number;
+    qiPerSecond: number;
+    /** 点鬼一下的伤害 = tapBase + 境界 × tapPerRealm；两次点击至少隔多少秒 */
+    tapBase: number;
+    tapPerRealm: number;
+    tapInterval: number;
+    /** 守卫升级花费（第 n 级升到 n+1 级），等级加成 */
+    upgradeCosts: number[];
+    levelBonus: number;
+    /** 修门：花费、回复最大血量的比例、冷却秒数 */
+    repairCost: number;
+    repairRatio: number;
+    repairCooldown: number;
+    /** 加固门：首次花费、之后每次花费倍数、加最大血量的比例 */
+    reinforceCost: number;
+    reinforceGrowth: number;
+    reinforceRatio: number;
+    /** 守卫强度 = 1 + 资质 / perRoot + 修为 / perCultivation */
+    perRoot: number;
+    perCultivation: number;
+    /** 每天前几局有奖励；之后可以随便玩，没有奖励 */
+    rewardedPerDay: number;
+    winStones: number;
+    winStonesPerRealm: number;
+    loseStonesPerWave: number;
+    /** 每个上阵的孩子赢了加多少修为、输了加多少 */
+    winCultivation: number;
+    loseCultivation: number;
+    /** 鬼的强度随境界放大：1 + (境界 − 1) × realmScale；每波血量再乘 1 + (波数 − 1) × waveHpScale */
+    realmScale: number;
+    waveHpScale: number;
+    /** 整体难度旋钮：鬼的血量、砸门伤害统一乘这个 */
+    ghostHpScale: number;
+    ghostDpsScale: number;
   };
 
   /** #9 #10 嫡传 */
@@ -342,7 +396,7 @@ export const defaultConfig: GameConfig = {
     reliefPerInteraction: 0.5,
     naturalDecayPerDay: 0.1,
   },
-  newbie: { protectionDays: 3, practiceHour: 20, practiceStrength: 0, tierGrowth: [8], memberRatios: [0.03, 0.15] },
+  newbie: { protectionDays: 3, practiceHour: 20, practiceStrength: 0, tierGrowth: [8], memberRatios: [0.002, 0.15], adoptedKids: 2, adoptedRoot: 8 },
   ghosts: {
     wildPerHour: 0.02,
     wildBaseStrength: 30,
@@ -386,6 +440,39 @@ export const defaultConfig: GameConfig = {
     maxMembers: 12,
     memberStartCultivation: 1,
     memberCultivationPerDay: 0.5,
+  },
+  raid: {
+    waves: 5,
+    prepSeconds: 5,
+    waveGap: 26,
+    spawnSpan: 14,
+    doorBase: 150,
+    doorPerPower: 2.5,
+    startQi: 40,
+    qiPerSecond: 3,
+    tapBase: 3,
+    tapPerRealm: 1.5,
+    tapInterval: 0.08,
+    upgradeCosts: [0, 15, 35, 65, 110],
+    levelBonus: 0.35,
+    repairCost: 20,
+    repairRatio: 0.3,
+    repairCooldown: 3,
+    reinforceCost: 40,
+    reinforceGrowth: 1.7,
+    reinforceRatio: 0.25,
+    perRoot: 60,
+    perCultivation: 40,
+    rewardedPerDay: 2,
+    winStones: 15,
+    winStonesPerRealm: 5,
+    loseStonesPerWave: 3,
+    winCultivation: 2,
+    loseCultivation: 0.5,
+    realmScale: 1.2,
+    waveHpScale: 0.45,
+    ghostHpScale: 1.3,
+    ghostDpsScale: 1,
   },
   heir: { strandThreshold: 60, consumeRatio: 0.4 },
   tribulation: {

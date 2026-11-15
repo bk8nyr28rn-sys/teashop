@@ -39,6 +39,12 @@ export interface ClanMember {
   cultivation: number;
   /** 疗伤到第几个小时（#8） */
   injuredUntil: number;
+  /** 资质：出生那一刻红线的浓度（感情越好，孩子越强）。收养的孩子是固定的低值 */
+  root?: number;
+  /** 道途：继承父母一方，决定守夜时是什么样的守卫 */
+  path?: string;
+  /** 开局收养的孩子：不占新手期加速名额，也不占红线结出的族人上限 */
+  adopted?: boolean;
 }
 
 /** 一个玩家的家族（当家人就是玩家的 OC） */
@@ -88,6 +94,9 @@ export interface House {
   cultivationProgress: number;
   breakthroughPills: number;
   tribulationCooldownUntil: number;
+  /** 守夜局：哪一天、当天已经拿过几次奖励 */
+  raidDay?: number;
+  raidRewardsToday?: number;
 }
 
 export type ThreadState = 'active' | 'cut' | 'severed';
@@ -159,6 +168,7 @@ export type GameEvent =
   | { type: 'reconciled'; hour: number; thread: ThreadId }
   | { type: 'severed'; hour: number; by: HouseId; other: HouseId }
   | { type: 'memberBorn'; hour: number; house: HouseId; thread: ThreadId }
+  | { type: 'raidEnded'; hour: number; house: HouseId; win: boolean; wave: number; rewarded: boolean; stones: number; hearts: number }
   | { type: 'heirBorn'; hour: number; heir: HeirId; thread: ThreadId }
   | { type: 'heirHomeSet'; hour: number; heir: HeirId; home: HouseId; reason: 'agreed' | 'breakup' | 'adulthood' }
   | { type: 'golden'; hour: number; thread: ThreadId }

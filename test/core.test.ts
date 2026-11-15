@@ -47,8 +47,9 @@ import {
 
 const DAY = 24;
 
+/** 测试里默认不送收养的孩子（单独测），免得干扰族人数量 */
 function world(config: DeepPartial<GameConfig> = {}, seed = 7): World {
-  return createWorld({ seed, config });
+  return createWorld({ seed, config: { ...config, newbie: { adoptedKids: 0, ...config.newbie } } });
 }
 
 function tie(w: World, a: string, b: string, kind: 'friend' | 'stranger' = 'friend'): Thread {

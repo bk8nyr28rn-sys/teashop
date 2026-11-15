@@ -14,3 +14,4 @@ export * from './threads';
 export * from './tick';
 export * from './types';
 export * from './world';
+export * from './raid';

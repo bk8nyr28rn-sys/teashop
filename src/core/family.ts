@@ -1,3 +1,4 @@
+import { GUARD_PATHS } from './config';
 import { addStrands } from './threads';
 import type { ClanMember, Heir, HeirId, HouseId, Result, Thread, ThreadId, World } from './types';
 import { emit, fail, getHouse, getThread, newId, ok, rankedThreads, spendAction } from './world';
@@ -17,8 +18,9 @@ export function hourlyFamily(world: World): void {
       if (thread.strands <= 0) continue;
       let progress = (thread.memberProgress[house.id] ?? 0) + thread.strands * weight;
       // 新手期：前几位族人结得快
-      const need = () => base * (ratios[house.members.length] ?? 1);
-      while (progress >= need() && house.members.length < world.config.family.maxMembers) {
+      const born = () => house.members.filter((m) => !m.adopted).length;
+      const need = () => base * (ratios[born()] ?? 1);
+      while (progress >= need() && born() < world.config.family.maxMembers) {
         progress -= need();
         birthMember(world, house.id, thread);
       }
@@ -30,16 +32,33 @@ export function hourlyFamily(world: World): void {
 function birthMember(world: World, houseId: HouseId, thread: Thread): void {
   const house = getHouse(world, houseId);
   const cfg = world.config.family;
-  if (house.members.length >= cfg.maxMembers) return;
+  if (house.members.filter((m) => !m.adopted).length >= cfg.maxMembers) return;
+  const id = newId(world, 'm');
   const member: ClanMember = {
-    id: newId(world, 'm'),
+    id,
     parents: [thread.a, thread.b ?? thread.npcName ?? 'NPC'],
     threadId: thread.id,
     cultivation: cfg.memberStartCultivation,
     injuredUntil: 0,
+    // 资质 = 出生那一刻的红线浓度：感情越好，孩子越强
+    root: Math.round(thread.strands * 10) / 10,
+    path: inheritPath(world, thread, id),
   };
   house.members.push(member);
   emit(world, { type: 'memberBorn', hour: world.hour, house: houseId, thread: thread.id });
+}
+
+/** 孩子从父母的道途里继承一个；父母都没写道途时按编号挑 */
+function inheritPath(world: World, thread: Thread, memberId: string): string {
+  const parents = [thread.a, thread.b].filter((x): x is HouseId => !!x && world.houses.has(x));
+  const options = [...new Set(parents.flatMap((p) => getHouse(world, p).traits))].filter((t) =>
+    (GUARD_PATHS as readonly string[]).includes(t),
+  );
+  // 不消耗随机数（不改变其他规则的随机序列），按编号定
+  let h = 7;
+  for (const ch of memberId) h = (h * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+  const pool = options.length > 0 ? options : GUARD_PATHS;
+  return pool[h % pool.length] as string;
 }
 
 /** 每天结算：没在疗伤的族人修为慢慢涨 */

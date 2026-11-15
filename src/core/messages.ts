@@ -64,6 +64,13 @@ export function describeEvent(world: World, e: GameEvent, me: HouseId): Message 
     case 'severed':
       if (e.by !== me && e.other !== me) return null;
       return { text: '一刀两断，此后不相往来。', tone: 'info' };
+    case 'raidEnded': {
+      if (e.house !== me) return null;
+      const gain = e.rewarded ? `，带回 ${e.stones} 灵石${e.hearts ? `、${e.hearts} 颗诡心` : ''}，孩子们修为见长` : '（今天的奖励已领完，这局是练手）';
+      return e.win
+        ? { text: `守夜大胜，五波鬼尽数打散${gain}。`, tone: 'good' }
+        : { text: `守夜失利，撑到第 ${e.wave} 波${gain}。`, tone: 'bad' };
+    }
     case 'memberBorn':
       if (e.house !== me) return null;
       return { text: `与${partnerOf(thread(e.thread))}的情丝结出一位族人，家中又添人丁。`, tone: 'good' };

@@ -1,4 +1,4 @@
-import { mergeConfig, type DeepPartial, type GameConfig } from './config';
+import { GUARD_PATHS, mergeConfig, type DeepPartial, type GameConfig } from './config';
 import { Rng } from './rng';
 import type { Appearance, GameEvent, Gender, House, HouseId, Openness, Result, Thread, World } from './types';
 
@@ -79,6 +79,19 @@ export function addHouse(
     breakthroughPills: 0,
     tribulationCooldownUntil: 0,
   };
+  // 保底：开局收养几个孩子（一个剑修打鬼、一个丹修回门），一个人也能守夜
+  for (let i = 0; i < world.config.newbie.adoptedKids; i++) {
+    house.members.push({
+      id: newId(world, 'm'),
+      parents: [id, '收养'],
+      threadId: '',
+      cultivation: world.config.family.memberStartCultivation,
+      injuredUntil: 0,
+      root: world.config.newbie.adoptedRoot,
+      path: GUARD_PATHS[i % 2 === 0 ? 0 : 1],
+      adopted: true,
+    });
+  }
   world.houses.set(id, house);
   return house;
 }
