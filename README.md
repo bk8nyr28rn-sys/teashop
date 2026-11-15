@@ -1,6 +1,8 @@
 # teashop · 融合玩法逻辑核心
 
-《融合玩法方案汇总（v2）》的规则实现和数值模拟器。目前没有画面：这一步只写规则，用来先验证数值。
+《融合玩法方案汇总（v2.1）》的规则实现、数值模拟器和竖屏网页可玩原型。
+
+**接手调试先读 [`docs/HANDOFF.md`](docs/HANDOFF.md)**；美术规格见 [`docs/ART_SPEC.md`](docs/ART_SPEC.md)；方案文档离线副本见 [`docs/DESIGN_v2.1.md`](docs/DESIGN_v2.1.md)；各页面参考截图在 `docs/art/screens/`。
 
 ## 目录
 
@@ -17,6 +19,8 @@ src/core/   逻辑核心：只有规则，不依赖任何引擎和 Node API，�
 src/sim/    数值模拟器（只在开发时用，不进游戏）
 src/web/    网页可玩原型：界面只是一层壳，规则全部来自 src/core
 test/       单元测试，每条决定至少一个
+docs/       交接说明、美术规格、方案文档副本、参考截图
+design/     竖屏设计稿画布源文件
 ```
 
 代码注释里的 `#N` 对应 v2 文档“决定记录”的编号。
@@ -27,7 +31,7 @@ test/       单元测试，每条决定至少一个
 npm install
 npm test            # 单元测试
 npm run typecheck   # 类型检查（核心用不含 Node 的配置单独检查）
-npm run sim         # 数值模拟：5 类玩家，每类 200 人，30 天
+npm run sim         # 数值模拟：6 类玩家，每类 200 人，30 天
 npm run sim -- --players 500 --days 60 --seed 3
 npm run sim -- --set grudge.dailyCap=20 --set breach.graceActions=8
 npm run sim -- --json
@@ -128,7 +132,6 @@ npm run build:web   # 打包网页原型：dist/web/teashop.html（单文件，�
 - 嫡传成年的境界（文档待定），完整的归属争取期（第二版）
 - 预兆推送的实际通知（规则里已标记 omen）
 - 大富翁（第二版）
-- 存档序列化（`House`、`Thread` 都是普通对象，可以直接转 JSON，`World` 里的 Map 需要转一下）
 
 ## 接入 Cocos Creator
 
