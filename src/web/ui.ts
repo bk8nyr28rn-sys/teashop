@@ -8,6 +8,9 @@ import {
   bigSuccessChance,
   canAttemptTribulation,
   doorPower,
+  guardLineup,
+  raidRewardsLeft,
+  RAID_SPOTS,
   formationUpgradeCost,
   isInRetreat,
   isProtected,
@@ -22,7 +25,7 @@ import {
   type Thread,
   type World,
 } from '../core';
-import { DEFAULT_LOOK, HAIRS, HEADDRESSES, OUTFITS, PATHS, ROBES, SKINS, TRIMS, chibi, ghost, npcLook, type Mood, type Swatch } from './art';
+import { hexToHsl, hslToHex, DEFAULT_LOOK, HAIRS, HEADDRESSES, OUTFITS, PATHS, ROBES, SKINS, TRIMS, chibi, ghost, npcLook, type Mood, type Swatch } from './art';
 import { Game, ME, SPEEDS, SPEED_LABEL, type Speed } from './game';
 
 export const REGIONS = ['hud', 'scene', 'fx', 'panel', 'nav', 'banner', 'toast', 'sheet'] as const;
@@ -46,6 +49,8 @@ interface Draft {
   gender: Gender;
   role: string;
   look: Appearance;
+  /** 正在用调色盘调哪一项（robe / trim / skin / hair） */
+  picker?: string | null;
 }
 
 const ui = {
@@ -212,14 +217,14 @@ function hud(game: Game): string {
 /** 地图画板 390 × 430。鬼从三个院门进来，砸的是正中你家的门 */
 const MAP_H = 430;
 const DOOR = { x: 195, y: 238 };
-/** 族人小屋的六块地：左右两列 + 底下两块 */
-const PLOTS = [
-  { x: 64, y: 300 },
-  { x: 326, y: 300 },
-  { x: 64, y: 392 },
-  { x: 326, y: 392 },
-  { x: 152, y: 404 },
-  { x: 238, y: 404 },
+/** 族人小屋的六块地（左右两列 + 底下两块）；孩子站在 RAID_SPOTS 上，守夜时就在原地出手 */
+const HUTS = [
+  { x: 52, y: 330 },
+  { x: 338, y: 330 },
+  { x: 52, y: 404 },
+  { x: 338, y: 404 },
+  { x: 122, y: 412 },
+  { x: 268, y: 412 },
 ];
 
 function hut(x: number, base: number, roof: string, lit: boolean): string {
@@ -233,7 +238,20 @@ function hut(x: number, base: number, roof: string, lit: boolean): string {
   </g>`;
 }
 
-function homeScene(game: Game): string {
+/** 守夜局的背景：同一张院子地图，去掉孩子、当家人、游荡的鬼和所有可点的东西（这些由守夜画面自己画） */
+export function raidBackdrop(game: Game): string {
+  return homeScene(game, true).replace(/ data-(act|v)="[^"]*"/g, '');
+}
+
+/** 给守夜画面用：孩子和当家人的样子 */
+export function lookOfGuard(game: Game, id: string): Appearance {
+  const me = game.world.houses.get(ME)!;
+  if (id === 'self') return myLook(game).look;
+  const i = me.members.findIndex((m) => m.id === id);
+  return i >= 0 ? memberLook(game, me.members[i]!, i) : DEFAULT_LOOK;
+}
+
+function homeScene(game: Game, backdrop = false): string {
   const w = game.world;
   const me = w.houses.get(ME)!;
   const h = w.hour % 24;
@@ -278,20 +296,24 @@ function homeScene(game: Game): string {
     </g>`;
   }
 
-  // —— 族人小屋 ——
-  const huts = PLOTS.map((s, i) => {
-    const m = me.members[i];
+  // —— 族人小屋：守夜阵容里的孩子站在自己的位置上，受伤的排在后面 ——
+  const { guards, hurt } = guardLineup(w, ME);
+  const shown = [...guards, ...hurt].slice(0, HUTS.length);
+  const huts = HUTS.map((s, i) => {
+    const m = shown[i];
     if (!m) {
       return `<g opacity="0.7"><rect x="${s.x - 26}" y="${s.y - 34}" width="52" height="34" rx="8" fill="none" stroke="#5B61B0" stroke-width="2" stroke-dasharray="5 5"/>
         <text x="${s.x}" y="${s.y - 12}" text-anchor="middle" font-size="11" fill="#8C90D0">空地</text></g>`;
     }
-    const hurt = m.injuredUntil > w.hour;
-    const side = s.x < 195 ? 22 : -54;
+    const spot = RAID_SPOTS[i]!;
+    const isHurt = m.injuredUntil > w.hour;
+    const idx = me.members.indexOf(m);
+    if (backdrop) return hut(s.x, s.y, '#6A58B8', night);
     return `${hut(s.x, s.y, '#6A58B8', night)}
-      <g ${hurt ? 'opacity="0.6"' : ''}>${chibi(memberLook(game, m, i), hurt ? 'sad' : 'calm', `x="${s.x + side}" y="${s.y - 38}" width="32" height="40"`)}</g>
-      ${hurt ? `<g transform="translate(${s.x + side + 22} ${s.y - 40})"><rect width="12" height="12" rx="3" fill="#FFFFFF"/><path d="M6 2V10M2 6H10" stroke="#F0525A" stroke-width="2.4"/></g>` : ''}`;
+      <g ${isHurt ? 'opacity="0.6"' : ''}>${chibi(memberLook(game, m, idx), isHurt ? 'sad' : 'calm', `x="${spot.x - 16}" y="${spot.y - 40}" width="32" height="40"`)}</g>
+      ${isHurt ? `<g transform="translate(${spot.x + 6} ${spot.y - 42})"><rect width="12" height="12" rx="3" fill="#FFFFFF"/><path d="M6 2V10M2 6H10" stroke="#F0525A" stroke-width="2.4"/></g>` : ''}`;
   }).join('');
-  const extra = me.members.length > PLOTS.length ? `<text x="195" y="424" text-anchor="middle" font-size="11" fill="#B9BCE8">还有 ${me.members.length - PLOTS.length} 位族人在后院</text>` : '';
+  const extra = me.members.length > HUTS.length ? `<text x="195" y="428" text-anchor="middle" font-size="10.5" fill="#B9BCE8">还有 ${me.members.length - HUTS.length} 位族人在后院</text>` : '';
 
   // —— 灵石堆（点了收）和丹炉（点了炼丹） ——
   const pending = pendingStones(w);
@@ -365,8 +387,8 @@ function homeScene(game: Game): string {
     ${huts}${extra}
     ${neighbor}
     ${thread}
-    <g class="tap bob" data-act="avatar">${chibi(look, mood, `x="${DOOR.x - 62}" y="${DOOR.y - 50}" width="46" height="57.5"`)}</g>
-    ${roamers}
+    ${backdrop ? '' : `<g class="tap bob" data-act="avatar">${chibi(look, mood, `x="${DOOR.x - 62}" y="${DOOR.y - 50}" width="46" height="57.5"`)}</g>`}
+    ${backdrop ? '' : roamers}
   </svg>`;
 }
 
@@ -450,7 +472,14 @@ function homePanel(game: Game): string {
       ? actionBtn('repair', '修阵法', `每处 ${w.config.economy.repairCostPerDamage} 灵石`, me.stones < w.config.economy.repairCostPerDamage)
       : actionBtn('upgrade', '升符阵', `${cost} 灵石`, me.stones < cost);
 
+  const left = raidRewardsLeft(w, ME);
+  const lineup = guardLineup(w, ME).guards.length;
+  const raidCard = `<button id="raid-start" class="raid-start" data-act="raid-start">
+      <span class="raid-start-title">开始守夜</span>
+      <span class="raid-start-sub">你和 ${lineup} 个孩子一起守院子 · ${left > 0 ? `今天还有 ${left} 局有奖励` : '今天的奖励领完了，可以练手'}</span>
+    </button>`;
   return `<div class="gutter stack">
+    ${raidCard}
     ${latest ? `<button id="btn-log" class="subtitle tone-${latest.tone}" data-act="log"><span class="tag">见闻</span><span class="line">${esc(latest.text)}</span><span class="go">›</span></button>` : ''}
     ${chips.length ? `<div class="chips">${chips.join('')}</div>` : ''}
     ${todos(game)}
@@ -625,11 +654,12 @@ function familyPanel(game: Game): string {
   const groupHtml = [...groups.entries()]
     .map(([key, list]) => {
       const [a = '', b = ''] = key.split('|');
-      return `<div class="group"><span class="group-title">${esc(nameOf(a))}与${esc(nameOf(b))}所结 · ${list.length} 位</span>
+      const title = b === '收养' ? `收养的孩子 · ${list.length} 位` : `${esc(nameOf(a))}与${esc(nameOf(b))}所结 · ${list.length} 位`;
+      return `<div class="group"><span class="group-title">${title}</span>
         <div class="members">${list
           .map(({ m, i }) => {
             const hurt = m.injuredUntil > w.hour;
-            return `<div class="member${hurt ? ' hurt' : ''}">${chibi(memberLook(game, m, i), hurt ? 'sad' : 'happy', 'class="member-svg"')}<span class="num">${hurt ? `疗伤 ${Math.ceil((m.injuredUntil - w.hour) / HOURS_PER_DAY)} 天` : `修为 ${fmt(m.cultivation)}`}</span></div>`;
+            return `<div class="member${hurt ? ' hurt' : ''}">${chibi(memberLook(game, m, i), hurt ? 'sad' : 'happy', 'class="member-svg"')}<span class="path">${esc(m.path ?? '')}</span><span class="num">${hurt ? `疗伤 ${Math.ceil((m.injuredUntil - w.hour) / HOURS_PER_DAY)} 天` : `资质 ${fmt(m.root ?? 0)} · 修为 ${fmt(m.cultivation)}`}</span></div>`;
           })
           .join('')}</div></div>`;
     })
@@ -797,10 +827,26 @@ function avatarSheet(game: Game, first: boolean, head: Head): string {
     `<fieldset><legend>${label}</legend><div class="options">${items
       .map((it) => `<button id="opt-${key}-${it.id}" type="button" class="opt${it.id === current ? ' on' : ''}" data-act="draft" data-id="${key}" data-v="${esc(it.id)}" aria-pressed="${it.id === current}">${esc(it.n)}</button>`)
       .join('')}</div></fieldset>`;
-  const swatches = (label: string, key: string, items: Swatch[], current: string) =>
-    `<fieldset><legend>${label}</legend><div class="swatches">${items
-      .map((it, i) => `<button id="sw-${key}-${i}" type="button" class="swatch${it.c === current ? ' on' : ''}" style="--c:${it.c}" data-act="draft" data-id="${key}" data-v="${it.c}" aria-pressed="${it.c === current}" aria-label="${label} ${it.n}"></button>`)
-      .join('')}</div></fieldset>`;
+  // 每一项颜色：一排推荐色 + 一个“调色盘”，点开后用色相 / 鲜艳 / 明暗三条滑块随便调
+  const swatches = (label: string, key: string, items: Swatch[], current: string) => {
+    const custom = !items.some((it) => it.c.toUpperCase() === current.toUpperCase());
+    const open = d.picker === key;
+    const { h, s, l } = hexToHsl(current);
+    const slider = (id: string, name: string, min: number, max: number, value: number, track: string) =>
+      `<label class="pick-row"><span>${name}</span><input id="pk-${key}-${id}" type="range" min="${min}" max="${max}" value="${value}" data-pick="${key}" style="--track:${track}" aria-label="${label}${name}"></label>`;
+    return `<fieldset><legend>${label}</legend><div class="swatches">${items
+      .map((it, i) => `<button id="sw-${key}-${i}" type="button" class="swatch${it.c.toUpperCase() === current.toUpperCase() ? ' on' : ''}" style="--c:${it.c}" data-act="draft" data-id="${key}" data-v="${it.c}" aria-pressed="${it.c === current}" aria-label="${label} ${it.n}"></button>`)
+      .join('')}<button id="sw-${key}-custom" type="button" class="swatch custom${custom || open ? ' on' : ''}" style="--c:${current}" data-act="picker" data-id="${key}" aria-expanded="${open}" aria-label="${label}：调色盘"><span></span></button></div>
+      ${
+        open
+          ? `<div class="picker">
+          ${slider('h', '色相', 0, 360, h, 'linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)')}
+          ${slider('s', '鲜艳', 0, 100, s, `linear-gradient(90deg,${hslToHex(h, 0, l)},${hslToHex(h, 100, l)})`)}
+          ${slider('l', '明暗', 8, 92, l, `linear-gradient(90deg,${hslToHex(h, s, 8)},${hslToHex(h, s, 50)},${hslToHex(h, s, 92)})`)}
+        </div>`
+          : ''
+      }</fieldset>`;
+  };
   return `${head(first ? '先捏一个你的 OC' : '设置形象')}
     <div class="sheet-body gutter stack" id="avatar-scroll" data-keep-scroll>
       <div class="avatar-stage">${chibi(d.look, 'happy', 'class="avatar-big"', { label: '形象预览' })}</div>
@@ -949,6 +995,17 @@ export function bind(game: Game, root: HTMLElement, rerender: () => void): void 
   root.addEventListener('input', (ev) => {
     const t = ev.target as HTMLInputElement;
     if (t.id === 'oc-name' && ui.draft) ui.draft.name = t.value;
+    // 调色盘：拖动时只改预览和这一项的色块，不整块重画（重画会打断拖动）；松手后再整块重画
+    const key = t.getAttribute('data-pick');
+    if (key && ui.draft && (key === 'robe' || key === 'trim' || key === 'skin' || key === 'hair')) {
+      const v = (id: string) => Number((document.getElementById(`pk-${key}-${id}`) as HTMLInputElement | null)?.value ?? 0);
+      const hex = hslToHex(v('h'), v('s'), v('l'));
+      ui.draft.look[key] = hex;
+      const stage = document.querySelector('.avatar-stage');
+      if (stage) stage.innerHTML = chibi(ui.draft.look, 'happy', 'class="avatar-big"', { label: '形象预览' });
+      const sw = document.getElementById(`sw-${key}-custom`) as HTMLElement | null;
+      sw?.style.setProperty('--c', hex);
+    }
   });
 }
 
@@ -997,7 +1054,11 @@ function handle(game: Game, act: string, id: string, v: string): void {
       else if (id === 'role') ui.draft.role = v;
       else if (id === 'headdress') ui.draft.look.headdress = v as Appearance['headdress'];
       else if (id === 'outfit') ui.draft.look.outfit = v as Appearance['outfit'];
+      if (id === 'robe' || id === 'trim' || id === 'skin' || id === 'hair') ui.draft.picker = null;
       else if (id === 'robe' || id === 'trim' || id === 'skin' || id === 'hair') ui.draft.look[id] = v;
+      break;
+    case 'picker':
+      if (ui.draft) ui.draft.picker = ui.draft.picker === id ? null : id;
       break;
     case 'avatar-save': {
       if (!ui.draft) break;
@@ -1031,6 +1092,9 @@ function handle(game: Game, act: string, id: string, v: string): void {
       break;
     case 'speed':
       game.setSpeed(v as Speed);
+      break;
+    case 'raid-start':
+      game.beginRaid();
       break;
     case 'collect':
       game.collect();

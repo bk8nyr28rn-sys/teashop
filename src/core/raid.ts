@@ -25,12 +25,12 @@ export const RAID_LANES: { x: number; y: number }[][] = [
 ];
 /** 孩子站的六个位置，和当家人的位置 */
 export const RAID_SPOTS = [
-  { x: 112, y: 286 },
-  { x: 278, y: 286 },
-  { x: 112, y: 344 },
-  { x: 278, y: 344 },
-  { x: 168, y: 392 },
-  { x: 222, y: 392 },
+  { x: 104, y: 300 },
+  { x: 286, y: 300 },
+  { x: 104, y: 372 },
+  { x: 286, y: 372 },
+  { x: 168, y: 396 },
+  { x: 222, y: 396 },
 ];
 export const RAID_SELF_SPOT = { x: 156, y: 222 };
 
@@ -112,6 +112,8 @@ export interface RaidState {
   rngState: number;
   /** 开局后过了多少秒 */
   t: number;
+  /** 还没够一小步的零碎时间（帧很短时攒起来） */
+  acc: number;
   qi: number;
   doorHp: number;
   doorMax: number;
@@ -201,6 +203,7 @@ export function startRaid(world: World, houseId: HouseId): Result<RaidState> {
     realm: house.realm,
     rngState: rng.getState(),
     t: 0,
+    acc: 0,
     qi: cfg.startQi,
     doorHp: doorMax,
     doorMax,
@@ -257,7 +260,11 @@ export function raidStep(world: World, s: RaidState, dt: number): void {
   const rng = new Rng(1);
   rng.setState(s.rngState);
   const scale = 1 + (s.realm - 1) * cfg.realmScale;
-  let steps = Math.min(200, Math.round(dt / STEP));
+  // 帧时间攒起来，够一小步算一步：帧率高低，结果都一样
+  s.acc = Math.min(s.acc + dt, 10);
+  let steps = Math.floor((s.acc + 1e-9) / STEP);
+  s.acc -= steps * STEP;
+  steps = Math.min(steps, 200);
   while (steps-- > 0 && !s.result) {
     s.t += STEP;
     // 出鬼

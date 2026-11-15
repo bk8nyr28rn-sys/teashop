@@ -5,6 +5,15 @@
 import {
   addHouse,
   addStrands,
+  finishRaid,
+  raidRepair,
+  raidReinforce,
+  raidStep,
+  raidTap,
+  raidUpgrade,
+  startRaid,
+  type RaidReward,
+  type RaidState,
   advanceHour,
   attemptTribulation,
   bigInteract,
@@ -172,6 +181,72 @@ export class Game {
       this.acc -= 1;
     }
     if (this.acc > 1) this.acc = 1;
+  }
+
+  // ---------- 守夜局 ----------
+
+  /** 正在打的守夜局（局内状态不进存档；关掉页面就算没打） */
+  raid: RaidState | null = null;
+  raidReward: RaidReward | null = null;
+  private raidPrevSpeed: Speed | null = null;
+
+  /** 开一局守夜：打的时候院子里的时间停住，免得同时还有鬼来砸门 */
+  beginRaid(): boolean {
+    if (this.raid) return true;
+    const r = startRaid(this.world, ME);
+    if (!r.ok) {
+      this.tell(r.reason, 'bad');
+      return false;
+    }
+    this.raid = r.value;
+    this.raidReward = null;
+    this.notice = null;
+    this.raidPrevSpeed = this.speed;
+    this.speed = 'pause';
+    return true;
+  }
+
+  /** 每帧调用。打完了就结算 */
+  raidFrame(dt: number): void {
+    const s = this.raid;
+    if (!s || this.raidReward) return;
+    raidStep(this.world, s, dt);
+    if (s.result) this.endRaid();
+  }
+
+  raidTap = (ghostId: number) => (this.raid ? raidTap(this.world, this.raid, ghostId) : false);
+  raidUpgrade = (guardId: string) => this.raidTry(() => raidUpgrade(this.world, this.raid!, guardId));
+  raidRepair = () => this.raidTry(() => raidRepair(this.world, this.raid!));
+  raidReinforce = () => this.raidTry(() => raidReinforce(this.world, this.raid!));
+
+  private raidTry(f: () => Result): boolean {
+    if (!this.raid || this.raidReward) return false;
+    const r = f();
+    if (!r.ok) this.tell(r.reason, 'bad');
+    return r.ok;
+  }
+
+  /** 中途撤退按输算 */
+  retreatRaid(): void {
+    if (!this.raid || this.raidReward) return;
+    this.raid.result = 'lose';
+    this.endRaid();
+  }
+
+  private endRaid(): void {
+    if (!this.raid) return;
+    this.raidReward = finishRaid(this.world, this.raid);
+    this.save();
+  }
+
+  /** 看完结算，回院子 */
+  closeRaid(): void {
+    this.raid = null;
+    this.raidReward = null;
+    this.speed = this.raidPrevSpeed ?? 'fast';
+    this.raidPrevSpeed = null;
+    this.lastTick = Date.now();
+    this.save();
   }
 
   setSpeed(speed: Speed): void {

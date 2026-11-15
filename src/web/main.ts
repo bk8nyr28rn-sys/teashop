@@ -1,4 +1,5 @@
 import { Game } from './game';
+import { syncRaid } from './raidview';
 import { REGIONS, bind, render, type Region } from './ui';
 
 const app = document.getElementById('app')!;
@@ -67,7 +68,9 @@ window.addEventListener('pointercancel', release);
 
 setInterval(() => {
   game.tick();
-  if (!pressing) rerender();
+  // 守夜局有自己的逐帧画面；打的时候底下的页面不用重画
+  syncRaid(game, app, rerender);
+  if (!pressing && !game.raid) rerender();
 }, 100);
 
 document.addEventListener('visibilitychange', () => {

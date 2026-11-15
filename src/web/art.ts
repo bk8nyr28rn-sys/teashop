@@ -61,6 +61,39 @@ export function migrateTraits(traits: string[]): string[] {
   return [...new Set(traits.map((t) => LEGACY_TRAIT[t] ?? t))];
 }
 
+/** 调色盘用：色相 0–360，饱和、明暗 0–100 → #RRGGBB */
+export function hslToHex(h: number, s: number, l: number): string {
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const f = (n: number) => {
+    const k = (n + h / 30) % 12;
+    const c = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
+    return Math.round(c * 255).toString(16).padStart(2, '0');
+  };
+  return `#${f(0)}${f(8)}${f(4)}`.toUpperCase();
+}
+
+export function hexToHsl(hex: string): { h: number; s: number; l: number } {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  const n = m ? parseInt(m[1]!, 16) : 0;
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  const d = max - min;
+  let h = 0;
+  if (d > 0) {
+    if (max === r) h = ((g - b) / d) % 6;
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    h *= 60;
+    if (h < 0) h += 360;
+  }
+  const s = d === 0 ? 0 : d / (1 - Math.abs(2 * l - 1));
+  return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
+}
+
 export const DEFAULT_LOOK: Appearance = { robe: '#F0525A', trim: '#FFC24B', headdress: 'bun', skin: '#FFE4D6', hair: '#2B2233', outfit: 'robe' };
 
 /** 服装风格：玩家自己挑，画风不定死。衣色和镶边色在三种服装上都生效 */
