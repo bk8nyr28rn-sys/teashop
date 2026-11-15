@@ -100,6 +100,14 @@ function addStrain(world: World, houseId: HouseId): void {
   for (const t of existing) t.strain[houseId] = (t.strain[houseId] ?? 0) + amount;
 }
 
+/**
+ * 新手期关系起步快：互动和结伴历练得到的情丝按当前等级加成（默认只有相识 ×8，之后不变）。
+ * 只用在“经营关系”得到的情丝上；复合、打怨灵还原这些不加成，免得被拿来刷。
+ */
+export function growth(world: World, thread: Thread, base: number): number {
+  return base * (world.config.newbie.tierGrowth[thread.tier] ?? 1);
+}
+
 /** 浓度对应的关系等级（下标对应 config.tiers.names） */
 export function tierOf(world: World, strands: number): number {
   const mins = world.config.tiers.mins;
@@ -166,7 +174,7 @@ export function interact(world: World, by: HouseId, threadId: ThreadId, opts: { 
     if (opts.risky && !thread.quarrel && world.rng.chance(cfg.quarrel.riskyChance)) {
       startQuarrel(world, thread, 'risky');
     } else {
-      addStrands(world, thread, cfg.thread.interactionGain * (opts.risky ? cfg.quarrel.riskyGainMultiplier : 1));
+      addStrands(world, thread, growth(world, thread, cfg.thread.interactionGain * (opts.risky ? cfg.quarrel.riskyGainMultiplier : 1)));
     }
   } else if (!thread.pendingRequest) {
     thread.pendingRequest = { from: by, at: world.hour };
@@ -301,7 +309,7 @@ export function bigInteract(
   let strandsGained = 0;
   if (success) {
     stonesLost = stake;
-    strandsGained = stake * b.strandsPerStone * (1 + b.successEdge) * (thread.b ? 1 : world.config.npc.investMultiplier);
+    strandsGained = growth(world, thread, stake * b.strandsPerStone * (1 + b.successEdge) * (thread.b ? 1 : world.config.npc.investMultiplier));
     addStrands(world, thread, strandsGained);
   } else {
     const ratio = b.failLossMin + world.rng.next() * (b.failLossMax - b.failLossMin);
@@ -471,7 +479,7 @@ export function hourlyThreadUpdate(world: World): void {
     const req = thread.pendingRequest;
     if (req && req.from === thread.a && world.hour - req.at >= delay && !isThreadFrozen(world, thread)) {
       thread.pendingRequest = null;
-      addStrands(world, thread, world.config.thread.interactionGain);
+      addStrands(world, thread, growth(world, thread, world.config.thread.interactionGain));
       emit(world, { type: 'interaction', hour: world.hour, thread: thread.id, by: NPC_SIDE, kind: 'reply' });
     }
   }

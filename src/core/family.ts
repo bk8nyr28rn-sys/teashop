@@ -10,13 +10,16 @@ const blockedBetween = (world: World, x: HouseId, y: HouseId): boolean =>
  * 闭关不影响结族人：冻结只负责保护（不变淡、不生怨、冷落不计时、鬼不来），不停止成长。
  */
 export function hourlyFamily(world: World): void {
-  const need = world.config.family.memberStrandHours;
+  const base = world.config.family.memberStrandHours;
+  const ratios = world.config.newbie.memberRatios;
   for (const house of world.houses.values()) {
     for (const { thread, weight } of rankedThreads(world, house.id)) {
       if (thread.strands <= 0) continue;
       let progress = (thread.memberProgress[house.id] ?? 0) + thread.strands * weight;
-      while (progress >= need) {
-        progress -= need;
+      // 新手期：前几位族人结得快
+      const need = () => base * (ratios[house.members.length] ?? 1);
+      while (progress >= need() && house.members.length < world.config.family.maxMembers) {
+        progress -= need();
         birthMember(world, house.id, thread);
       }
       thread.memberProgress[house.id] = progress;

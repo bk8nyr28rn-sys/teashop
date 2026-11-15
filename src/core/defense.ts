@@ -43,7 +43,13 @@ export function rollKnock(world: World, house: House): GhostKind | null {
 }
 
 /** 结算一次砸门。离线时由符阵、族人和搭档快照自动守（#11） */
-export function resolveKnock(world: World, houseId: HouseId, kind: GhostKind, online: boolean): void {
+export function resolveKnock(
+  world: World,
+  houseId: HouseId,
+  kind: GhostKind,
+  online: boolean,
+  opts: { strength?: number } = {},
+): void {
   const house = getHouse(world, houseId);
   const g = world.config.ghosts;
   const c = world.config.conversion;
@@ -74,9 +80,10 @@ export function resolveKnock(world: World, houseId: HouseId, kind: GhostKind, on
   }
 
   const strength =
-    kind === 'wild'
+    opts.strength ??
+    (kind === 'wild'
       ? g.wildBaseStrength + house.realm * g.wildStrengthPerRealm
-      : g.spiritBaseStrength + chunk * g.spiritStrengthPerGrudge;
+      : g.spiritBaseStrength + chunk * g.spiritStrengthPerGrudge);
   const power =
     doorPower(world, house) +
     (helper ? helper.strands * world.config.door.helperPerStrand : 0) +

@@ -56,6 +56,9 @@ export interface ArchetypeReport {
   quarrelsPerWeek: number;
   /** 争执里最后和好的比例 */
   reconcileRate: number;
+  /** 第一根线到“知己”、结出第一位族人是第几天（中位数） */
+  tier1DayMedian: number | null;
+  firstMemberDayMedian: number | null;
   realmAvg: number;
   tribulationSuccessRate: number;
   /** 达到陌生人匹配门槛境界是第几天（中位数） */
@@ -75,6 +78,8 @@ interface Counters {
   grudgeHistory: number[];
   goldenHour: number | null;
   heirHour: number | null;
+  tier1Hour: number | null;
+  memberHour: number | null;
   quarrels: number;
   reconciled: number;
   rivals: number;
@@ -143,6 +148,8 @@ function emptyCounters(): Counters {
     grudgeHistory: [],
     goldenHour: null,
     heirHour: null,
+    tier1Hour: null,
+    memberHour: null,
     quarrels: 0,
     reconciled: 0,
     rivals: 0,
@@ -233,6 +240,15 @@ function count(e: GameEvent, counters: Map<string, Counters>, world: World): voi
       if (e.realm >= world.config.matching.strangerRealmGate) c.gateHour ??= e.hour;
       break;
     }
+    case 'tierChanged': {
+      if (e.to < 1) break;
+      const t = world.threads.get(e.thread)!;
+      for (const p of [t.a, t.b]) if (p) counters.get(p)!.tier1Hour ??= e.hour;
+      break;
+    }
+    case 'memberBorn':
+      counters.get(e.house)!.memberHour ??= e.hour;
+      break;
     case 'golden': {
       const t = world.threads.get(e.thread)!;
       for (const p of [t.a, t.b]) if (p) counters.get(p)!.goldenHour ??= e.hour;
@@ -283,6 +299,8 @@ function report(
     rivalLostShare: sum(cs.map((c) => c.rivals)) === 0 ? 0 : sum(cs.map((c) => c.rivalLost)) / sum(cs.map((c) => c.rivals)),
     quarrelsPerWeek: sum(cs.map((c) => c.quarrels)) / n / weeks,
     reconcileRate: sum(cs.map((c) => c.quarrels)) === 0 ? 0 : sum(cs.map((c) => c.reconciled)) / sum(cs.map((c) => c.quarrels)),
+    tier1DayMedian: medianDay(cs.map((c) => c.tier1Hour)),
+    firstMemberDayMedian: medianDay(cs.map((c) => c.memberHour)),
     realmAvg: sum(houses.map((h) => h.realm)) / n,
     tribulationSuccessRate: sum(cs.map((c) => c.tribAttempts)) === 0 ? 0 : sum(cs.map((c) => c.tribSuccesses)) / sum(cs.map((c) => c.tribAttempts)),
     strangerGateDayMedian: medianDay(cs.map((c) => c.gateHour)),

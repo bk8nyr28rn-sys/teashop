@@ -170,9 +170,19 @@ export interface GameConfig {
     naturalDecayPerDay: number;
   };
 
-  /** 新手保护：新建家族后这么多天内，野鬼、怨灵和情敌都不会来 */
+  /**
+   * 新手期：把前几个爽点提前，长期节奏（约 90 天到金缕）不变。
+   * - 保护期：新建家族后这么多天内，野鬼、怨灵和情敌都不会来
+   * - 练手小鬼：保护期第 practiceHour 个时辰来一只很弱的野鬼（必赢，送诡心）
+   * - 关系起步快：互动和结伴历练的情丝按当前等级乘 tierGrowth（默认只有相识 ×8），之后为 1
+   * - 前几位族人结得快：第 n 位族人所需的进度乘 memberRatios[n]
+   */
   newbie: {
     protectionDays: number;
+    practiceHour: number;
+    practiceStrength: number;
+    tierGrowth: number[];
+    memberRatios: number[];
   };
 
   /** #11 #13 鬼 */
@@ -314,7 +324,7 @@ export const defaultConfig: GameConfig = {
   big: {
     minTier: 0,
     minStake: 20,
-    strandsPerStone: 0.05,
+    strandsPerStone: 0.038,
     successEdge: 0.1,
     baseSuccess: 0.5,
     coPresenceBonus: 0.15,
@@ -332,7 +342,7 @@ export const defaultConfig: GameConfig = {
     reliefPerInteraction: 0.5,
     naturalDecayPerDay: 0.1,
   },
-  newbie: { protectionDays: 3 },
+  newbie: { protectionDays: 3, practiceHour: 20, practiceStrength: 0, tierGrowth: [8], memberRatios: [0.03, 0.15] },
   ghosts: {
     wildPerHour: 0.02,
     wildBaseStrength: 30,

@@ -61,11 +61,15 @@ function hours(w: World, n: number): void {
   for (let i = 0; i < n; i++) advanceHour(w);
 }
 
-/** 关掉随机砸门、随机误会和 NPC 情敌，让测试只看要测的规则 */
+/** 关掉新手期的加成和练手小鬼（单独测） */
+const NO_NEWBIE = { tierGrowth: [], memberRatios: [], practiceHour: -1 };
+
+/** 关掉随机砸门、随机误会、NPC 情敌和新手期加成，让测试只看要测的规则 */
 const calm: DeepPartial<GameConfig> = {
   ghosts: { wildPerHour: 0, spiritPerHourPerGrudge: 0 },
   quarrel: { baseChancePerDay: 0 },
   rival: { chancePerDay: 0 },
+  newbie: NO_NEWBIE,
 };
 
 describe('#12 每日怨丝上限', () => {
@@ -742,7 +746,7 @@ describe('渡劫', () => {
 
 describe('新手保护', () => {
   it('保护期内野鬼和怨灵都不来，过了保护期才来', () => {
-    const w = world({ ghosts: { wildPerHour: 1, wildBaseStrength: 1e9 }, newbie: { protectionDays: 3 } });
+    const w = world({ ghosts: { wildPerHour: 1, wildBaseStrength: 1e9 }, newbie: { ...NO_NEWBIE, protectionDays: 3 } });
     const a = addHouse(w, { id: 'A', stones: 100 });
     a.grudge = 30;
     hours(w, 3 * DAY);
@@ -752,13 +756,59 @@ describe('新手保护', () => {
   });
 
   it('保护期内情敌也不来', () => {
-    const w = world({ ...calm, rival: { chancePerDay: 1 }, newbie: { protectionDays: 3 } });
+    const w = world({ ...calm, rival: { chancePerDay: 1 }, newbie: { ...NO_NEWBIE, protectionDays: 3 } });
     addHouse(w, { id: 'A' });
     addHouse(w, { id: 'B' });
     const t = tie(w, 'A', 'B');
     addStrands(w, t, 30);
     hours(w, 3 * DAY);
     expect(w.events.some((e) => e.type === 'rival')).toBe(false);
+  });
+});
+
+describe('新手期：把爽点提前', () => {
+  it('练手小鬼：保护期里来一只必赢的野鬼，送一颗诡心', () => {
+    const w = world({ ghosts: { wildPerHour: 0 }, quarrel: { baseChancePerDay: 0 }, rival: { chancePerDay: 0 }, newbie: { practiceHour: 20 } });
+    const a = addHouse(w, { id: 'A' });
+    hours(w, 21);
+    expect(w.events.some((e) => e.type === 'defended')).toBe(true);
+    expect(a.ghostHearts).toBe(1);
+    expect(w.events.some((e) => e.type === 'breach')).toBe(false);
+  });
+
+  it('关系起步快：相识 ×4、知己 ×2，之后正常；复合不加成', () => {
+    const w = world({ ...calm, newbie: { tierGrowth: [4, 2] } });
+    addHouse(w, { id: 'A' });
+    addHouse(w, { id: 'B' });
+    const t = tie(w, 'A', 'B');
+    const g = w.config.thread.interactionGain;
+    interact(w, 'A', t.id);
+    interact(w, 'B', t.id);
+    expect(t.strands).toBeCloseTo(4 * g);
+    addStrands(w, t, 40 - t.strands);
+    interact(w, 'A', t.id);
+    interact(w, 'B', t.id);
+    expect(t.strands).toBeCloseTo(40 + 2 * g);
+    addStrands(w, t, 100 - t.strands);
+    interact(w, 'A', t.id);
+    interact(w, 'B', t.id);
+    expect(t.strands).toBeCloseTo(100 + g);
+  });
+
+  it('前两位族人结得快，之后恢复正常速度', () => {
+    const w = world({ ...calm, family: { memberStrandHours: 1000 }, newbie: { memberRatios: [0.1, 0.5] } });
+    const a = addHouse(w, { id: 'A' });
+    const r = tieThread(w, 'A', { kind: 'npc', name: '散修' });
+    if (!r.ok) throw new Error();
+    r.value.strands = 100;
+    hours(w, 1);
+    expect(a.members).toHaveLength(1);
+    hours(w, 5);
+    expect(a.members).toHaveLength(2);
+    hours(w, 9);
+    expect(a.members).toHaveLength(2);
+    hours(w, 1);
+    expect(a.members).toHaveLength(3);
   });
 });
 
