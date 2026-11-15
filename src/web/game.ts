@@ -362,9 +362,9 @@ export class Game {
     if (this.catchingUp) this.awayLog.unshift(entry);
   }
 
-  /** 正在演的砸门（演 4 秒多） */
+  /** 正在演的砸门：飞进院子、砸三下、出结果，一共 4.8 秒 */
   activeKnock(): KnockFx | null {
-    return this.knockFx && Date.now() - this.knockFx.at < 4200 ? this.knockFx : null;
+    return this.knockFx && Date.now() - this.knockFx.at < 4800 ? this.knockFx : null;
   }
 
   activeTribulation(): { success: boolean } | null {

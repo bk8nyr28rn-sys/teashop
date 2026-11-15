@@ -22,7 +22,7 @@ import {
   type Thread,
   type World,
 } from '../core';
-import { DEFAULT_LOOK, HAIRS, HEADDRESSES, PATHS, ROBES, SKINS, TRIMS, chibi, ghost, npcLook, type Mood, type Swatch } from './art';
+import { DEFAULT_LOOK, HAIRS, HEADDRESSES, OUTFITS, PATHS, ROBES, SKINS, TRIMS, chibi, ghost, npcLook, type Mood, type Swatch } from './art';
 import { Game, ME, SPEEDS, SPEED_LABEL, type Speed } from './game';
 
 export const REGIONS = ['hud', 'scene', 'fx', 'panel', 'nav', 'banner', 'toast', 'sheet'] as const;
@@ -110,7 +110,7 @@ function myLook(game: Game): { look: Appearance } {
   return { look: me.appearance ?? DEFAULT_LOOK };
 }
 
-/** 族人的样子取自父母双方：衣色随搭档，镶边随你（孩子是两个人的结晶） */
+/** 族人的样子取自父母双方：衣色随搭档，镶边随你，服装轮流随两边（孩子是两个人的结晶） */
 function memberLook(game: Game, m: ClanMember, i: number): Appearance {
   const mine = myLook(game).look;
   const otherKey = m.parents[0] === ME ? m.parents[1] : m.parents[0];
@@ -121,6 +121,7 @@ function memberLook(game: Game, m: ClanMember, i: number): Appearance {
     headdress: i % 2 ? 'bun' : 'plain',
     skin: i % 2 ? other.skin : mine.skin,
     hair: i % 2 ? mine.hair : other.hair,
+    outfit: i % 2 ? other.outfit : mine.outfit,
   };
 }
 
@@ -141,7 +142,7 @@ function openAvatar(game: Game, first: boolean): void {
     initialName: name,
     gender: me.gender ?? 'unsaid',
     role: PATHS.includes(me.traits[0] ?? '') ? me.traits[0]! : PATHS[0]!,
-    look: { ...(me.appearance ?? DEFAULT_LOOK) },
+    look: { outfit: 'robe', ...(me.appearance ?? DEFAULT_LOOK) },
   };
   ui.sheet = { type: 'avatar', first };
 }
@@ -199,105 +200,166 @@ function hud(game: Game): string {
   </div>`;
 }
 
-// ---------- 场景：修仙小院 ----------
+// ---------- 场景：家族大院地图 ----------
+
+/** 地图画板 390 × 430。鬼从三个院门进来，砸的是正中你家的门 */
+const MAP_H = 430;
+const DOOR = { x: 195, y: 238 };
+/** 族人小屋的六块地：左右两列 + 底下两块 */
+const PLOTS = [
+  { x: 64, y: 300 },
+  { x: 326, y: 300 },
+  { x: 64, y: 392 },
+  { x: 326, y: 392 },
+  { x: 152, y: 404 },
+  { x: 238, y: 404 },
+];
+
+function hut(x: number, base: number, roof: string, lit: boolean): string {
+  return `<g>
+    <ellipse cx="${x}" cy="${base + 2}" rx="30" ry="5" fill="#000" opacity="0.18"/>
+    <rect x="${x - 24}" y="${base - 30}" width="48" height="30" rx="3" fill="#F7EEE0"/>
+    <path d="M${x - 33} ${base - 26} L${x - 20} ${base - 46} L${x + 20} ${base - 46} L${x + 33} ${base - 26} Q${x} ${base - 31} ${x - 33} ${base - 26} Z" fill="${roof}"/>
+    <path d="M${x - 33} ${base - 26} q-5 -3 -3 -8 M${x + 33} ${base - 26} q5 -3 3 -8" stroke="#FFC24B" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+    <path d="M${x - 7} ${base} V${base - 16} Q${x} ${base - 22} ${x + 7} ${base - 16} V${base} Z" fill="#B8323C"/>
+    <rect x="${x + 11}" y="${base - 22}" width="8" height="8" rx="1.5" fill="${lit ? '#FFD86B' : '#5B4F7A'}"/>
+  </g>`;
+}
 
 function homeScene(game: Game): string {
   const w = game.world;
   const me = w.houses.get(ME)!;
   const h = w.hour % 24;
   const phase = h >= 20 || h < 5 ? 'night' : h < 8 ? 'dawn' : h < 17 ? 'day' : 'dusk';
-  const sky = { night: '#262960', dawn: '#4B4A8C', day: '#3F5FA8', dusk: '#5C3F7A' }[phase];
+  const sky = { night: '#1F2256', dawn: '#4B4A8C', day: '#3F5FA8', dusk: '#5C3F7A' }[phase];
+  const ground = { night: '#17193F', dawn: '#2A2B5E', day: '#2C3A72', dusk: '#2A2050' }[phase];
   const knock = game.activeKnock();
   const retreating = isInRetreat(w, me);
-  const safe = retreating || isProtected(w, me);
+  const safe = retreating || isProtected(w, me) || me.graceActionsLeft > 0;
   const damaged = me.formationDamage > 0;
   const ring = safe ? '#52D6A6' : damaged ? '#FF9A6B' : '#FFC24B';
   const threads = sortedThreads(game);
   const top = threads[0];
   const { look } = myLook(game);
   const mood: Mood = knock ? (knock.outcome === 'breach' ? 'sad' : 'happy') : threads.some((t) => t.quarrel) ? 'sad' : 'calm';
+  const night = phase === 'night' || phase === 'dusk';
 
-  const celestial =
-    phase === 'night' || phase === 'dusk'
-      ? `<circle cx="322" cy="62" r="24" fill="#FFF2C4"/><circle cx="313" cy="56" r="4" fill="#F2E2A6"/><circle cx="330" cy="70" r="3" fill="#F2E2A6"/>
-         <g class="twinkle" fill="#FFFFFF"><circle cx="200" cy="38" r="1.600"/><circle cx="248" cy="84" r="1.400"/><circle cx="366" cy="118" r="1.800"/><circle cx="170" cy="72" r="1.200"/></g>`
-      : `<circle cx="322" cy="62" r="22" fill="#FFD98A"/>`;
-
-  let pill = '';
-  let line = '';
+  // —— 隔壁：搭档的宅子（地图右上，院墙外） ——
+  let neighbor = `<g class="tap" data-act="tab" data-v="threads">
+      <rect x="262" y="22" width="112" height="58" rx="10" fill="none" stroke="#4A4F8F" stroke-width="2" stroke-dasharray="6 6"/>
+      <text x="318" y="48" text-anchor="middle" font-size="13" fill="#B9BCE8">隔壁空着</text>
+      <text x="318" y="66" text-anchor="middle" font-size="11" fill="#FFC24B">去牵红线 ›</text></g>`;
+  let thread = '';
   if (top) {
     const p = partnerOf(game, top);
     const color = top.quarrel ? '#FF9A6B' : top.golden ? '#FFC24B' : '#F0525A';
     const tier = w.config.tiers.names[top.tier] ?? '';
-    line = `<path class="red-thread" d="M150 236 C 120 170, 70 120, 40 60" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" ${top.quarrel ? 'stroke-dasharray="7 6"' : ''}/>`;
-    pill = `<g class="tap" data-act="tab" data-v="threads">
-      <rect x="10" y="10" width="138" height="48" rx="24" fill="#2A2D5E" stroke="${color}" stroke-width="2"/>
-      <circle cx="34" cy="34" r="20" fill="#353A75"/>
-      <g clip-path="url(#pill-clip)">${chibi(p.look, partnerMood(w, top), 'x="14" y="14" width="40" height="40"', { portrait: true })}</g>
-      <text x="60" y="31" font-size="13" font-weight="700" fill="#FFFFFF">${esc(p.name)}</text>
-      <text x="60" y="47" font-size="11" fill="#FFC24B">${esc(tier)}${threads.length > 1 ? ` · 共 ${threads.length} 根线` : ''}</text>
+    const online = game.partnerOnline(top);
+    const asking = !!top.pendingRequest && top.pendingRequest.from !== ME;
+    thread = `<path class="red-thread" d="M318 108 C 330 200, 262 250, ${DOOR.x + 18} ${DOOR.y - 8}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" ${top.quarrel ? 'stroke-dasharray="7 6"' : ''}/>`;
+    neighbor = `<g class="tap" data-act="tab" data-v="threads">
+      <ellipse cx="318" cy="84" rx="58" ry="6" fill="#000" opacity="0.2"/>
+      <rect x="276" y="44" width="84" height="40" rx="3" fill="#F7EEE0"/>
+      <path d="M264 46 Q318 14 372 46 L364 38 Q318 8 272 38 Z" fill="${p.real ? '#3E8A6E' : '#6B6F9A'}"/>
+      <path d="M290 84 V64 Q300 56 310 64 V84 Z" fill="#B8323C"/>
+      <rect x="320" y="58" width="12" height="10" rx="2" fill="${online ? '#FFD86B' : '#5B4F7A'}"/>
+      <rect x="276" y="${online ? 88 : 88}" width="84" height="20" rx="10" fill="#2A2D5E" stroke="${color}" stroke-width="1.5"/>
+      <text x="318" y="102" text-anchor="middle" font-size="11.5" fill="#FFFFFF">${esc(p.name)}家 · <tspan fill="#FFC24B">${esc(tier)}</tspan>${threads.length > 1 ? ` +${threads.length - 1}` : ''}</text>
+      ${online ? `<g class="bob">${chibi(p.look, partnerMood(w, top), 'x="338" y="44" width="34" height="42.5"')}</g>` : ''}
+      ${asking ? `<g class="float"><rect x="250" y="20" width="44" height="26" rx="13" fill="#FFFFFF"/><path d="M282 44 L288 52 L290 44Z" fill="#FFFFFF"/><text x="272" y="38" text-anchor="middle" font-size="14" fill="#1E2048" class="display">…</text></g>` : ''}
+      ${top.quarrel ? '<path d="M262 30 l8 0 M266 26 l0 8 M276 22 l6 6 M276 28 l6 -6" stroke="#FF9A6B" stroke-width="3" stroke-linecap="round"/>' : ''}
     </g>`;
   }
 
-  const spots = [
-    { x: 46, y: 222, w: 46 },
-    { x: 228, y: 226, w: 42 },
-    { x: 262, y: 236, w: 34 },
-  ];
-  const members = me.members
-    .slice(0, spots.length)
-    .map((m, i) => {
-      const s = spots[i]!;
-      const hurt = m.injuredUntil > w.hour;
-      return `<g ${hurt ? 'opacity="0.55"' : ''}>${chibi(memberLook(game, m, i), hurt ? 'sad' : 'calm', `x="${s.x}" y="${s.y}" width="${s.w}" height="${s.w * 1.25}"`)}</g>`;
-    })
-    .join('');
+  // —— 族人小屋 ——
+  const huts = PLOTS.map((s, i) => {
+    const m = me.members[i];
+    if (!m) {
+      return `<g opacity="0.7"><rect x="${s.x - 26}" y="${s.y - 34}" width="52" height="34" rx="8" fill="none" stroke="#5B61B0" stroke-width="2" stroke-dasharray="5 5"/>
+        <text x="${s.x}" y="${s.y - 12}" text-anchor="middle" font-size="11" fill="#8C90D0">空地</text></g>`;
+    }
+    const hurt = m.injuredUntil > w.hour;
+    const side = s.x < 195 ? 22 : -54;
+    return `${hut(s.x, s.y, '#6A58B8', night)}
+      <g ${hurt ? 'opacity="0.6"' : ''}>${chibi(memberLook(game, m, i), hurt ? 'sad' : 'calm', `x="${s.x + side}" y="${s.y - 38}" width="32" height="40"`)}</g>
+      ${hurt ? `<g transform="translate(${s.x + side + 22} ${s.y - 40})"><rect width="12" height="12" rx="3" fill="#FFFFFF"/><path d="M6 2V10M2 6H10" stroke="#F0525A" stroke-width="2.4"/></g>` : ''}`;
+  }).join('');
+  const extra = me.members.length > PLOTS.length ? `<text x="195" y="424" text-anchor="middle" font-size="11" fill="#B9BCE8">还有 ${me.members.length - PLOTS.length} 位族人在后院</text>` : '';
 
+  // —— 灵石堆（点了收）和丹炉（点了炼丹） ——
   const pending = pendingStones(w);
   const gems = pending >= 60 ? 3 : pending >= 20 ? 2 : pending > 0 ? 1 : 0;
-  const pile =
-    gems === 0
-      ? ''
-      : `<g class="tap bob" data-act="collect">
-        <ellipse cx="322" cy="300" rx="34" ry="8" fill="#000" opacity="0.2"/>
-        ${gems >= 2 ? '<path d="M300 300 312 276 324 300Z" fill="#5CCBEF"/>' : ''}
-        <path d="M312 302 326 268 340 302Z" fill="#7FE0FF"/>
-        ${gems >= 3 ? '<path d="M330 302 342 280 354 302Z" fill="#A9EEFF"/>' : ''}
-        <path d="M326 268 330 290 340 302Z" fill="#FFFFFF" opacity="0.35"/>
-      </g>`;
+  const pile = `<g class="tap" data-act="collect">
+      <ellipse cx="80" cy="214" rx="30" ry="7" fill="#000" opacity="0.2"/>
+      ${gems >= 2 ? '<path d="M60 214 72 190 84 214Z" fill="#5CCBEF"/>' : ''}
+      ${gems >= 1 ? '<path d="M70 216 84 180 98 216Z" fill="#7FE0FF"/><path d="M84 180 88 202 98 216Z" fill="#FFFFFF" opacity="0.35"/>' : '<path d="M66 214 L94 214" stroke="#5B61B0" stroke-width="3" stroke-linecap="round"/>'}
+      ${gems >= 3 ? '<path d="M88 216 100 194 112 216Z" fill="#A9EEFF"/>' : ''}
+      ${pending > 0 ? `<g class="bob"><rect x="56" y="152" width="50" height="22" rx="11" fill="#52D6A6"/><text x="81" y="168" text-anchor="middle" font-size="13" fill="#15173A" class="num">+${pending}</text></g>` : '<text x="80" y="232" text-anchor="middle" font-size="10.5" fill="#8C90D0">打坐中</text>'}
+    </g>`;
+  const furnace = `<g class="tap" data-act="pills">
+      <ellipse cx="312" cy="216" rx="28" ry="6" fill="#000" opacity="0.2"/>
+      <path d="M294 214 L298 200 M330 214 L326 200" stroke="#8C7BDC" stroke-width="4" stroke-linecap="round"/>
+      <path d="M288 184 Q312 176 336 184 L332 204 Q312 212 292 204 Z" fill="#8C7BDC"/>
+      <rect x="290" y="180" width="44" height="7" rx="3.5" fill="#FFC24B"/>
+      <g class="glow"><ellipse cx="312" cy="198" rx="8" ry="5" fill="#FF9A6B"/></g>
+      <g class="drift-up" fill="#E9ECFF" opacity="0.35"><circle cx="308" cy="170" r="5"/><circle cx="316" cy="160" r="4"/></g>
+      ${me.ghostHearts > 0 ? `<g transform="translate(330 172)"><circle r="10" fill="#9B8CFF"/><text y="4.5" text-anchor="middle" font-size="12" fill="#FFFFFF" class="num">${me.ghostHearts}</text></g>` : ''}
+    </g>`;
 
-  return `<svg class="scene-svg" viewBox="0 0 390 340" role="img" aria-label="你的宅院">
-    <defs><clipPath id="pill-clip"><circle cx="34" cy="34" r="20"/></clipPath></defs>
-    <rect width="390" height="340" fill="${sky}"/>
-    ${celestial}
-    <g class="drift" fill="#FFFFFF" opacity="0.12"><ellipse cx="96" cy="96" rx="44" ry="10"/><ellipse cx="128" cy="88" rx="30" ry="9"/><ellipse cx="286" cy="124" rx="36" ry="8"/></g>
-    <path d="M0 214 60 134 110 194 170 114 240 204 300 144 390 218V340H0Z" fill="#1F2256" opacity="0.75"/>
-    <path d="M0 244 80 184 150 234 230 174 310 232 390 196V340H0Z" fill="#1A1C4A" opacity="0.8"/>
-    <rect y="268" width="390" height="72" fill="#3D4285"/>
-    <path d="M0 268H390" stroke="#5B61B0" stroke-width="3"/>
-    <path d="M0 292H390M0 316H390M60 268 40 340M140 268 130 340M250 268 260 340M330 268 350 340" stroke="#353A75" stroke-width="2"/>
-    <rect x="110" y="128" width="170" height="140" rx="10" fill="#FFF0E2"/>
-    <rect x="110" y="128" width="16" height="140" fill="#F0525A"/><rect x="264" y="128" width="16" height="140" fill="#F0525A"/>
-    <path d="M70 134Q195 66 320 134Q312 144 296 140L94 140Q78 144 70 134Z" fill="#6A58B8"/>
-    <path d="M92 126Q195 76 298 126" fill="none" stroke="#8C7BDC" stroke-width="3" stroke-linecap="round"/>
-    <path d="M70 134Q62 122 72 116M320 134Q328 122 318 116" stroke="#FFC24B" stroke-width="4" fill="none" stroke-linecap="round"/>
-    <rect x="152" y="98" width="86" height="26" rx="6" fill="#2A2D5E" stroke="#FFC24B" stroke-width="2"/>
-    <text x="195" y="117" text-anchor="middle" font-size="15" fill="#FFF2C4" class="display">护 宅</text>
-    <circle cx="195" cy="214" r="56" fill="${ring}" opacity="0.12"/>
-    <g class="ward"><circle cx="195" cy="214" r="64" fill="none" stroke="${ring}" stroke-width="2.500" stroke-dasharray="${damaged ? '3 9' : '8 6'}"/></g>
-    <path d="M167 268V200Q167 170 195 170Q223 170 223 200V268Z" fill="#C2434A"/>
-    <path d="M195 172V268" stroke="#8E2D33" stroke-width="2"/>
-    <circle cx="187" cy="224" r="3" fill="#FFC24B"/><circle cx="203" cy="224" r="3" fill="#FFC24B"/>
-    ${retreating ? '<rect x="181" y="190" width="28" height="44" rx="4" fill="#FFF2C4" stroke="#52D6A6" stroke-width="2"/><text x="195" y="208" text-anchor="middle" font-size="12" fill="#1E2048" class="display">闭</text><text x="195" y="226" text-anchor="middle" font-size="12" fill="#1E2048" class="display">关</text>' : ''}
-    <path d="M132 142V150M258 142V150" stroke="#FFC24B" stroke-width="2"/>
-    <g class="glow"><ellipse cx="132" cy="164" rx="11" ry="13" fill="#FFB347"/><ellipse cx="258" cy="164" rx="11" ry="13" fill="#FFB347"/></g>
-    ${me.guardianKnocks > 0 ? `<g class="float" opacity="0.85">${ghost('spirit', 'x="263" y="151" width="38" height="38"')}</g>` : ''}
-    ${line}
-    ${members}
-    <ellipse cx="150" cy="274" rx="30" ry="7" fill="#9B8CFF"/>
-    <g class="tap bob" data-act="avatar">${chibi(look, mood, 'x="112" y="180" width="76" height="95"')}</g>
-    ${pile}
-    ${pill}
+  // —— 门的血条：符阵等级减去受损 ——
+  const hp = me.formationLevel > 0 ? Math.max(0, me.formationLevel - me.formationDamage) / me.formationLevel : 1;
+  const hpBar = `<g>
+      <rect x="160" y="160" width="70" height="8" rx="4" fill="#15173A"/>
+      <rect x="160" y="160" width="${(70 * hp).toFixed(1)}" height="8" rx="4" fill="${ring}"/>
+      <text x="195" y="182" text-anchor="middle" font-size="11" fill="#1E2048" class="num">大阵 ${fmt(doorPower(w, me))}</text>
+    </g>`;
+
+  // —— 游荡的鬼：院墙外一直在转；没有保护时，院子里也有一只在晃 ——
+  const spirits = Math.min(3, Math.ceil(me.grudge / 10));
+  const omen = me.grudge >= w.config.ghosts.omenGrudge;
+  const roamers = [
+    `<g class="roam roam-top">${ghost('wild', 'x="-16" y="-16" width="32" height="32"')}</g>`,
+    `<g class="roam roam-left">${ghost('wild', 'x="-14" y="-14" width="28" height="28"')}</g>`,
+    ...Array.from({ length: spirits }, (_, i) => `<g class="roam roam-${['right', 'bottom', 'top2'][i]}">${ghost('spirit', 'x="-17" y="-17" width="34" height="34"')}</g>`),
+    safe ? '' : `<g class="roam roam-yard" opacity="0.92">${ghost(omen ? 'spirit' : 'wild', 'x="-18" y="-18" width="36" height="36"')}</g>`,
+  ].join('');
+
+  return `<svg class="scene-svg" viewBox="0 0 390 ${MAP_H}" role="img" aria-label="你的家族大院：鬼在院外游荡，砸的是你家的门">
+    <rect width="390" height="${MAP_H}" fill="${ground}"/>
+    <rect width="390" height="104" fill="${sky}"/>
+    ${night ? `<circle cx="40" cy="40" r="18" fill="#FFF2C4"/><g class="twinkle" fill="#FFFFFF"><circle cx="110" cy="22" r="1.5"/><circle cx="180" cy="50" r="1.3"/><circle cx="230" cy="16" r="1.6"/><circle cx="90" cy="70" r="1.2"/></g>` : '<circle cx="40" cy="40" r="17" fill="#FFD98A"/>'}
+    <path d="M0 96 50 62 96 88 150 54 210 90 250 70 262 96Z" fill="#1A1C4A" opacity="0.7"/>
+    <path d="M0 104H390" stroke="#000" stroke-opacity="0.15" stroke-width="6"/>
+    ${safe ? '<rect x="18" y="110" width="354" height="314" rx="22" fill="none" stroke="#52D6A6" stroke-width="10" opacity="0.25" class="glow"/>' : ''}
+    <rect x="26" y="118" width="338" height="298" rx="16" fill="#3D4285"/>
+    <path d="M26 166H364M26 214H364M26 262H364M26 310H364M26 358H364M90 118V416M160 118V416M230 118V416M300 118V416" stroke="#363B7A" stroke-width="2"/>
+    <path d="M195 246 V416" stroke="#4A4F8F" stroke-width="22"/>
+    <rect x="26" y="118" width="338" height="298" rx="16" fill="none" stroke="#6A58B8" stroke-width="9"/>
+    <g fill="${ground}"><rect x="20" y="236" width="14" height="40"/><rect x="356" y="236" width="14" height="40"/><rect x="175" y="410" width="40" height="14"/></g>
+    <g fill="#FFC24B"><rect x="19" y="228" width="16" height="8" rx="2"/><rect x="19" y="276" width="16" height="8" rx="2"/><rect x="355" y="228" width="16" height="8" rx="2"/><rect x="355" y="276" width="16" height="8" rx="2"/><rect x="167" y="408" width="8" height="16" rx="2"/><rect x="215" y="408" width="8" height="16" rx="2"/></g>
+    ${[[30, 122], [360, 122], [30, 412], [360, 412]].map(([x, y]) => `<g class="glow"><circle cx="${x}" cy="${y}" r="7" fill="${ring}"/></g>`).join('')}
+    ${pile}${furnace}
+    <ellipse cx="${DOOR.x}" cy="${DOOR.y}" rx="104" ry="20" fill="${ring}" opacity="0.1"/>
+    <ellipse class="ward-flow" cx="${DOOR.x}" cy="${DOOR.y}" rx="104" ry="20" fill="none" stroke="${ring}" stroke-width="2.5" stroke-dasharray="${damaged ? '3 9' : '9 7'}"/>
+    <rect x="130" y="150" width="130" height="90" fill="#FFF0E2"/>
+    <rect x="130" y="150" width="12" height="90" fill="#F0525A"/><rect x="248" y="150" width="12" height="90" fill="#F0525A"/>
+    <path d="M110 154 Q195 104 280 154 Q272 162 258 158 L132 158 Q118 162 110 154 Z" fill="#6A58B8"/>
+    <path d="M110 154 Q102 144 112 138 M280 154 Q288 144 278 138" stroke="#FFC24B" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <rect x="160" y="118" width="70" height="22" rx="5" fill="#2A2D5E" stroke="#FFC24B" stroke-width="2"/>
+    <text x="195" y="134" text-anchor="middle" font-size="13" fill="#FFF2C4" class="display">${esc(me.name.slice(0, 4))}宅</text>
+    ${hpBar}
+    <path d="M176 240 V206 Q176 190 195 190 Q214 190 214 206 V240 Z" fill="#C2434A"/>
+    <path d="M195 192 V240" stroke="#8E2D33" stroke-width="2"/>
+    <circle cx="189" cy="218" r="2.6" fill="#FFC24B"/><circle cx="201" cy="218" r="2.6" fill="#FFC24B"/>
+    ${retreating ? '<rect x="184" y="198" width="22" height="36" rx="3" fill="#FFF2C4" stroke="#52D6A6" stroke-width="2"/><text x="195" y="213" text-anchor="middle" font-size="10" fill="#1E2048" class="display">闭</text><text x="195" y="227" text-anchor="middle" font-size="10" fill="#1E2048" class="display">关</text>' : ''}
+    ${damaged ? '<path d="M180 200 L190 212 L184 222 M210 204 L202 216" stroke="#15173A" stroke-width="2" fill="none"/>' : ''}
+    <g class="glow"><ellipse cx="150" cy="176" rx="8" ry="10" fill="#FFB347"/><ellipse cx="240" cy="176" rx="8" ry="10" fill="#FFB347"/></g>
+    ${me.guardianKnocks > 0 ? `<g class="float" opacity="0.9">${ghost('spirit', 'x="222" y="196" width="30" height="30"')}</g>` : ''}
+    ${huts}${extra}
+    ${neighbor}
+    ${thread}
+    <g class="tap bob" data-act="avatar">${chibi(look, mood, `x="${DOOR.x - 62}" y="${DOOR.y - 50}" width="46" height="57.5"`)}</g>
+    ${roamers}
   </svg>`;
 }
 
@@ -325,15 +387,22 @@ function fx(game: Game): string {
     if (!k) return '';
     const badge = { defended: '散！', purified: '化！', guarded: '挡！', breach: '破！' }[k.outcome];
     const color = k.outcome === 'breach' ? '#FF9A6B' : k.outcome === 'purified' ? '#52D6A6' : '#FFC24B';
-    return `<svg class="scene-svg" viewBox="0 0 390 340" aria-hidden="true" data-fx="${k.at}">
-      <g class="fx-in"><g class="fx-out fx-${k.outcome}">${ghost(k.kind, 'x="290" y="168" width="84" height="84"')}</g></g>
-      <g class="fx-knock"><rect x="266" y="128" width="104" height="28" rx="14" fill="#FFFFFF"/><text x="318" y="147" text-anchor="middle" font-size="14" fill="#1E2048" class="display">咚…咚咚…</text></g>
-      ${
-        k.outcome === 'breach'
-          ? '<rect class="fx-flash" width="390" height="340" fill="#FF9A6B"/>'
-          : `<path class="fx-burst" d="M195 150 205 192 244 174 220 210 262 220 220 230 244 266 205 248 195 290 185 248 146 266 170 230 128 220 170 210 146 174 185 192Z" fill="${color}"/>`
-      }
-      <text class="fx-badge display" x="250" y="176" text-anchor="middle" font-size="40" fill="${color}" stroke="#15173A" stroke-width="6" paint-order="stroke">${badge}</text>
+    // 从哪个院门进来：按这次砸门的时间挑一个，同一次重画不会变
+    const gate = ['left', 'right', 'bottom'][Math.floor(k.at / 7) % 3];
+    return `<svg class="scene-svg" viewBox="0 0 390 ${MAP_H}" aria-hidden="true" data-fx="${k.at}">
+      ${k.outcome === 'breach' ? `<rect class="m-flash" width="390" height="${MAP_H}" fill="#FF9A6B"/>` : ''}
+      <g class="m-ring"><ellipse cx="${DOOR.x}" cy="${DOOR.y - 20}" rx="22" ry="22" fill="none" stroke="#FFFFFF" stroke-width="3"/></g>
+      <g class="m-ring m-ring2"><ellipse cx="${DOOR.x}" cy="${DOOR.y - 20}" rx="22" ry="22" fill="none" stroke="#FFFFFF" stroke-width="3"/></g>
+      <g class="m-ring m-ring3"><ellipse cx="${DOOR.x}" cy="${DOOR.y - 20}" rx="22" ry="22" fill="none" stroke="#FFFFFF" stroke-width="3"/></g>
+      <g class="raid raid-${gate}"><g class="m-bang"><g class="m-out m-${k.outcome}">
+        <g class="whack" data-act="whack">${ghost(k.kind, 'x="-30" y="-30" width="60" height="60"')}<circle r="34" fill="transparent"/></g>
+      </g></g></g>
+      <g class="m-knock"><rect x="214" y="148" width="104" height="28" rx="14" fill="#FFFFFF"/><path d="M222 174 L216 184 L232 175Z" fill="#FFFFFF"/><text x="266" y="167" text-anchor="middle" font-size="14" fill="#1E2048" class="display">咚…咚咚…</text></g>
+      ${k.outcome === 'breach'
+        ? `<path class="m-crack" d="M182 196 L192 210 L184 222 L196 236 M206 198 L200 214 L210 228" stroke="#15173A" stroke-width="3" fill="none" stroke-linecap="round"/>`
+        : `<path class="m-burst" d="M195 160 205 196 240 182 218 212 256 220 218 228 240 258 205 244 195 280 185 244 150 258 172 228 134 220 172 212 150 182 185 196Z" fill="${color}"/>`}
+      <text class="m-badge display" x="${DOOR.x}" y="296" text-anchor="middle" font-size="48" fill="${color}" stroke="#15173A" stroke-width="6" paint-order="stroke">${badge}</text>
+      <g class="m-hint"><rect x="120" y="84" width="150" height="26" rx="13" fill="#15173A" opacity="0.85"/><text x="195" y="102" text-anchor="middle" font-size="12.5" fill="#FFFFFF">点鬼可以帮忙打！</text></g>
     </svg>`;
   }
   if (ui.tab === 'trib') {
@@ -576,7 +645,7 @@ function heirCard(game: Game, h: Heir): string {
   const otherId = h.parents[0] === ME ? h.parents[1] : h.parents[0];
   const other = w.houses.get(otherId);
   const otherLook = other?.appearance ?? DEFAULT_LOOK;
-  const look: Appearance = { robe: '#FFC24B', trim: otherLook.robe, headdress: 'guan', skin: mine.skin, hair: otherLook.hair };
+  const look: Appearance = { robe: '#FFC24B', trim: otherLook.robe, headdress: 'guan', skin: mine.skin, hair: otherLook.hair, outfit: mine.outfit };
   const home = h.home ? (h.home === ME ? '你家' : `${w.houses.get(h.home)?.name ?? h.home}家`) : null;
   return `<section class="card heir">
     <div class="heir-top">
@@ -732,6 +801,7 @@ function avatarSheet(game: Game, first: boolean, head: Head): string {
       <input id="oc-name" maxlength="8" value="${esc(d.initialName)}" placeholder="1–8 个字" autocomplete="off">
       ${group('性别', 'gender', GENDERS, d.gender)}
       <p class="hint">性别随时可改，和发型、道途都不挂钩。</p>
+      ${group('服装', 'outfit', OUTFITS, d.look.outfit ?? 'robe')}
       ${group('发型', 'headdress', HEADDRESSES, d.look.headdress)}
       ${swatches('衣色', 'robe', ROBES, d.look.robe)}
       ${swatches('镶边', 'trim', TRIMS, d.look.trim)}
@@ -825,6 +895,10 @@ export function bind(game: Game, root: HTMLElement, rerender: () => void): void 
   root.addEventListener('click', (ev) => {
     const el = (ev.target as Element).closest('[data-act]');
     if (!el || el.hasAttribute('disabled')) return;
+    if (el.getAttribute('data-act') === 'whack') {
+      whack(el, ev as MouseEvent);
+      return;
+    }
     handle(game, el.getAttribute('data-act') ?? '', el.getAttribute('data-id') ?? '', el.getAttribute('data-v') ?? '');
     rerender();
   });
@@ -840,6 +914,29 @@ export function bind(game: Game, root: HTMLElement, rerender: () => void): void 
     const t = ev.target as HTMLInputElement;
     if (t.id === 'oc-name' && ui.draft) ui.draft.name = t.value;
   });
+}
+
+/**
+ * 在线时点正在砸门的鬼：打一下有火花和“啪”，纯手感，不改结果（砸门的结果由规则决定，见 docs/HANDOFF.md）。
+ * 直接改 DOM、不重画，免得把正在播的砸门动画打断。
+ */
+function whack(el: Element, ev: MouseEvent): void {
+  const svg = el.closest('svg.scene-svg') as SVGSVGElement | null;
+  if (!svg) return;
+  const box = svg.getBoundingClientRect();
+  const vb = svg.viewBox.baseVal;
+  const x = ((ev.clientX - box.left) / box.width) * vb.width;
+  const y = ((ev.clientY - box.top) / box.height) * vb.height;
+  const words = ['啪！', '砰！', '去！', '嘿！'];
+  const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+  g.setAttribute('class', 'm-hit');
+  g.setAttribute('transform', `translate(${x.toFixed(1)} ${y.toFixed(1)})`);
+  g.innerHTML = `<path d="M0 -18 5 -6 18 -8 8 2 14 14 0 7 -14 14 -8 2 -18 -8 -5 -6Z" fill="#FFC24B"/><text y="-22" text-anchor="middle" font-size="18" fill="#FFFFFF" stroke="#15173A" stroke-width="4" paint-order="stroke" class="display">${words[Math.floor(Math.random() * words.length)]}</text>`;
+  svg.appendChild(g);
+  el.classList.remove('m-shake');
+  void el.getBoundingClientRect();
+  el.classList.add('m-shake');
+  setTimeout(() => g.remove(), 650);
 }
 
 function handle(game: Game, act: string, id: string, v: string): void {
@@ -863,6 +960,7 @@ function handle(game: Game, act: string, id: string, v: string): void {
       if (id === 'gender') ui.draft.gender = v as Gender;
       else if (id === 'role') ui.draft.role = v;
       else if (id === 'headdress') ui.draft.look.headdress = v as Appearance['headdress'];
+      else if (id === 'outfit') ui.draft.look.outfit = v as Appearance['outfit'];
       else if (id === 'robe' || id === 'trim' || id === 'skin' || id === 'hair') ui.draft.look[id] = v;
       break;
     case 'avatar-save': {

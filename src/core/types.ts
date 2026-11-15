@@ -20,7 +20,12 @@ export interface Appearance {
   headdress: 'bun' | 'guan' | 'plain' | 'twin' | 'ribbon';
   skin: string;
   hair: string;
+  /** 服装风格，玩家自己选；没有时按仙袍画（旧存档） */
+  outfit?: Outfit;
 }
+
+/** 服装风格：仙袍 / 短褂 / 卫衣。只是外观，不影响数值 */
+export type Outfit = 'robe' | 'tunic' | 'hoodie';
 
 /** OC 的性别：随时可改，和道途、发型都不挂钩 */
 export type Gender = 'male' | 'female' | 'other' | 'unsaid';
