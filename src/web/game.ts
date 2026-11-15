@@ -84,8 +84,13 @@ export interface Banner {
   title: string;
   sub: string;
   tone: Tone;
+  /** 最早什么时候能显示（砸门的结果要等撞门演完） */
+  readyAt: number;
   shownAt: number | null;
 }
+
+/** 砸门动画里，撞完三下、出结果的时刻（和 page.html 里 .m-badge 的 2.55 秒对齐） */
+const KNOCK_RESULT_MS = 2550;
 
 /** 场景里正在演的一次砸门（只用于画面） */
 export interface KnockFx {
@@ -271,11 +276,13 @@ export class Game {
         if (!kind) break; // 渡劫失败也会触发 breach，由渡劫自己的弹字负责
         this.knockFx = { kind, outcome: e.type, at: now };
         const cleared = Math.max(0, this.grudgeBeforeKnock - me.grudge);
-        if (e.type === 'breach') this.banner('大阵被破…', `灵石 -${e.stonesLost} · 进入劫后余生`, 'bad');
-        else if (e.type === 'purified') this.banner('感化怨灵！', `净化 ${n1(cleared)} 缕怨丝 · 情丝 +${n1(e.strandsReturned)} · 它留下帮你守门`, 'good');
-        else if (kind === 'wild') this.banner(e.type === 'guarded' ? '护宅怨灵挡下了！' : '击退野鬼！', '诡心 +1', 'good');
-        else if (e.type === 'guarded') this.banner('护宅怨灵挡下了！', `净化 ${n1(cleared)} 缕怨丝`, 'good');
-        else this.banner('打散怨灵！', `净化 ${n1(cleared)} 缕怨丝 · 情丝 +${n1(e.strandsReturned)}`, 'good');
+        // 结果弹字等鬼撞完三下再出，不能抢在动画前面
+        const later = KNOCK_RESULT_MS;
+        if (e.type === 'breach') this.banner('大阵被破…', `灵石 -${e.stonesLost} · 进入劫后余生`, 'bad', later);
+        else if (e.type === 'purified') this.banner('感化怨灵！', `净化 ${n1(cleared)} 缕怨丝 · 情丝 +${n1(e.strandsReturned)} · 它留下帮你守门`, 'good', later);
+        else if (kind === 'wild') this.banner(e.type === 'guarded' ? '护宅怨灵挡下了！' : '击退野鬼！', '诡心 +1', 'good', later);
+        else if (e.type === 'guarded') this.banner('护宅怨灵挡下了！', `净化 ${n1(cleared)} 缕怨丝`, 'good', later);
+        else this.banner('打散怨灵！', `净化 ${n1(cleared)} 缕怨丝 · 情丝 +${n1(e.strandsReturned)}`, 'good', later);
         break;
       }
       case 'tierChanged': {
@@ -332,22 +339,22 @@ export class Game {
     }
   }
 
-  private banner(title: string, sub: string, tone: Tone): void {
+  private banner(title: string, sub: string, tone: Tone, delayMs = 0): void {
     // 极速时事件很密：最多排 3 条，旧的没来得及显示就丢掉
     while (this.banners.length >= 3) this.banners.splice(1, 1);
-    this.banners.push({ id: ++this.bannerSeq, title, sub, tone, shownAt: null });
+    this.banners.push({ id: ++this.bannerSeq, title, sub, tone, readyAt: Date.now() + delayMs, shownAt: null });
   }
 
-  /** 现在该显示的弹字（每条显示 1.7 秒，排队播放） */
+  /** 现在该显示的弹字（每条显示 1.7 秒，排队播放；还没到时间的先让后面已就绪的播） */
   currentBanner(): Banner | null {
     const now = Date.now();
-    while (this.banners.length > 0) {
-      const b = this.banners[0] as Banner;
-      if (b.shownAt === null) b.shownAt = now;
-      if (now - b.shownAt < 1700) return b;
-      this.banners.shift();
-    }
-    return null;
+    this.banners = this.banners.filter((b) => b.shownAt === null || now - b.shownAt < 1700);
+    const showing = this.banners.find((b) => b.shownAt !== null);
+    if (showing) return showing;
+    const next = this.banners.find((b) => b.readyAt <= now);
+    if (!next) return null;
+    next.shownAt = now;
+    return next;
   }
 
   /** 刚收过灵石（用来让灵石数字跳一下） */

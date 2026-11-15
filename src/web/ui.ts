@@ -402,7 +402,7 @@ function fx(game: Game): string {
         ? `<path class="m-crack" d="M182 196 L192 210 L184 222 L196 236 M206 198 L200 214 L210 228" stroke="#15173A" stroke-width="3" fill="none" stroke-linecap="round"/>`
         : `<path class="m-burst" d="M195 160 205 196 240 182 218 212 256 220 218 228 240 258 205 244 195 280 185 244 150 258 172 228 134 220 172 212 150 182 185 196Z" fill="${color}"/>`}
       <text class="m-badge display" x="${DOOR.x}" y="296" text-anchor="middle" font-size="48" fill="${color}" stroke="#15173A" stroke-width="6" paint-order="stroke">${badge}</text>
-      <g class="m-hint"><rect x="120" y="84" width="150" height="26" rx="13" fill="#15173A" opacity="0.85"/><text x="195" y="102" text-anchor="middle" font-size="12.5" fill="#FFFFFF">点鬼可以帮忙打！</text></g>
+      <g class="m-hint"><rect x="120" y="84" width="150" height="26" rx="13" fill="#15173A" opacity="0.85"/><text x="195" y="102" text-anchor="middle" font-size="12.5" fill="#FFFFFF">戳戳它，出口气！</text></g>
     </svg>`;
   }
   if (ui.tab === 'trib') {
@@ -917,7 +917,7 @@ export function bind(game: Game, root: HTMLElement, rerender: () => void): void 
 }
 
 /**
- * 在线时点正在砸门的鬼：打一下有火花和“啪”，纯手感，不改结果（砸门的结果由规则决定，见 docs/HANDOFF.md）。
+ * 在线时戳正在砸门的鬼：有火花和“啪”，纯手感，不改结果（提示语也故意不说“帮忙打”）（砸门的结果由规则决定，见 docs/HANDOFF.md）。
  * 直接改 DOM、不重画，免得把正在播的砸门动画打断。
  */
 function whack(el: Element, ev: MouseEvent): void {
