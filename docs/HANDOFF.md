@@ -44,6 +44,7 @@ src/web/     网页原型（只是界面壳）：game.ts 控制层、ui.ts 各�
 test/        core.test.ts（规则）、save.test.ts（存档与提示）
 docs/        本文件、美术规格、方案文档、参考截图
 design/      设计稿画布的源文件（.dc.html 是 HTML + 一段组件脚本，要在在线画布里才能渲染；看样子请用 docs/art/screens 的截图）
+             ⚠️ 画布是 11 月 14 日的旧稿，形象里还有已删掉的戏曲款（翎子、凤冠、行当）。以 ART_SPEC.md 和截图为准
 ```
 
 数据流：界面层只调用 `src/core/index.ts` 导出的函数，规则引擎通过 `world.listener` 发事件（`GameEvent`），界面层把事件变成弹字和动画。**不要在界面层写规则**。
