@@ -110,18 +110,25 @@ function myLook(game: Game): { look: Appearance } {
   return { look: me.appearance ?? DEFAULT_LOOK };
 }
 
-/** 族人的样子取自父母双方：衣色随搭档，镶边随你，服装轮流随两边（孩子是两个人的结晶） */
+/**
+ * 族人的样子取自父母双方（孩子是两个人的结晶）：衣色、镶边、肤色、发色、服装各随父母一方，发型五选一。
+ * 按族人自己的编号定，同一位族人永远长一样；父母长得像时也不会一排都一模一样。
+ */
 function memberLook(game: Game, m: ClanMember, i: number): Appearance {
   const mine = myLook(game).look;
   const otherKey = m.parents[0] === ME ? m.parents[1] : m.parents[0];
   const other = game.world.houses.get(otherKey)?.appearance ?? npcLook(otherKey);
+  let h = 17 + i;
+  for (const ch of m.id) h = (h * 31 + (ch.codePointAt(0) ?? 0)) >>> 0;
+  const bit = (n: number) => ((h >>> n) & 1) === 1;
+  const flip = bit(0);
   return {
-    robe: other.robe,
-    trim: mine.robe,
-    headdress: i % 2 ? 'bun' : 'plain',
-    skin: i % 2 ? other.skin : mine.skin,
-    hair: i % 2 ? mine.hair : other.hair,
-    outfit: i % 2 ? other.outfit : mine.outfit,
+    robe: flip ? mine.robe : other.robe,
+    trim: flip ? other.robe : mine.robe,
+    headdress: HEADDRESSES[(h >>> 3) % HEADDRESSES.length]!.id,
+    skin: bit(6) ? other.skin : mine.skin,
+    hair: bit(7) ? mine.hair : other.hair,
+    outfit: bit(8) ? other.outfit : mine.outfit,
   };
 }
 
@@ -892,15 +899,44 @@ function settingsSheet(game: Game, head: Head): string {
 // ---------- 点击 ----------
 
 export function bind(game: Game, root: HTMLElement, rerender: () => void): void {
-  root.addEventListener('click', (ev) => {
-    const el = (ev.target as Element).closest('[data-act]');
-    if (!el || el.hasAttribute('disabled')) return;
+  const keyOf = (el: Element) => [el.getAttribute('data-act'), el.getAttribute('data-id'), el.getAttribute('data-v')].join('|');
+  const activate = (el: Element, ev: MouseEvent) => {
+    if (el.hasAttribute('disabled')) return;
     if (el.getAttribute('data-act') === 'whack') {
-      whack(el, ev as MouseEvent);
+      whack(el, ev);
       return;
     }
     handle(game, el.getAttribute('data-act') ?? '', el.getAttribute('data-id') ?? '', el.getAttribute('data-v') ?? '');
     rerender();
+  };
+
+  /*
+   * 按下时就记住按的是哪个按钮（按 data-act / data-id / data-v 认，不按元素认）。
+   * 松手时只要还在同一个按钮上就算点到，哪怕这期间界面重画、元素被换掉了。
+   * 有的浏览器（尤其是 Mac 触控板）在元素被换掉时会把这一下当成选字，click 就丢了。
+   */
+  let down: { key: string; x: number; y: number } | null = null;
+  let handledAt = 0;
+  root.addEventListener('pointerdown', (ev) => {
+    const el = (ev.target as Element).closest('[data-act]');
+    down = el && !el.hasAttribute('disabled') ? { key: keyOf(el), x: ev.clientX, y: ev.clientY } : null;
+  });
+  root.addEventListener('pointercancel', () => (down = null));
+  root.addEventListener('pointerup', (ev) => {
+    const start = down;
+    down = null;
+    if (!start || Math.hypot(ev.clientX - start.x, ev.clientY - start.y) > 12) return;
+    const el = (ev.target as Element).closest('[data-act]');
+    if (!el || keyOf(el) !== start.key) return;
+    handledAt = Date.now();
+    activate(el, ev);
+  });
+  // 键盘（回车 / 空格）和读屏软件只会发 click（detail 为 0）；指针刚处理过的那一下（detail ≥ 1）跳过
+  root.addEventListener('click', (ev) => {
+    const el = (ev.target as Element).closest('[data-act]');
+    if (!el) return;
+    if (ev.detail > 0 && Date.now() - handledAt < 800) return;
+    activate(el, ev);
   });
   root.addEventListener('submit', (ev) => {
     const form = ev.target as HTMLFormElement;
