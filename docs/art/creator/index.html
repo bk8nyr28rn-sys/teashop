@@ -57,7 +57,7 @@ header.top p { margin: 0; color: var(--muted); font-size: 13px; }
   .act { min-height: 36px; }
   body.drawing .stage { position: static; }
 }
-.rowbar .lab { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.rowbar .lab { flex: none; white-space: nowrap; font-size: 12px; color: var(--muted); margin-right: 2px; }
 .chip { min-height: 34px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 13px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .act { min-height: 40px; padding: 0 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); font-weight: 500; }
@@ -97,6 +97,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 30px
 .drawtools { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .toast { min-height: 18px; font-size: 12.5px; color: var(--accent); }
 .count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.idle { animation: idle 2.2s ease-in-out infinite; }
+@keyframes idle { 50% { transform: translateY(-4px); } }
+.persona { display: grid; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line); }
+.persona b { font-family: var(--font-display); font-size: 24px; font-weight: 400; }
+.persona span { font-size: 13px; color: var(--muted); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 </style>
 
@@ -158,6 +163,8 @@ const OPT = {
   mouth: [['smile', '微笑'], ['o', '小圆嘴'], ['flat', '抿嘴'], ['grin', '咧嘴笑'], ['cat', '猫嘴'], ['smirk', '坏笑']],
   beard: [['none', '无'], ['mustache', '八字胡'], ['goatee', '山羊胡'], ['full', '络腮胡']],
   mark: [['none', '无'], ['tearmole', '泪痣'], ['huadian', '花钿'], ['scar', '刀疤'], ['freckles', '雀斑'], ['paint', '面纹']],
+  nose: [['none', '无'], ['dot', '鼻孔'], ['small', '小鼻'], ['hook', '侧影'], ['button', '圆头'], ['line', '直线'], ['round', '大鼻头']],
+  glasses: [['none', '无'], ['round', '圆框'], ['square', '方框'], ['half', '半框'], ['sun', '墨镜'], ['monocle', '单片镜']],
   hairFront: [['qi', '齐刘海'], ['middle', '中分'], ['side', '偏分'], ['messy', '碎发'], ['air', '空气刘海'], ['bare', '无刘海'], ['longside', '长侧刘海'], ['curly', '卷刘海']],
   hairBack: [['highpony', '高马尾'], ['lowpony', '低马尾'], ['long', '长直发'], ['buns', '双髻'], ['topknot', '道髻'], ['short', '短发'], ['twintails', '双马尾'], ['halfup', '半扎发']],
   streak: [['none', '无'], ['left', '左边挑染'], ['right', '右边挑染'], ['tips', '发梢挑染']],
@@ -184,6 +191,10 @@ const DEFAULT = {
   bottom: 'pants', bottomColor: '#2E3446', shoes: 'boots', shoeColor: '#3A2C26', cape: 'none', capeColor: '#C8402E',
   head: 'band', headColor: '#C8402E', ear: 'none', earColor: '#E3A33B', neck: 'none', neckColor: '#7FA36B',
   weapon: 'sword', weaponPos: 'back', weaponColor: '#C9D2E2',
+  eyeRot: 0, eyeSquash: 0.5, browY: 0.5, browGap: 0.5, browSize: 0.5, nose: 'small', noseY: 0.5, noseSize: 0.5,
+  mouthSize: 0.5, mouthSquash: 0.5, mole: false, moleX: 0.45, moleY: 0.35, moleSize: 0.4,
+  glasses: 'none', glassesColor: '#2A2D36', glassesSize: 0.5, glassesY: 0.5,
+  pMove: 3, pTalk: 3, pExpr: 3, pAttitude: 3, pQuirk: 3, vPitch: 0.5, vRate: 0.5,
   brushColor: '#2B2233', brushSize: 0.05, tileSize: 0.5,
 };
 
@@ -425,7 +436,8 @@ function drawPerson(s0, expr, age, opt = {}) {
   if (s.mark === 'freckles') for (const [dx, dy] of [[-1.3, 1.3], [-0.9, 1.6], [-0.5, 1.4], [0.5, 1.4], [0.9, 1.6], [1.3, 1.3]]) headParts.push(`<circle cx="${cx + dx * egap * 0.9}" cy="${ey + dy * 10 * es + 6}" r="1.4" fill="${mc}" opacity="0.8"/>`);
   if (s.mark === 'paint') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 2)} ${ey + 14 * es} l${sd * 14} -4 M${cx + sd * (egap + 2)} ${ey + 20 * es} l${sd * 14} -4" stroke="${mc}" stroke-width="3" stroke-linecap="round"/>`);
   // 眼睛
-  if (!hideFace) for (const sd of [-1, 1]) headParts.push(`<g transform="translate(${cx + sd * egap} ${ey}) scale(${sd * es} ${es})">${eyeWithState(eyeState, eyeStyle, s.eyeColor, s.skin)}</g>`);
+  const eyeRotDeg = (s.eyeRot || 0) * 25, esq = 0.7 + 0.6 * (s.eyeSquash ?? 0.5);
+  if (!hideFace) for (const sd of [-1, 1]) headParts.push(`<g transform="translate(${cx + sd * egap} ${ey}) rotate(${-sd * eyeRotDeg}) scale(${sd * es} ${es * esq})">${eyeWithState(eyeState, eyeStyle, s.eyeColor, s.skin)}</g>`);
   if (age === 'elder') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 12 * es)} ${ey - 2} l${sd * 6} -3 M${cx + sd * (egap + 12 * es)} ${ey + 3} l${sd * 6} 2" stroke="#C9A58F" stroke-width="1.2"/>`);
   // 表情特效
   if (fx.has('blush')) for (const sd of [-1, 1]) headParts.push(`<ellipse cx="${cx + sd * (egap + 2)}" cy="${ey + 16 * es + 4}" rx="${12 * es + 2}" ry="${6 * es + 1}" fill="#FF6B81" opacity="0.55"/><path d="M${cx + sd * (egap - 4)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 2)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 8)} ${ey + 14 * es + 4} l${sd * 3} 5" stroke="#E2475F" stroke-width="1.6" opacity="0.7"/>`);
@@ -433,10 +445,16 @@ function drawPerson(s0, expr, age, opt = {}) {
   // 眉毛
   const bth = 1.6 + 4.2 * s.browThick;
   // 眉毛画在头发上层（Q 版常见画法），刘海再厚表情也看得出来
-  const browsSvg = [-1, 1].map((sd) => `<g transform="translate(${cx + sd * egap} ${ey - 15 * es - 4 - browLift}) scale(${sd} 1) rotate(${-tilt * 18})">${brow(s.brows, browColor, bth, es)}</g>`).join('');
+  const bgap = egap * (0.8 + 0.4 * (s.browGap ?? 0.5)), byy = ey - 15 * es - 4 - browLift - ((s.browY ?? 0.5) - 0.5) * ry * 0.45, bsz = 0.7 + 0.6 * (s.browSize ?? 0.5);
+  const browsSvg = [-1, 1].map((sd) => `<g transform="translate(${cx + sd * bgap} ${byy}) scale(${sd} 1) rotate(${-tilt * 18})">${brow(s.brows, browColor, bth, es * bsz)}</g>`).join('');
   // 嘴
   const my = hcy + ry * (0.5 + 0.2 * (s.mouthY - 0.5));
-  if (!hideFace) headParts.push(`<g transform="translate(${cx} ${my}) scale(${ry / 52})">${mouth(mouthStyle)}</g>`);
+  const ny = hcy + ry * (0.3 + 0.22 * ((s.noseY ?? 0.5) - 0.5)), nk = (ry / 52) * (0.7 + 0.6 * (s.noseSize ?? 0.5));
+  if (s.nose && s.nose !== 'none') headParts.push(`<g transform="translate(${cx} ${ny}) scale(${nk})">${nose(s.nose, shade(s.skin, -22))}</g>`);
+  const mw = 0.7 + 0.6 * (s.mouthSize ?? 0.5), mh = mw * (0.7 + 0.6 * (s.mouthSquash ?? 0.5));
+  if (!hideFace) headParts.push(`<g transform="translate(${cx} ${my}) scale(${(ry / 52) * mw} ${(ry / 52) * mh})">${mouth(mouthStyle)}</g>`);
+  // 痣：脸上任意位置
+  if (s.mole) headParts.push(`<circle cx="${cx + (s.moleX ?? 0.45) * rx * 0.85}" cy="${hcy + (s.moleY ?? 0.35) * ry * 0.85}" r="${(1.3 + 3 * (s.moleSize ?? 0.4)) * (ry / 52)}" fill="${INK}"/>`);
   // 胡子
   const bc = age === 'elder' ? '#E6E4DE' : hc;
   if (s.beard === 'mustache') headParts.push(`<path d="M${cx} ${my - 6} q-8 -4 -16 2 q8 0 16 -1 q8 1 16 1 q-8 -6 -16 -2 Z" fill="${bc}"/>`);
@@ -445,6 +463,7 @@ function drawPerson(s0, expr, age, opt = {}) {
   // 前发
   headParts.push(frontHair(s.hairFront, cx, hcy, rx, ry, hc));
   if (!hideFace) headParts.push(browsSvg);
+  if (s.glasses && s.glasses !== 'none') headParts.push(glasses(s.glasses, s.glassesColor, cx, egap, ey + ((s.glassesY ?? 0.5) - 0.5) * ry * 0.25, (11 + 8 * (s.glassesSize ?? 0.5)) * (ry / 52)));
   // 手绘：脸上一直显示的层 + 当前手绘表情的层，画在头发上面，画什么就是什么
   const handLayers = ['face', X.hand].filter((k) => k && k !== opt.skip);
   for (const k of handLayers) headParts.push(`<g transform="translate(${cx} ${hcy}) scale(${ry})">${strokesSvg(D[k])}</g>`);
@@ -526,6 +545,30 @@ function brow(style, c, th, es) {
     case 'thick': return `<rect x="${-w}" y="${-th}" width="${w * 2}" height="${th * 2}" rx="${th}" fill="${c}"/>`;
     case 'droopy': return `<path d="M${-w} -2 Q0 -4 ${w} 3" stroke="${c}" stroke-width="${th}" fill="none" stroke-linecap="round"/>`;
     case 'short': return `<path d="M${-w * 0.4} 0 H${w * 0.4}" stroke="${c}" stroke-width="${th + 1}" stroke-linecap="round"/>`;
+  }
+  return '';
+}
+function shade(hex, dl) { const { h, s, l } = hex2hsl(hex); return hsl2hex(h, Math.min(100, s + 8), Math.max(5, Math.min(95, l + dl))); }
+function nose(style, c) {
+  switch (style) {
+    case 'dot': return `<circle cx="-2.5" cy="0" r="1.3" fill="${c}"/><circle cx="2.5" cy="0" r="1.3" fill="${c}"/>`;
+    case 'small': return `<path d="M-2.5 1 Q0 3 2.5 1" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    case 'hook': return `<path d="M0 -7 Q4 -1 1 2 L-1 2" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    case 'button': return `<circle r="3" fill="${c}" opacity="0.55"/>`;
+    case 'line': return `<path d="M0 -7 V1" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`;
+    case 'round': return `<ellipse rx="5" ry="4" fill="${c}" opacity="0.4"/><circle cx="-2.5" cy="1.5" r="1.2" fill="${c}"/><circle cx="2.5" cy="1.5" r="1.2" fill="${c}"/>`;
+  }
+  return '';
+}
+function glasses(style, c, cx, gap, y, r) {
+  const L = cx - gap, R = cx + gap;
+  const bridge = `<path d="M${L + r} ${y} Q${cx} ${y - r * 0.35} ${R - r} ${y}" stroke="${c}" stroke-width="2" fill="none"/>`;
+  switch (style) {
+    case 'round': return `<circle cx="${L}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><circle cx="${R}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/>${bridge}`;
+    case 'square': return `<rect x="${L - r * 1.1}" y="${y - r * 0.8}" width="${r * 2.2}" height="${r * 1.6}" rx="${r * 0.3}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><rect x="${R - r * 1.1}" y="${y - r * 0.8}" width="${r * 2.2}" height="${r * 1.6}" rx="${r * 0.3}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/>${bridge}`;
+    case 'half': return `<path d="M${L - r} ${y} Q${L} ${y + r * 1.1} ${L + r} ${y} M${R - r} ${y} Q${R} ${y + r * 1.1} ${R + r} ${y}" stroke="${c}" stroke-width="2.4" fill="none"/><path d="M${L - r} ${y - 1} H${L + r} M${R - r} ${y - 1} H${R + r}" stroke="${c}" stroke-width="1.2"/>${bridge}`;
+    case 'sun': return `<ellipse cx="${L}" cy="${y}" rx="${r * 1.1}" ry="${r * 0.85}" fill="${c}" stroke="${c}" stroke-width="2"/><ellipse cx="${R}" cy="${y}" rx="${r * 1.1}" ry="${r * 0.85}" fill="${c}" stroke="${c}" stroke-width="2"/><path d="M${L - r * 0.5} ${y - r * 0.35} l${r * 0.4} -${r * 0.2} M${R - r * 0.5} ${y - r * 0.35} l${r * 0.4} -${r * 0.2}" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>${bridge}`;
+    case 'monocle': return `<circle cx="${R}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><path d="M${R + r * 0.7} ${y + r * 0.7} Q${R + r * 1.6} ${y + r * 3} ${R + r * 0.4} ${y + r * 4.5}" stroke="${c}" stroke-width="1.2" fill="none"/>`;
   }
   return '';
 }
@@ -619,18 +662,42 @@ const TABS = [
     { t: 'color', k: 'markColor', n: '面饰颜色', p: 'accent' },
   ]],
   ['features', '五官', [
-    { t: 'choice', k: 'eyes', n: '眼睛' },
-    { t: 'slider', k: 'eyeSize', n: '眼睛大小' },
-    { t: 'slider', k: 'eyeGap', n: '眼距' },
-    { t: 'slider', k: 'eyeY', n: '眼睛高低' },
+    { t: 'sub', n: '眼睛' },
+    { t: 'choice', k: 'eyes', n: '款式' },
     { t: 'color', k: 'eyeColor', n: '瞳色', p: 'eye' },
-    { t: 'choice', k: 'brows', n: '眉毛' },
-    { t: 'slider', k: 'browThick', n: '眉毛粗细' },
-    { t: 'slider', k: 'browTilt', n: '眉毛角度', min: -1, max: 1 },
+    { t: 'slider', k: 'eyeY', n: '上下' },
+    { t: 'slider', k: 'eyeGap', n: '间距' },
+    { t: 'slider', k: 'eyeSize', n: '大小' },
+    { t: 'slider', k: 'eyeRot', n: '旋转（眼角上挑 / 下垂）', min: -1, max: 1 },
+    { t: 'slider', k: 'eyeSquash', n: '压扁 / 拉长' },
+    { t: 'sub', n: '眉毛' },
+    { t: 'choice', k: 'brows', n: '款式' },
+    { t: 'slider', k: 'browY', n: '上下' },
+    { t: 'slider', k: 'browGap', n: '间距' },
+    { t: 'slider', k: 'browSize', n: '长短' },
+    { t: 'slider', k: 'browThick', n: '粗细' },
+    { t: 'slider', k: 'browTilt', n: '角度', min: -1, max: 1 },
     { t: 'toggle', k: 'browFollow', n: '眉色跟着发色' },
     { t: 'color', k: 'browColor', n: '眉色', p: 'hair', when: (s) => !s.browFollow },
-    { t: 'choice', k: 'mouth', n: '嘴' },
-    { t: 'slider', k: 'mouthY', n: '嘴的位置' },
+    { t: 'sub', n: '鼻子' },
+    { t: 'choice', k: 'nose', n: '款式' },
+    { t: 'slider', k: 'noseY', n: '上下', when: (s) => s.nose !== 'none' },
+    { t: 'slider', k: 'noseSize', n: '大小', when: (s) => s.nose !== 'none' },
+    { t: 'sub', n: '嘴' },
+    { t: 'choice', k: 'mouth', n: '款式' },
+    { t: 'slider', k: 'mouthY', n: '上下' },
+    { t: 'slider', k: 'mouthSize', n: '大小' },
+    { t: 'slider', k: 'mouthSquash', n: '压扁 / 拉长' },
+    { t: 'sub', n: '痣（放在脸上任意位置）' },
+    { t: 'toggle', k: 'mole', n: '有没有痣', on: '有', off: '没有' },
+    { t: 'slider', k: 'moleX', n: '左右', min: -1, max: 1, when: (s) => s.mole },
+    { t: 'slider', k: 'moleY', n: '上下', min: -1, max: 1, when: (s) => s.mole },
+    { t: 'slider', k: 'moleSize', n: '大小', when: (s) => s.mole },
+    { t: 'sub', n: '眼镜' },
+    { t: 'choice', k: 'glasses', n: '款式' },
+    { t: 'color', k: 'glassesColor', n: '颜色', p: 'accent', when: (s) => s.glasses !== 'none' },
+    { t: 'slider', k: 'glassesSize', n: '大小', when: (s) => s.glasses !== 'none' },
+    { t: 'slider', k: 'glassesY', n: '上下', when: (s) => s.glasses !== 'none' },
   ]],
   ['hair', '头发', [
     { t: 'choice', k: 'hairFront', n: '前发' },
@@ -667,6 +734,7 @@ const TABS = [
     { t: 'color', k: 'weaponColor', n: '兵刃颜色', p: 'accent', when: (s) => ['sword', 'saber'].includes(s.weapon) },
   ]],
   ['expr', '表情', []],
+  ['persona', '性格', []],
   ['draw', '手绘', []],
   ['share', '灵感', []],
 ];
@@ -674,7 +742,13 @@ const TABS = [
 // ---------------- 渲染 ----------------
 const $ = (id) => document.getElementById(id);
 function renderView() {
-  $('view').innerHTML = background(view.bg) + `<g style="--skin:${S.skin}">${drawPerson(S, view.expr, view.age)}</g>`;
+  const dur = (3.4 - 2.4 * ((S.pMove ?? 3) / 7)).toFixed(2);
+  let bubble = '';
+  if (view.tab === 'persona') {
+    const t = personaType(S), w = Math.max(90, t.line.length * 13 + 26);
+    bubble = `<g transform="translate(${120 - w / 2} -34)"><rect width="${w}" height="30" rx="15" fill="#FFFDF8" stroke="#2B2233" stroke-opacity="0.2"/><path d="M${w / 2 - 6} 29 L${w / 2} 38 L${w / 2 + 6} 29 Z" fill="#FFFDF8"/><text x="${w / 2}" y="20" text-anchor="middle" font-size="13" fill="#2B2233">${t.line}</text></g>`;
+  }
+  $('view').innerHTML = background(view.bg) + `<g class="idle" style="--skin:${S.skin};animation-duration:${dur}s">${drawPerson(S, view.expr, view.age)}</g>` + bubble;
 }
 function chipRow(id, items, key) {
   const row = $(id);
@@ -691,7 +765,7 @@ function renderTabs() {
   for (const [id, name] of TABS) {
     const b = document.createElement('button');
     b.type = 'button'; b.className = 'tab'; b.role = 'tab'; b.id = 'tab-' + id; b.textContent = name; b.setAttribute('aria-selected', String(view.tab === id));
-    b.addEventListener('click', () => { view.tab = id; view.picker = null; renderTabs(); renderPane(); try { localStorage.setItem('wulin-tab', id); } catch (e) {} });
+    b.addEventListener('click', () => { view.tab = id; view.picker = null; renderTabs(); renderPane(); renderView(); try { localStorage.setItem('wulin-tab', id); } catch (e) {} });
     tabs.appendChild(b);
   }
 }
@@ -704,6 +778,7 @@ function renderPane() {
   if (view.tab === 'share') { pane.innerHTML = sharePane(); bindShare(); return; }
   if (view.tab === 'expr') { pane.innerHTML = exprPane(); bindExpr(); return; }
   if (view.tab === 'draw') { pane.innerHTML = drawPane(); bindDraw(); return; }
+  if (view.tab === 'persona') { pane.innerHTML = personaPane(); bindPersona(); return; }
   const items = tab[2].filter((c) => !c.when || c.when(S));
   pane.innerHTML = `<div class="grid2">${items.map(ctrlHtml).join('')}</div>`;
   for (const c of items) bindCtrl(c);
@@ -711,7 +786,8 @@ function renderPane() {
 function ctrlHtml(c) {
   if (c.t === 'choice') return `<div class="ctrl"><div class="name">${c.n}<b>${OPT[c.k].find((o) => o[0] === S[c.k])?.[1] ?? ''}</b></div><div class="opts">${OPT[c.k].map(([v, n]) => `<button type="button" class="opt" id="o-${c.k}-${v}" data-v="${v}" aria-pressed="${S[c.k] === v}">${n}</button>`).join('')}</div></div>`;
   if (c.t === 'slider') { const min = c.min ?? 0, max = c.max ?? 1; return `<div class="ctrl"><label class="name" for="r-${c.k}">${c.n}<b id="v-${c.k}">${c.fmt ? c.fmt(S[c.k]) : fmtPct(S[c.k], min, max)}</b></label><input type="range" id="r-${c.k}" min="${min}" max="${max}" step="0.01" value="${S[c.k]}"></div>`; }
-  if (c.t === 'toggle') return `<div class="ctrl"><div class="name">${c.n}</div><div class="opts"><button type="button" class="opt" id="t-${c.k}" aria-pressed="${!!S[c.k]}">${S[c.k] ? '跟着发色' : '自己选'}</button></div></div>`;
+  if (c.t === 'toggle') return `<div class="ctrl"><div class="name">${c.n}</div><div class="opts"><button type="button" class="opt" id="t-${c.k}" aria-pressed="${!!S[c.k]}">${S[c.k] ? c.on || '跟着发色' : c.off || '自己选'}</button></div></div>`;
+  if (c.t === 'sub') return `<div class="sub" style="grid-column:1/-1">${c.n}</div>`;
   if (c.t === 'color') {
     const list = PRESETS[c.p];
     const custom = !list.some((x) => x.toUpperCase() === String(S[c.k]).toUpperCase());
@@ -760,6 +836,87 @@ function refreshExprChips() {
   chipRow('expr', [...EXPRESSIONS.map(([id, n]) => [id, n]), ['mine', '我的表情'], ...hand], 'expr');
 }
 try { const m = localStorage.getItem('wulin-myexpr'); if (m) myExpr = { ...myExpr, ...JSON.parse(m) }; } catch (e) {}
+
+// ---------------- 性格和声音 ----------------
+// 5 个滑块各 8 档。只影响说话、口头禅和小动作，不影响任何数值（不做职业）
+const PERSONA_SLIDERS = [
+  ['pMove', '行动', '慢吞吞', '风风火火'],
+  ['pTalk', '说话', '惜字如金', '话匣子'],
+  ['pExpr', '表情', '喜怒不形于色', '全写在脸上'],
+  ['pAttitude', '态度', '温和', '直爽'],
+  ['pQuirk', '气质', '规规矩矩', '古灵精怪'],
+];
+const PERSONA_TYPES = [
+  [['隐士', '不争不抢，喜欢一个人待着', '山中无甲子，寒尽不知年。'], ['书痴', '安静又认真，一看书就忘了时辰', '且慢，待我翻翻书。'], ['冷面侠', '话少，但句句在理', '嗯。'], ['怪才', '想法总和别人不一样', '你们不懂，这叫机关。']],
+  [['君子', '温文尔雅，人缘很好', '在下有礼了。'], ['账房先生', '精打细算，靠得住', '这笔账，得算清楚。'], ['侠客', '路见不平就要管', '这事，我管定了！'], ['游方人', '四处游历，见多识广', '我走过的路可多了。']],
+  [['热心肠', '谁有难处都想帮一把', '别客气，交给我！'], ['大管家', '里里外外安排得妥妥当当', '都别慌，听我安排。'], ['莽少侠', '想到就做，冲在最前面', '冲啊——'], ['鬼灵精', '点子多，爱捉弄人', '嘿嘿，猜猜我藏了什么？']],
+  [['开心果', '走到哪儿笑到哪儿', '哈哈，今天也是好日子！'], ['大当家', '天生的领头人', '兄弟们，跟我走！'], ['暴脾气', '一点就着，来得快去得快', '谁敢动我家门！'], ['混世魔王', '天不怕地不怕，走到哪儿热闹到哪儿', '这江湖，我说了算！']],
+];
+function personaType(s) {
+  const out = ((s.pMove ?? 3) + (s.pTalk ?? 3) + (s.pExpr ?? 3)) / 3;
+  const edge = ((s.pAttitude ?? 3) + (s.pQuirk ?? 3)) / 2;
+  const a = Math.min(3, Math.floor((out / 7) * 4)), b = Math.min(3, Math.floor((edge / 7) * 4));
+  const [name, desc, line] = PERSONA_TYPES[a][b];
+  return { name, desc, line };
+}
+function personaPane() {
+  const t = personaType(S);
+  const slider = ([k, n, lo, hi]) => `<div class="ctrl"><label class="name" for="r-${k}">${n}<b id="v-${k}">${S[k] + 1} / 8</b></label><input type="range" id="r-${k}" min="0" max="7" step="1" value="${S[k]}"><div class="name" style="font-size:11.5px"><span>${lo}</span><span>${hi}</span></div></div>`;
+  return `<div class="persona" id="persona"><span>性格</span><b>${t.name}</b><span>${t.desc}</span><span>口头禅：“${t.line}”</span></div>
+    <p class="note">性格只影响说话、口头禅和小动作（比如“行动”越快，待机时晃得越快），不影响任何数值。5 个滑块各 8 档，能组合出 16 种性格。</p>
+    <div class="grid2">${PERSONA_SLIDERS.map(slider).join('')}</div>
+    <div class="sub">声音</div>
+    <div class="grid2">
+      <div class="ctrl"><label class="name" for="r-vPitch">音高<b id="v-vPitch">${fmtPct(S.vPitch)}</b></label><input type="range" id="r-vPitch" min="0" max="1" step="0.01" value="${S.vPitch}"></div>
+      <div class="ctrl"><label class="name" for="r-vRate">语速<b id="v-vRate">${fmtPct(S.vRate)}</b></label><input type="range" id="r-vRate" min="0" max="1" step="0.01" value="${S.vRate}"></div>
+    </div>
+    <div class="opts"><button type="button" class="act main" id="speak">听听声音</button></div>
+    <p class="note" id="voice-note">手机静音时听不到。设备没有中文语音时，会用“叽叽喳喳”的拟声代替。</p>`;
+}
+function bindPersona() {
+  for (const [k] of PERSONA_SLIDERS) $(`r-${k}`).addEventListener('input', (e) => {
+    S[k] = Number(e.target.value); $(`v-${k}`).textContent = `${S[k] + 1} / 8`;
+    const t = personaType(S);
+    $('persona').innerHTML = `<span>性格</span><b>${t.name}</b><span>${t.desc}</span><span>口头禅：“${t.line}”</span>`;
+    saveState(); renderView();
+  });
+  for (const k of ['vPitch', 'vRate']) $(`r-${k}`).addEventListener('input', (e) => { S[k] = Number(e.target.value); $(`v-${k}`).textContent = fmtPct(S[k]); saveState(); });
+  $('speak').addEventListener('click', () => speak(personaType(S).line));
+}
+function speak(text) {
+  const pitch = 0.3 + 1.7 * S.vPitch, rate = 0.6 + 1.0 * S.vRate;
+  const synth = window.speechSynthesis;
+  const voices = synth ? synth.getVoices().filter((v) => /^zh/i.test(v.lang)) : [];
+  if (synth && voices.length) {
+    try {
+      synth.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = voices[0].lang; u.voice = voices[0]; u.pitch = Math.min(2, pitch); u.rate = rate;
+      synth.speak(u);
+      return;
+    } catch (e) {}
+  }
+  babble(text, pitch, rate);
+}
+// 没有中文语音时：每个字一个短促的音，音高跟着“音高”滑块
+let audioCtx = null;
+function babble(text, pitch, rate) {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    const step = 0.11 / rate;
+    let t = audioCtx.currentTime + 0.02;
+    for (const ch of text) {
+      if (/[，。！？、—\s]/.test(ch)) { t += step * 1.4; continue; }
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      const code = ch.codePointAt(0) || 0;
+      o.type = 'triangle';
+      o.frequency.value = 180 * pitch * (1 + (code % 7) * 0.05);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.18, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + step * 0.9);
+      o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + step);
+      t += step;
+    }
+  } catch (e) { const n = $('voice-note'); if (n) n.textContent = '这台设备放不了声音。'; }
+}
 
 // ---------------- 手绘 ----------------
 const drawUI = { layer: 'face', erase: false, history: [] };
@@ -903,6 +1060,14 @@ function randomize() {
   if (Math.random() < 0.6) n.streak = 'none';
   if (Math.random() < 0.6) n.cape = 'none';
   n.browFollow = true;
+  // 五官细调：在中间附近小范围随机，免得随机出太离谱的脸
+  const near = (v, d) => Math.round(Math.max(0, Math.min(1, v + (Math.random() * 2 - 1) * d)) * 100) / 100;
+  n.eyeRot = Math.round((Math.random() * 0.8 - 0.4) * 100) / 100;
+  for (const k of ['eyeSquash', 'browY', 'browGap', 'browSize', 'noseY', 'noseSize', 'mouthSize', 'mouthSquash']) n[k] = near(0.5, 0.3);
+  if (Math.random() < 0.75) n.glasses = 'none';
+  n.mole = Math.random() < 0.25; n.moleX = Math.round((Math.random() * 1.4 - 0.7) * 100) / 100; n.moleY = Math.round((Math.random() * 0.8) * 100) / 100;
+  for (const k of ['pMove', 'pTalk', 'pExpr', 'pAttitude', 'pQuirk']) n[k] = Math.floor(Math.random() * 8);
+  n.vPitch = near(0.5, 0.4); n.vRate = near(0.5, 0.3);
   n.draw = S.draw; n.brushColor = S.brushColor; n.brushSize = S.brushSize; n.tileSize = S.tileSize;
   if (n.pattern === 'custom' && !S.draw.cloth.length) n.pattern = 'cloud';
   S = n; saveState(); renderView(); renderPane();
