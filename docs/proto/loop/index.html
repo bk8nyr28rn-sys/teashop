@@ -101,6 +101,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .sh-btns { display: flex; flex-direction: column; gap: 8px; }
 .sh-btns button { min-height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 6px 12px; font-weight: 500; }
 .sh-btns button.main { background: var(--seal); border-color: var(--seal); color: var(--on-seal); }
+.sh-btns button.perk { text-align: left; border: 2px solid var(--gold); padding: 8px 12px; }
+.sh-btns button small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
 .list li > span { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -727,19 +729,48 @@ const TRAPS = {
 };
 
 // ---------------- 夜里 ----------------
-const ITEMS = [['sword', '剑', '砍恶鬼', '#C9D2E2'], ['bow', '弓', '射飞鬼', '#E0B46A'], ['lamp', '灯', '照隐身鬼', '#FF9A4D']];
+// 手里的东西只写“它擅长什么”，不写“该打哪种鬼”：怎么对付由玩家自己想
+const ITEMS = [['sword', '剑', '近身，打得狠', '#C9D2E2'], ['bow', '弓', '射得到天上', '#E0B46A'], ['lamp', '灯', '照出看不见的', '#FF9A4D']];
 const ITEM = Object.fromEntries(ITEMS.map(([k, g, hint, c]) => [k, { g, hint, c }]));
-const MULT = { sword: { evil: 1.6, fly: 0.3, shade: 1 }, bow: { evil: 0.8, fly: 2, shade: 0.8 }, lamp: { evil: 0.6, fly: 0.6, shade: 1.6 } };
+const MULT = { sword: { evil: 1.5, fly: 0.3, shade: 1, armor: 0.5 }, bow: { evil: 0.9, fly: 2, shade: 0.9, armor: 0.5 }, lamp: { evil: 0.6, fly: 0.6, shade: 1.5, armor: 0.4 } };
+// 鬼头上只标特点（tag）。每个特点都有好几种解法：
+// 飞 → 弓、弩机、剑气；隐 → 提灯、灯笼串、火眼、听声辨位；甲 → 弩机（不怕甲）、重手、灯光烧鬼、会心一击
 const GHOSTS = {
-  evil: { name: '恶鬼', hp: 42, speed: 26, hit: 7, counter: 'sword' },
-  fly: { name: '飞鬼', hp: 30, speed: 34, hit: 5, counter: 'bow' },
-  shade: { name: '隐身鬼', hp: 34, speed: 24, hit: 8, counter: 'lamp' },
+  evil: { name: '恶鬼', hp: 42, speed: 26, hit: 7, tag: null },
+  fly: { name: '飞鬼', hp: 30, speed: 34, hit: 5, tag: ['飞', '#9CC9F0'] },
+  shade: { name: '隐身鬼', hp: 34, speed: 24, hit: 8, tag: ['隐', '#B9A2E8'] },
+  armor: { name: '铁甲鬼', hp: 70, speed: 18, hit: 11, tag: ['甲', '#B8BFC9'] },
 };
-// 守夜的难度：一晚 3 波；鬼的血和砸门力度按第几天变大；spread = 每波的鬼在几秒内出完（越小越挤）
-const NIGHT = { waveGap: 21, spread: 5, hpPerDay: 0.2, hitPerDay: 0.12, tap: 10, bowDmg: 12, bowCd: 1.4, allyDmg: 12 };
+// 守夜的难度：一晚 5 波，守住一波挑一个本事；鬼的血按第几天、第几波变大
+const NIGHT = { waves: 5, spread: 3.5, hpPerDay: 0.2, hpPerWave: 0.06, hitPerDay: 0.12, tap: 10, bowDmg: 12, bowCd: 1.4, allyDmg: 12 };
 function waveCounts(d, w) {
-  return { evil: 3 + w + Math.floor(0.6 * (d - 1)), fly: 1 + Math.floor((d + w) / 2), shade: d >= 2 || w === 2 ? 1 + Math.floor(Math.max(0, d + w - 2) / 2) : 0 };
+  return {
+    evil: 3 + w + Math.floor(0.4 * (d - 1)),
+    fly: w >= 1 ? 1 + Math.floor((d + w - 1) / 3) : 0,
+    shade: d >= 2 || w >= 3 ? 1 + Math.floor(Math.max(0, d + w - 3) / 3) : 0,
+    armor: w === 4 || (d >= 3 && w >= 2) ? 1 + Math.floor(Math.max(0, d + w - 5) / 3) : 0,
+  };
 }
+// 本事：每守住一波，从三个里挑一个。stack = 能不能挑好几次
+const PERKS = {
+  heavy: { n: '重手', d: '点一下伤害 +40%，铁甲也挡不住', stack: true },
+  crit: { n: '会心一击', d: '每下有 25% 机会打出三倍伤害', stack: true },
+  sweep: { n: '横扫', d: '点中一个鬼，旁边的鬼也挨一半', stack: false },
+  qi: { n: '剑气', d: '剑能砍到天上的飞鬼', stack: false },
+  pierce: { n: '穿云箭', d: '弓的伤害 +60%', stack: true },
+  burn: { n: '灯光烧鬼', d: '提着灯时，灯光里的鬼一直掉血', stack: true },
+  ear: { n: '听声辨位', d: '看不见的鬼也能打，伤害减半', stack: false },
+  eye: { n: '火眼', d: '隐身鬼走到半路就现形', stack: false },
+  lampstr: { n: '挂灯笼', d: '今晚墙上多挂一串灯笼，门口的隐身鬼现形', stack: false },
+  bowplus: { n: '连弩', d: '每台弩机多射一个鬼；没有弩机就先送你一台', stack: true },
+  bowfast: { n: '快弩', d: '弩机射得快一倍', stack: true },
+  rain: { n: '剑雨', d: '每打散 5 个鬼，全场落一阵剑雨', stack: true },
+  fix: { n: '连夜补门', d: '门马上回 40% 的血', stack: true },
+  bolt: { n: '铁门栓', d: '门挨的打少三成', stack: true },
+  slow: { n: '定身符', d: '门口的鬼走得更慢', stack: true },
+  soul: { n: '吸魂', d: '每打散一个鬼，门回 3 点血', stack: true },
+  coins: { n: '纸钱雨', d: '每打散一个鬼，多掉 3 文纸钱', stack: true },
+};
 
 // ---------------- 人 ----------------
 const NEIGHBORS = [
@@ -828,7 +859,7 @@ function sheet({ title, body = '', buttons = [], bind, dismiss = false }) {
   const f = el.querySelector('.sh-btns button:not([disabled])');
   if (f) f.focus({ preventScroll: true });
 }
-function closeSheet() { const el = $('sheet'); el.hidden = true; el.innerHTML = ''; }
+function closeSheet() { const el = $('sheet'); el.hidden = true; el.innerHTML = ''; el.dataset.num = ''; }
 $('sheet').addEventListener('click', (e) => { if (e.target === $('sheet') && $('sheet').dataset.dismiss) closeSheet(); });
 
 // ---------------- 画面零件 ----------------
@@ -1165,14 +1196,44 @@ function afterArrive() { if (G.time >= CFG.dusk) startNight(false); else render(
 
 // ================= 夜里守门 =================
 let N = null, raf = 0, gidN = 0;
-function makeWaves(d) {
-  const list = [];
-  for (let w = 0; w < 3; w++) {
-    const c = waveCounts(d, w);
-    const types = Object.entries(c).flatMap(([t, n]) => Array(n).fill(t)).sort(() => Math.random() - 0.5);
-    types.forEach((type, i) => list.push({ at: 3 + w * NIGHT.waveGap + (i * NIGHT.spread) / types.length, type, wave: w, c }));
-  }
-  return list;
+// 一波一波来：这一波清完才挑本事，挑完下一波才来
+function startWave(w) {
+  const c = waveCounts(N.d, w);
+  const types = Object.entries(c).flatMap(([t, n]) => Array(n).fill(t)).sort(() => Math.random() - 0.5);
+  N.spawns = types.map((type, i) => ({ at: N.t + 1.5 + (i * NIGHT.spread) / types.length, type, wave: w, c }));
+  N.wave = w;
+  N.picking = false;
+  $('nwave').textContent = `第 ${w + 1} 波 / 共 ${NIGHT.waves} 波：` + Object.entries(c).filter(([, n]) => n).map(([t, n]) => `${GHOSTS[t].name} ×${n}`).join(' · ');
+}
+function perkAvailable(id) {
+  const p = PERKS[id], have = N.pk[id] || 0;
+  if (have && !p.stack) return false;
+  if (id === 'bowfast' && !N.bows.length) return false;
+  if (id === 'lampstr' && G.traps.lamp) return false;
+  if (id === 'fix' && N.door > N.doorMax * 0.8) return false;
+  return true;
+}
+function offerPerks() {
+  N.picking = true;
+  const pool = Object.keys(PERKS).filter(perkAvailable).sort(() => Math.random() - 0.5);
+  N.offer = pool.slice(0, 3);
+  const have = Object.entries(N.pk).map(([id, n]) => PERKS[id].n + (n > 1 ? ` ×${n}` : '')).join('、');
+  sheet({
+    title: `第 ${N.wave + 1} 波守住了！挑一个本事`,
+    body: `<p class="note">本事只在今晚有用。${have ? `已经有：${have}` : '想怎么打，就挑什么。'}</p>`,
+    buttons: N.offer.map((id, i) => [`${i + 1} · ${PERKS[id].n}<small>${PERKS[id].d}</small>`, () => choosePerk(id), 'perk']),
+  });
+  $('sheet').dataset.num = '1';
+}
+function choosePerk(id) {
+  closeSheet();
+  N.pk[id] = (N.pk[id] || 0) + 1;
+  if (id === 'fix') { N.door = Math.min(N.doorMax, N.door + N.doorMax * 0.4); updateDoor(); }
+  if (id === 'bowplus' && !N.bows.length) { N.bows.push({ x: 40, y: 410, cd: 0.5 }); $('nbows').innerHTML += crossbowSvg(40, 410, 1.2); }
+  $('perkline').textContent = '今晚的本事：' + Object.entries(N.pk).map(([k, n]) => PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、');
+  floatText(180, 260, PERKS[id].n, 'good');
+  startWave(N.wave + 1);
+  N.last = performance.now();
 }
 function startNight(guardian) {
   cancelAnimationFrame(raf);
@@ -1182,7 +1243,8 @@ function startNight(guardian) {
   const d = guardian ? CFG.lifeDays : G.day;
   const doorMax = DOORS[G.door].hp;
   N = {
-    d, guardian, t: 0, door: doorMax, doorMax, ghosts: [], spawns: makeWaves(d), ally: null, helpUsed: false, names: [], kills: 0, coins: 0,
+    d, guardian, t: 0, door: doorMax, doorMax, ghosts: [], spawns: [], ally: null, helpUsed: false, names: [], kills: 0, coins: 0,
+    pk: {}, offer: [], picking: false, rainCount: 0, burnT: 0,
     over: false, wave: -1, lastHit: '', hintT: 0, bows: [[40, 410], [320, 410], [92, 410], [268, 410]].slice(0, G.traps.crossbow).map(([x, y], i) => ({ x, y, cd: 1 + i * 0.35 })),
     kid: guardian ? randomLook() : null,
   };
@@ -1190,13 +1252,15 @@ function startNight(guardian) {
   document.body.dataset.phase = G.phase;
   renderHud();
   $('scene').innerHTML = `<div class="doorbar"><span>门 · ${DOORS[G.door].name}</span><div class="bar" id="nd-bar"><i></i></div><b id="nd-num"></b></div>
-    <div class="wave" id="nwave">${guardian ? '你是护家神：子孙在守门，你在旁边显灵。' : '天黑了。鬼头上的图标 = 该拿什么打它。'}</div>
+    <div class="wave" id="nwave"></div>
     <svg viewBox="0 0 360 500" class="stage tall" id="nsvg" role="application" aria-label="守夜：点鬼打它，按 1 2 3 换手里的东西，空格打离门最近的鬼">${nightSvg()}</svg>`;
   renderNightPanel();
   drawPlayer();
   const svg = $('nsvg');
   svg.addEventListener('pointerdown', (e) => { if (N.over) return; e.preventDefault(); const p = toSvg(svg, e); hitAt(p.x, p.y); });
   updateDoor();
+  startWave(0);
+  if (guardian) toast('你是护家神：子孙在守门，你在旁边显灵。');
   N.last = performance.now();
   raf = requestAnimationFrame(nightLoop);
 }
@@ -1258,7 +1322,7 @@ function nightSvg() {
     ${bigLantern(180, 108, 4)}${bigLantern(180, 382, 15)}`;
   if (G.door >= 2) s += lanternSvg(124, 420, 8) + lanternSvg(236, 420, 8);
   if (G.traps.lamp) for (const x of [30, 80, 280, 330]) s += lanternSvg(x, 426, 6);
-  s += `<g id="glayer"></g><g id="nplayer"></g><g id="nally"></g>`;
+  s += `<g id="nbows"></g><g id="glayer"></g><g id="nplayer"></g><g id="nally"></g>`;
   if (N.guardian) s += `<g class="float">${ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22)}</g>`;
   s += `<g pointer-events="none"><g class="rain1"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainA)"/></g><g class="rain2"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainB)"/></g></g><g id="fx"></g>`;
   return s;
@@ -1280,7 +1344,8 @@ function renderNightPanel() {
   const helper = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt).sort((a, b) => G.friends[b.id] - G.friends[a.id])[0];
   $('panel').innerHTML = `<div class="items" role="group" aria-label="手里拿什么">${ITEMS.map(([k, g, hint, c], i) => `<button type="button" class="item" data-item="${k}" aria-pressed="${G.item === k}"><span class="g" style="--c:${c}">${g}</span>${g === '灯' ? '灯笼' : g}<small>${i + 1} · ${hint}</small></button>`).join('')}</div>
     <div class="help">${helper ? `<button type="button" class="big" id="callhelp"${N.helpUsed ? ' disabled' : ''}>${N.helpUsed ? `${helper.who}来帮过了` : `求救：喊${helper.who}来帮忙`}<small>交情 ${G.friends[helper.id]} · 每晚一次</small></button>` : `<p class="note">交情到 ${CFG.helpAt} 的邻居，夜里可以喊来帮忙（驰援）。</p>`}</div>
-    <p class="note">点鬼打它。拿对了东西伤害翻倍，拿错了几乎打不动。手里的东西随时换。</p>`;
+    <p class="note" id="perkline">${Object.keys(N.pk).length ? '今晚的本事：' + Object.entries(N.pk).map(([k, n]) => PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、') : '还没有本事：每守住一波，挑一个。'}</p>
+    <p class="note">点鬼打它。鬼头上写着它的特点：飞、隐、甲。怎么对付随你：换手里的东西、靠机关、挑本事都行。</p>`;
   $('panel').querySelectorAll('[data-item]').forEach((b) => { b.onclick = () => setItem(b.dataset.item); });
   if (helper && !N.helpUsed) $('callhelp').onclick = () => callHelp(helper);
 }
@@ -1301,28 +1366,25 @@ function callHelp(n) {
   renderNightPanel();
 }
 function toSvg(svg, e) { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
-function revealed(g) { return g.type !== 'shade' || (G.item === 'lamp' && g.y > 150) || (G.traps.lamp && g.y > 330) || g.flash > 0; }
+function revealed(g) {
+  return g.type !== 'shade' || (G.item === 'lamp' && g.y > 150) || ((G.traps.lamp || N.pk.lampstr) && g.y > 330) || (N.pk.eye && g.y > 240) || g.flash > 0;
+}
 function spawnGhost(sp) {
-  const T = GHOSTS[sp.type], hpMul = 1 + NIGHT.hpPerDay * (N.d - 1);
+  const T = GHOSTS[sp.type], hpMul = (1 + NIGHT.hpPerDay * (N.d - 1)) * (1 + NIGHT.hpPerWave * sp.wave);
   const g = { id: ++gidN, type: sp.type, hp: T.hp * hpMul, max: T.hp * hpMul, lane: rnd(-0.85, 0.85), x: 180, y: rnd(96, 122), ox: 0, k: 0.55, tx: 180 + rnd(-48, 48), ty: 424 + rnd(-6, 4), speed: T.speed * rnd(0.85, 1.15), state: 'walk', bashT: rnd(0.2, 0.8), name: ghostName(), ph: rnd(0, 6.28), hit: T.hit, flash: 0, lit: null };
   if (sp.type === 'fly') g.ty -= 34;
   N.names.push(g.name);
   const el = document.createElementNS(NS, 'g');
   el.setAttribute('class', 'ghost ' + sp.type);
-  const ic = ITEM[T.counter];
+  const tag = T.tag ? `<g transform="translate(0 -15)"><circle r="10" fill="${T.tag[1]}" stroke="#0B0F1E" stroke-width="1.5"/><text y="4.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1E2A2C">${T.tag[0]}</text></g>` : '';
   el.innerHTML = `<g class="gb"><ellipse cx="0" cy="-44" rx="32" ry="48" fill="url(#gglow)"/>${ghostSvg(randomLook(), pick(['angry', 'rage', 'gloomy']), Math.random() < 0.5 ? 'elder' : 'adult', 0, 0, 0.2)}</g>
     <g class="tg"><g class="hpw"><rect x="-17" y="-3" width="34" height="6" rx="3" fill="#0B0F1E" opacity="0.85"/><rect class="hpb" x="-17" y="-3" width="34" height="6" rx="3" fill="#FF6B6B"/></g>
-      <g transform="translate(0 -15)"><circle r="10" fill="${ic.c}" stroke="#0B0F1E" stroke-width="1.5"/><text y="4.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1E2A2C">${ic.g}</text></g>
+      ${tag}
       <text class="nametag" y="-32" text-anchor="middle" font-size="10" fill="#DCE8F7" paint-order="stroke" stroke="#0B0F1E" stroke-width="3">${g.name}</text></g>`;
   $('glayer').appendChild(el);
   g.el = el; g.gb = el.querySelector('.gb'); g.tg = el.querySelector('.tg'); g.hpb = el.querySelector('.hpb'); g.hpw = el.querySelector('.hpw');
   N.ghosts.push(g);
   refreshGhost(g);
-  if (sp.wave !== N.wave) {
-    N.wave = sp.wave;
-    const c = sp.c;
-    $('nwave').textContent = `第 ${sp.wave + 1} 波 / 共 3 波：` + Object.entries(c).filter(([, n]) => n).map(([t, n]) => `${GHOSTS[t].name} ×${n}`).join(' · ');
-  }
 }
 function refreshGhost(g) {
   const vis = revealed(g), c = ghostCenter(g);
@@ -1350,29 +1412,50 @@ function ghostAt(x, y) {
   for (const g of N.ghosts) { const c = ghostCenter(g), d = Math.hypot(x - c.x, y - c.y); if (d < 36 * Math.max(g.k, 0.8) && d < bd) { best = g; bd = d; } }
   return best;
 }
+// 点一下的伤害：手里的东西 × 特点，再算上本事
+function tapMult(g) {
+  let m = MULT[G.item][g.type];
+  if (g.type === 'armor' && N.pk.heavy) m = MULT[G.item].evil;
+  if (g.type === 'fly' && G.item === 'sword' && N.pk.qi) m = 1.3;
+  if (G.item === 'bow') m *= 1 + 0.6 * (N.pk.pierce || 0);
+  return m * (1 + 0.4 * (N.pk.heavy || 0));
+}
 function hitAt(x, y) {
   const g = ghostAt(x, y);
-  if (!g) return floatText(x, y, '没打中', 'miss');
-  if (!revealed(g)) { floatText(x, y, '看不见！拿灯笼', 'miss'); return; }
-  const m = MULT[G.item][g.type];
+  // 提示字别刷屏：同一句话至少隔 0.7 秒
+  const say = (msg) => { if (N.t > (N.missT || 0)) { N.missT = N.t + 0.7; floatText(x, y, msg, 'miss'); } };
+  if (!g) return say('没打中');
+  const hidden = !revealed(g);
+  if (hidden && !N.pk.ear) return say('看不见！');
+  const m = tapMult(g) * (hidden ? 0.5 : 1);
   const hurt = N.guardian ? 1 : G.hp >= CFG.hpMax ? 1 : G.hp <= 1 ? 0.6 : 0.85;
   const age = N.guardian ? AGE_FX.child : AGE_FX[ageOf(G.day)];
-  const dmg = Math.max(1, Math.round(NIGHT.tap * m * age.dmg * hurt * (N.guardian ? 1.25 : 1)));
-  if (m < 0.7 && N.t > N.hintT) { N.hintT = N.t + 1.5; floatText(g.x + g.ox, g.y - 124 * g.k, `该用${ITEM[GHOSTS[g.type].counter].g === '灯' ? '灯笼' : ITEM[GHOSTS[g.type].counter].g}`, 'weak'); }
-  hurtGhost(g, dmg, m >= 1.5 ? 'crit' : m < 0.7 ? 'weak' : '', true);
+  const crit = Math.random() < Math.min(0.75, 0.25 * (N.pk.crit || 0));
+  const dmg = Math.max(1, Math.round(NIGHT.tap * m * age.dmg * hurt * (N.guardian ? 1.25 : 1) * (crit ? 3 : 1)));
+  if (m < 0.7 && !crit && N.t > N.hintT) { N.hintT = N.t + 1.5; floatText(g.x + g.ox, g.y - 124 * g.k, '打不动', 'weak'); }
+  const c = ghostCenter(g);
+  hurtGhost(g, dmg, crit || m >= 1.5 ? 'crit' : m < 0.7 ? 'weak' : '', true);
+  if (N.pk.sweep) for (const o of N.ghosts.slice()) { if (o === g || !revealed(o)) continue; const oc = ghostCenter(o); if (Math.hypot(oc.x - c.x, oc.y - c.y) < 70) hurtGhost(o, Math.max(1, Math.round(dmg / 2)), 'weak', true); }
 }
 // 空格：打离门最近、看得见的鬼
 function autoHit() { const g = N.ghosts.filter(revealed).sort((a, b) => b.y - a.y)[0]; if (g) { const c = ghostCenter(g); hitAt(c.x, c.y); } }
-function hurtGhost(g, dmg, cls, byPlayer) {
+function hurtGhost(g, dmg, cls, byPlayer, quiet) {
+  if (g.hp <= 0) return;
   g.hp -= dmg; g.flash = 0.25;
-  floatText(g.x + g.ox + rnd(-8, 8), g.y - 70 * g.k, '-' + dmg, cls);
+  if (!quiet) floatText(g.x + g.ox + rnd(-8, 8), g.y - 70 * g.k, '-' + dmg, cls);
   if (g.hp <= 0) {
     g.el.remove();
     N.ghosts = N.ghosts.filter((x) => x !== g);
     N.kills++;
-    if (byPlayer) N.coins += 2;
+    N.coins += (byPlayer ? 2 : 0) + 3 * (N.pk.coins || 0);
     floatText(g.x + g.ox, g.y - 40, '散了', 'good');
+    if (N.pk.soul) { N.door = Math.min(N.doorMax, N.door + 3 * N.pk.soul); updateDoor(); }
+    if (N.pk.rain && ++N.rainCount >= 5) { N.rainCount = 0; swordRain(); }
   } else refreshGhost(g);
+}
+function swordRain() {
+  floatText(180, 230, '剑雨！', 'crit');
+  for (const o of N.ghosts.slice()) { const c = ghostCenter(o); line(c.x - 20, c.y - 120, c.x, c.y, '#DCE8F7', 2); hurtGhost(o, 15 * N.pk.rain, '', false); }
 }
 function updateDoor() {
   const p = clamp(N.door / N.doorMax, 0, 1);
@@ -1389,9 +1472,10 @@ function nightLoop(now) {
   if (!N.over) raf = requestAnimationFrame(nightLoop);
 }
 function nightStep(dt) {
+  if (N.picking) return;
   N.t += dt;
   while (N.spawns.length && N.spawns[0].at <= N.t) spawnGhost(N.spawns.shift());
-  const slowNear = Math.pow(0.72, G.traps.talisman) * (N.guardian ? 0.65 : 1);
+  const slowNear = Math.pow(0.72, G.traps.talisman) * Math.pow(0.7, N.pk.slow || 0) * (N.guardian ? 0.65 : 1);
   let bashed = false;
   for (const g of N.ghosts) {
     const wasVis = revealed(g);
@@ -1409,7 +1493,7 @@ function nightStep(dt) {
       g.bashT -= dt;
       if (g.bashT <= 0) {
         g.bashT = 1;
-        const hit = g.hit * (1 + NIGHT.hitPerDay * (N.d - 1));
+        const hit = g.hit * (1 + NIGHT.hitPerDay * (N.d - 1)) * Math.pow(0.7, N.pk.bolt || 0);
         N.door -= hit; N.lastHit = g.name; bashed = true;
         floatText(180 + rnd(-30, 30), 430, '-' + Math.round(hit), 'door');
       }
@@ -1427,12 +1511,19 @@ function nightStep(dt) {
   for (const b of N.bows) {
     b.cd -= dt;
     if (b.cd > 0) continue;
-    const tg = N.ghosts.filter((g) => revealed(g) && g.y > 150).sort((a, c) => Math.hypot(a.x - b.x, a.y - b.y) - Math.hypot(c.x - b.x, c.y - b.y))[0];
-    if (!tg) { b.cd = 0.2; continue; }
-    b.cd = NIGHT.bowCd;
-    const tc = ghostCenter(tg);
-    line(b.x, b.y - 14, tc.x, tc.y, '#FFE7A3');
-    hurtGhost(tg, NIGHT.bowDmg, '', false);
+    // 弩机不怕铁甲；连弩一次射好几个
+    const tgs = N.ghosts.filter((g) => revealed(g) && g.y > 150).sort((a, c) => Math.hypot(a.x - b.x, a.y - b.y) - Math.hypot(c.x - b.x, c.y - b.y)).slice(0, 1 + (N.pk.bowplus || 0));
+    if (!tgs.length) { b.cd = 0.2; continue; }
+    b.cd = Math.max(0.35, NIGHT.bowCd * Math.pow(0.5, N.pk.bowfast || 0));
+    for (const tg of tgs) { const tc = ghostCenter(tg); line(b.x, b.y - 14, tc.x, tc.y, '#FFE7A3'); hurtGhost(tg, NIGHT.bowDmg, '', false); }
+  }
+  // 灯光烧鬼：提着灯时，灯光里的鬼一直掉血（隐身的也烧）
+  if (N.pk.burn && G.item === 'lamp') {
+    N.burnT += dt;
+    if (N.burnT >= 0.5) {
+      N.burnT = 0;
+      for (const g of N.ghosts.slice()) { const c = ghostCenter(g); if (c.y > 150 && Math.hypot(c.x - LAMP.x, c.y - LAMP.y) < LAMP.r) hurtGhost(g, 2.5 * N.pk.burn, '', false, true); }
+    }
   }
   // 驰援的邻居
   if (N.ally) {
@@ -1444,7 +1535,7 @@ function nightStep(dt) {
     if (N.ally.t <= 0) { N.ally = null; $('nally').innerHTML = ''; }
   }
   if (N.door <= 0) return endNight(false);
-  if (!N.spawns.length && !N.ghosts.length) return endNight(true);
+  if (!N.spawns.length && !N.ghosts.length) return N.wave >= NIGHT.waves - 1 ? endNight(true) : offerPerks();
 }
 function endNight(won) {
   N.over = true;
@@ -1466,7 +1557,9 @@ function endNight(won) {
     title = '门破了！';
     body = `<p><b>${N.lastHit}</b>砸破了你家的${DOORS[G.door].name}，鬼冲进院子，${parts.join('，还有')}。</p>`;
   }
-  body += `<p class="note">今晚来砸门的：${names}……真游戏里，这些鬼都是死去的真人玩家。</p>`;
+  const pks = Object.entries(N.pk).map(([k, n]) => PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、');
+  if (pks) body += `<p>今晚挑的本事：${pks}</p>`;
+  body += `<p class="note">今晚来砸门的：${names}……真游戏里，大部分是电脑鬼，偶尔会有死去的真人玩家变成的厉鬼。</p>`;
   let next, label;
   if (N.guardian) { G.afterlife = { kind: 'guard', won }; next = goReborn; label = '天亮了，去投胎'; body = `<p>${won ? '你显灵帮子孙守住了家门。' : '你没能护住子孙的家门。'}</p>` + body; }
   else if (G.day >= CFG.lifeDays) { next = () => die('old', `${G.day} 天过去了，你老了。`); label = '天亮了……'; }
@@ -1690,7 +1783,12 @@ function intro() {
 
 // ================= 键盘 =================
 document.addEventListener('keydown', (e) => {
-  if (!$('sheet').hidden) { if (e.key === 'Escape' && $('sheet').dataset.dismiss) closeSheet(); return; }
+  if (!$('sheet').hidden) {
+    if (e.key === 'Escape' && $('sheet').dataset.dismiss) closeSheet();
+    const n = ['1', '2', '3'].indexOf(e.key);
+    if (n >= 0 && $('sheet').dataset.num) { const b = $('sheet').querySelectorAll('.sh-btns button')[n]; if (b) b.click(); }
+    return;
+  }
   if ((G.phase === 'night' || G.phase === 'guard') && N && !N.over) {
     const i = ['1', '2', '3'].indexOf(e.key);
     if (i >= 0) setItem(ITEMS[i][0]);
