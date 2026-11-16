@@ -99,6 +99,22 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 30px
 .count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .idle { animation: idle 2.2s ease-in-out infinite; }
 @keyframes idle { 50% { transform: translateY(-4px); } }
+[hidden] { display: none !important; }
+/* 两层：第一层直接显示，“微调”折叠起来 */
+.groups { display: flex; flex-direction: column; gap: 18px; }
+.group { display: flex; flex-direction: column; gap: 12px; }
+.foldbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.foldbar .note { flex: 1 1 220px; margin: 0; }
+.act.small { min-height: 36px; padding: 0 12px; font-size: 13px; font-weight: 400; }
+.fine { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.fold { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 8px; padding: 6px 12px; border: 0; border-radius: 12px; background: none; text-align: left; -webkit-tap-highlight-color: transparent; }
+.fold-t { flex: none; font-weight: 500; }
+.fold-l { flex: 1; min-width: 0; font-size: 12.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fold em { flex: none; font-style: normal; font-size: 12px; color: var(--accent); }
+.fold i { flex: none; font-style: normal; font-size: 20px; line-height: 1; color: var(--muted); transition: transform 0.15s; }
+.fold[aria-expanded="true"] i { transform: rotate(90deg); }
+.fine-body { display: grid; gap: 12px; padding: 4px 12px 12px; }
+.fine .opt { background: var(--panel); }
 .persona { display: grid; gap: 4px; padding: 12px 14px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line); }
 .persona b { font-family: var(--font-display); font-size: 24px; font-weight: 400; }
 .persona span { font-size: 13px; color: var(--muted); }
@@ -253,7 +269,8 @@ function strokesSvg(list) {
 }
 
 let S = loadState() || { ...DEFAULT, draw: emptyDraw() };
-const view = { expr: 'calm', age: 'adult', bg: 'day', tab: 'body', picker: null };
+const view = { expr: 'calm', age: 'adult', bg: 'day', tab: 'body', picker: null, open: new Set() };
+try { const o = JSON.parse(localStorage.getItem('wulin-open') || '[]'); if (Array.isArray(o)) view.open = new Set(o.map(String)); } catch (e) {}
 
 // 手绘：每层是一串笔画 { c 颜色, w 粗细, p 点 [[x, y], ...] }。脸上的层以头的中心为原点、以头的半高为 1；花纹和图案以 0–1 的方块为准
 const DRAW_LAYERS = [['face', '脸上（一直显示）'], ['h1', '手绘表情 1'], ['h2', '手绘表情 2'], ['h3', '手绘表情 3'], ['h4', '手绘表情 4'], ['cloth', '衣服花纹'], ['emblem', '胸前图案']];
@@ -654,40 +671,40 @@ const TABS = [
   ]],
   ['face', '脸', [
     { t: 'choice', k: 'faceShape', n: '脸型' },
-    { t: 'slider', k: 'faceWidth', n: '脸宽' },
-    { t: 'slider', k: 'blush', n: '腮红' },
-    { t: 'color', k: 'blushColor', n: '腮红颜色', p: 'cloth' },
     { t: 'choice', k: 'beard', n: '胡子' },
     { t: 'choice', k: 'mark', n: '面饰' },
-    { t: 'color', k: 'markColor', n: '面饰颜色', p: 'accent' },
+    { t: 'color', k: 'markColor', n: '面饰颜色', p: 'accent', when: (s) => s.mark !== 'none' },
+    { t: 'slider', k: 'faceWidth', n: '脸宽', f: 1 },
+    { t: 'slider', k: 'blush', n: '腮红', f: 1 },
+    { t: 'color', k: 'blushColor', n: '腮红颜色', p: 'cloth', f: 1 },
   ]],
   ['features', '五官', [
     { t: 'sub', n: '眼睛' },
     { t: 'choice', k: 'eyes', n: '款式' },
     { t: 'color', k: 'eyeColor', n: '瞳色', p: 'eye' },
-    { t: 'slider', k: 'eyeY', n: '上下' },
-    { t: 'slider', k: 'eyeGap', n: '间距' },
-    { t: 'slider', k: 'eyeSize', n: '大小' },
-    { t: 'slider', k: 'eyeRot', n: '旋转（眼角上挑 / 下垂）', min: -1, max: 1 },
-    { t: 'slider', k: 'eyeSquash', n: '压扁 / 拉长' },
+    { t: 'slider', k: 'eyeY', n: '上下', f: 1 },
+    { t: 'slider', k: 'eyeGap', n: '间距', f: 1 },
+    { t: 'slider', k: 'eyeSize', n: '大小', f: 1 },
+    { t: 'slider', k: 'eyeRot', n: '旋转（眼角上挑 / 下垂）', min: -1, max: 1, f: 1 },
+    { t: 'slider', k: 'eyeSquash', n: '压扁 / 拉长', f: 1 },
     { t: 'sub', n: '眉毛' },
     { t: 'choice', k: 'brows', n: '款式' },
-    { t: 'slider', k: 'browY', n: '上下' },
-    { t: 'slider', k: 'browGap', n: '间距' },
-    { t: 'slider', k: 'browSize', n: '长短' },
-    { t: 'slider', k: 'browThick', n: '粗细' },
-    { t: 'slider', k: 'browTilt', n: '角度', min: -1, max: 1 },
     { t: 'toggle', k: 'browFollow', n: '眉色跟着发色' },
     { t: 'color', k: 'browColor', n: '眉色', p: 'hair', when: (s) => !s.browFollow },
+    { t: 'slider', k: 'browY', n: '上下', f: 1 },
+    { t: 'slider', k: 'browGap', n: '间距', f: 1 },
+    { t: 'slider', k: 'browSize', n: '长短', f: 1 },
+    { t: 'slider', k: 'browThick', n: '粗细', f: 1 },
+    { t: 'slider', k: 'browTilt', n: '角度', min: -1, max: 1, f: 1 },
     { t: 'sub', n: '鼻子' },
     { t: 'choice', k: 'nose', n: '款式' },
-    { t: 'slider', k: 'noseY', n: '上下', when: (s) => s.nose !== 'none' },
-    { t: 'slider', k: 'noseSize', n: '大小', when: (s) => s.nose !== 'none' },
+    { t: 'slider', k: 'noseY', n: '上下', when: (s) => s.nose !== 'none', f: 1 },
+    { t: 'slider', k: 'noseSize', n: '大小', when: (s) => s.nose !== 'none', f: 1 },
     { t: 'sub', n: '嘴' },
     { t: 'choice', k: 'mouth', n: '款式' },
-    { t: 'slider', k: 'mouthY', n: '上下' },
-    { t: 'slider', k: 'mouthSize', n: '大小' },
-    { t: 'slider', k: 'mouthSquash', n: '压扁 / 拉长' },
+    { t: 'slider', k: 'mouthY', n: '上下', f: 1 },
+    { t: 'slider', k: 'mouthSize', n: '大小', f: 1 },
+    { t: 'slider', k: 'mouthSquash', n: '压扁 / 拉长', f: 1 },
     { t: 'sub', n: '痣（放在脸上任意位置）' },
     { t: 'toggle', k: 'mole', n: '有没有痣', on: '有', off: '没有' },
     { t: 'slider', k: 'moleX', n: '左右', min: -1, max: 1, when: (s) => s.mole },
@@ -696,8 +713,8 @@ const TABS = [
     { t: 'sub', n: '眼镜' },
     { t: 'choice', k: 'glasses', n: '款式' },
     { t: 'color', k: 'glassesColor', n: '颜色', p: 'accent', when: (s) => s.glasses !== 'none' },
-    { t: 'slider', k: 'glassesSize', n: '大小', when: (s) => s.glasses !== 'none' },
-    { t: 'slider', k: 'glassesY', n: '上下', when: (s) => s.glasses !== 'none' },
+    { t: 'slider', k: 'glassesSize', n: '大小', when: (s) => s.glasses !== 'none', f: 1 },
+    { t: 'slider', k: 'glassesY', n: '上下', when: (s) => s.glasses !== 'none', f: 1 },
   ]],
   ['hair', '头发', [
     { t: 'choice', k: 'hairFront', n: '前发' },
@@ -709,18 +726,18 @@ const TABS = [
   ]],
   ['outfit', '服装', [
     { t: 'choice', k: 'top', n: '上衣' },
-    { t: 'choice', k: 'sleeve', n: '袖子' },
     { t: 'color', k: 'topColor', n: '衣色', p: 'cloth' },
-    { t: 'color', k: 'trimColor', n: '镶边', p: 'accent' },
-    { t: 'choice', k: 'pattern', n: '花纹' },
-    { t: 'color', k: 'patternColor', n: '花纹颜色', p: 'accent', when: (s) => s.pattern !== 'none' },
-    { t: 'color', k: 'beltColor', n: '腰带', p: 'accent' },
     { t: 'choice', k: 'bottom', n: '下装' },
     { t: 'color', k: 'bottomColor', n: '下装颜色', p: 'cloth' },
     { t: 'choice', k: 'shoes', n: '鞋' },
-    { t: 'color', k: 'shoeColor', n: '鞋的颜色', p: 'cloth' },
     { t: 'choice', k: 'cape', n: '披风' },
     { t: 'color', k: 'capeColor', n: '披风颜色', p: 'cloth', when: (s) => s.cape !== 'none' },
+    { t: 'choice', k: 'sleeve', n: '袖子', f: 1 },
+    { t: 'choice', k: 'pattern', n: '花纹', f: 1 },
+    { t: 'color', k: 'patternColor', n: '花纹颜色', p: 'accent', when: (s) => s.pattern !== 'none', f: 1 },
+    { t: 'color', k: 'trimColor', n: '镶边', p: 'accent', f: 1 },
+    { t: 'color', k: 'beltColor', n: '腰带', p: 'accent', f: 1 },
+    { t: 'color', k: 'shoeColor', n: '鞋的颜色', p: 'cloth', f: 1 },
   ]],
   ['acc', '配饰', [
     { t: 'choice', k: 'head', n: '头饰' },
@@ -730,8 +747,8 @@ const TABS = [
     { t: 'choice', k: 'neck', n: '颈饰' },
     { t: 'color', k: 'neckColor', n: '颈饰颜色', p: 'accent', when: (s) => s.neck !== 'none' },
     { t: 'choice', k: 'weapon', n: '兵器和随身物' },
-    { t: 'choice', k: 'weaponPos', n: '带法', when: (s) => ['sword', 'saber', 'umbrella', 'flute', 'bow'].includes(s.weapon) },
-    { t: 'color', k: 'weaponColor', n: '兵刃颜色', p: 'accent', when: (s) => ['sword', 'saber'].includes(s.weapon) },
+    { t: 'choice', k: 'weaponPos', n: '带法', when: (s) => ['sword', 'saber', 'umbrella', 'flute', 'bow'].includes(s.weapon), f: 1 },
+    { t: 'color', k: 'weaponColor', n: '兵刃颜色', p: 'accent', when: (s) => ['sword', 'saber'].includes(s.weapon), f: 1 },
   ]],
   ['expr', '表情', []],
   ['persona', '性格', []],
@@ -779,10 +796,61 @@ function renderPane() {
   if (view.tab === 'expr') { pane.innerHTML = exprPane(); bindExpr(); return; }
   if (view.tab === 'draw') { pane.innerHTML = drawPane(); bindDraw(); return; }
   if (view.tab === 'persona') { pane.innerHTML = personaPane(); bindPersona(); return; }
-  const items = tab[2].filter((c) => !c.when || c.when(S));
-  pane.innerHTML = `<div class="grid2">${items.map(ctrlHtml).join('')}</div>`;
-  for (const c of items) bindCtrl(c);
+  // 两层：第一层是部件和主要颜色；位置、大小这些“微调”默认收起，想改再点开
+  const groups = paneGroups(tab);
+  const withFine = groups.filter((g) => g.fine.length);
+  pane.innerHTML = `<div class="groups">${withFine.length ? `<div class="foldbar"><span class="note">先挑部件和颜色。位置、大小这些细节收在“微调”里，想改再点开。</span><button type="button" class="act small" id="fold-all">${withFine.every((g) => view.open.has(g.id)) ? '全部收起' : '全部展开'}</button></div>` : ''}
+    ${groups.map((g) => `<div class="group">${g.name ? `<div class="sub">${g.name}</div>` : ''}${g.main.length ? `<div class="grid2">${g.main.map(ctrlHtml).join('')}</div>` : ''}${g.fine.length ? foldHtml(g) : ''}</div>`).join('')}</div>`;
+  view.fineOf = {};
+  for (const g of groups) {
+    for (const c of [...g.main, ...g.fine]) bindCtrl(c);
+    if (!g.fine.length) continue;
+    for (const c of g.fine) view.fineOf[c.k] = g;
+    $(`fold-${g.id}`).addEventListener('click', () => {
+      const open = !view.open.has(g.id);
+      if (open) view.open.add(g.id); else view.open.delete(g.id);
+      $(`fold-${g.id}`).setAttribute('aria-expanded', String(open));
+      $(`fine-${g.id}`).hidden = !open;
+      $('fold-all').textContent = withFine.every((x) => view.open.has(x.id)) ? '全部收起' : '全部展开';
+      saveOpen();
+    });
+    $(`fr-${g.id}`).addEventListener('click', () => { for (const c of g.every) S[c.k] = DEFAULT[c.k]; view.picker = null; saveState(); renderView(); renderPane(); });
+  }
+  if (withFine.length) $('fold-all').addEventListener('click', () => {
+    const all = withFine.every((g) => view.open.has(g.id));
+    for (const g of withFine) { if (all) view.open.delete(g.id); else view.open.add(g.id); }
+    saveOpen(); renderPane();
+  });
 }
+// 按小标题分组；每组分成“第一层”和“微调”（f: 1）。g.every 是这组全部微调项，恢复默认时连暂时没显示的也一起恢复
+function paneGroups(tab) {
+  const groups = [];
+  let g = null, si = 0;
+  for (const c of tab[2]) {
+    if (c.t === 'sub') { g = { id: `${tab[0]}-${++si}`, name: c.n, main: [], fine: [], every: [] }; groups.push(g); continue; }
+    if (!g) { g = { id: `${tab[0]}-0`, name: null, main: [], fine: [], every: [] }; groups.push(g); }
+    if (c.f) g.every.push(c);
+    if (c.when && !c.when(S)) continue;
+    (c.f ? g.fine : g.main).push(c);
+  }
+  return groups;
+}
+function tweakedCount(list) {
+  return list.filter((c) => { const a = S[c.k], b = DEFAULT[c.k]; return typeof a === 'number' ? Math.abs(a - b) > 0.005 : String(a).toUpperCase() !== String(b).toUpperCase(); }).length;
+}
+function foldHtml(g) {
+  const open = view.open.has(g.id), n = tweakedCount(g.fine);
+  const names = g.fine.map((c) => c.n.replace(/（.*?）/g, '').replace(/\s*\/\s*/g, '/')).join('、');
+  return `<div class="fine"><button type="button" class="fold" id="fold-${g.id}" aria-expanded="${open}" aria-controls="fine-${g.id}"><span class="fold-t">微调</span><span class="fold-l">${names}</span><em id="tw-${g.id}"${n ? '' : ' hidden'}>改过 ${n} 项</em><i aria-hidden="true">›</i></button>
+    <div class="fine-body" id="fine-${g.id}"${open ? '' : ' hidden'}><div class="grid2">${g.fine.map(ctrlHtml).join('')}</div><div class="opts"><button type="button" class="act small" id="fr-${g.id}">微调恢复默认</button></div></div></div>`;
+}
+function refreshTweak(k) {
+  const g = view.fineOf && view.fineOf[k], el = g && $(`tw-${g.id}`);
+  if (!el) return;
+  const n = tweakedCount(g.fine);
+  el.hidden = !n; el.textContent = `改过 ${n} 项`;
+}
+function saveOpen() { try { localStorage.setItem('wulin-open', JSON.stringify([...view.open])); } catch (e) {} }
 function ctrlHtml(c) {
   if (c.t === 'choice') return `<div class="ctrl"><div class="name">${c.n}<b>${OPT[c.k].find((o) => o[0] === S[c.k])?.[1] ?? ''}</b></div><div class="opts">${OPT[c.k].map(([v, n]) => `<button type="button" class="opt" id="o-${c.k}-${v}" data-v="${v}" aria-pressed="${S[c.k] === v}">${n}</button>`).join('')}</div></div>`;
   if (c.t === 'slider') { const min = c.min ?? 0, max = c.max ?? 1; return `<div class="ctrl"><label class="name" for="r-${c.k}">${c.n}<b id="v-${c.k}">${c.fmt ? c.fmt(S[c.k]) : fmtPct(S[c.k], min, max)}</b></label><input type="range" id="r-${c.k}" min="${min}" max="${max}" step="0.01" value="${S[c.k]}"></div>`; }
@@ -800,7 +868,7 @@ function ctrlHtml(c) {
 }
 function bindCtrl(c) {
   if (c.t === 'choice') for (const [v] of OPT[c.k]) $(`o-${c.k}-${v}`).addEventListener('click', () => set(c.k, v, true));
-  if (c.t === 'slider') { const r = $(`r-${c.k}`); r.addEventListener('input', () => { S[c.k] = Number(r.value); $(`v-${c.k}`).textContent = c.fmt ? c.fmt(S[c.k]) : fmtPct(S[c.k], c.min ?? 0, c.max ?? 1); renderView(); saveState(); }); }
+  if (c.t === 'slider') { const r = $(`r-${c.k}`); r.addEventListener('input', () => { S[c.k] = Number(r.value); $(`v-${c.k}`).textContent = c.fmt ? c.fmt(S[c.k]) : fmtPct(S[c.k], c.min ?? 0, c.max ?? 1); renderView(); saveState(); refreshTweak(c.k); }); }
   if (c.t === 'toggle') $(`t-${c.k}`).addEventListener('click', () => set(c.k, !S[c.k], true));
   if (c.t === 'color') {
     const box = $(`pk-${c.k}`).parentElement;
@@ -808,7 +876,7 @@ function bindCtrl(c) {
     $(`pk-${c.k}`).addEventListener('click', () => { view.picker = view.picker === c.k ? null : c.k; renderPane(); });
     if (view.picker === c.k) for (const part of ['h', 's', 'l']) $(`${part}-${c.k}`).addEventListener('input', () => {
       const hex = hsl2hex(Number($(`h-${c.k}`).value), Number($(`s-${c.k}`).value), Number($(`l-${c.k}`).value));
-      S[c.k] = hex; $(`pk-${c.k}`).style.setProperty('--c', hex); renderView(); saveState();
+      S[c.k] = hex; $(`pk-${c.k}`).style.setProperty('--c', hex); renderView(); saveState(); refreshTweak(c.k);
     });
   }
 }
