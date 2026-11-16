@@ -6,7 +6,8 @@
     "test": "vitest run",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.sim.json",
     "sim": "tsx src/sim/cli.ts",
-    "build:web": "node scripts/build-web.mjs"
+    "build:web": "node scripts/build-web.mjs",
+    "sync:draw": "node scripts/sync-shared-draw.mjs"
   },
   "repository": {
     "type": "git",

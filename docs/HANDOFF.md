@@ -43,6 +43,10 @@ src/sim/     模拟器（agents.ts 玩家行为假设、simulate.ts 统计、cli
 src/web/     网页原型（只是界面壳）：game.ts 控制层、ui.ts 各页面、art.ts 占位美术、main.ts、page.html 样式
 test/        core.test.ts（规则）、save.test.ts（存档与提示）
 docs/        本文件、美术规格、方案文档、参考截图
+  art/creator/index.html  武林捏人台（单文件页面，捏脸 / 表情 / 手绘 / 性格）
+  proto/loop/index.html   一日一夜样机（单文件页面）：白天出门、天黑前回家、夜里守门、老死当鬼、投胎。
+                          画人代码从捏人台复制过来（// @@shared-begin 到 // @@shared-end），
+                          改了捏人台的画人代码要跑 node scripts/sync-shared-draw.mjs
 design/      设计稿画布的源文件（.dc.html 是 HTML + 一段组件脚本，要在在线画布里才能渲染；看样子请用 docs/art/screens 的截图）
              ⚠️ 画布是 11 月 14 日的旧稿，形象里还有已删掉的戏曲款（翎子、凤冠、行当）。以 ART_SPEC.md 和截图为准
 ```
@@ -127,6 +131,7 @@ design/      设计稿画布的源文件（.dc.html 是 HTML + 一段组件脚�
 - **点鬼**只是手感（火花 + “啪！”），不改砸门结果。要让它影响结果是规则改动，先问产品负责人
 - **服装风格**：`Appearance.outfit`（仙袍 / 短褂 / 卫衣），玩家自选，画风不定死
 - **形象**（文档里没有）：`House.appearance` 和 `House.gender`，玩家自己捏，见 `ART_SPEC.md` 第 4 节
+- **方向又变了（2026-11-16，以路线图文档为准）**：题材改成武侠；孩子就是真人玩家；第一版核心循环是“一天一夜”（白天出门、天黑前回家 → 夜里守门、门破丢东西 → 老死当护家神或厉鬼 → 投胎），砸门的鬼是死去的真人玩家。先用 `docs/proto/loop` 样机试手感；`src/` 下的原型还是旧规则（道途、修仙），第二期再改
 
 ## 7. 已知问题和下一步
 
@@ -145,6 +150,7 @@ design/      设计稿画布的源文件（.dc.html 是 HTML + 一段组件脚�
 1. `npm run typecheck && npm test` 全绿
 2. 改了数值：`npm run sim -- --days 120 --players 300`，对照第 5 节
 3. 改了界面：`npm run build:web`，用 390 × 844 和 320 × 640 两种尺寸打开 `dist/web/teashop.html`，确认没有横向滚动、没有控制台报错；捏形象 → 收灵石 → 回话 → 结伴历练 → 渡劫走一遍
-4. 新规则必须配测试：测试里用 `calm` 配置关掉随机砸门、随机误会、情敌和新手期加成，只测要测的那一条
+4. 改了捏人台的画人代码：`node scripts/sync-shared-draw.mjs`（`--check` 只检查不改），再打开样机看一眼
+5. 新规则必须配测试：测试里用 `calm` 配置关掉随机砸门、随机误会、情敌和新手期加成，只测要测的那一条
 
 在线版本（只有产品负责人的账号能打开）：可玩原型、设计稿画布、方案文档。离线副本都在这个压缩包里。

@@ -149,6 +149,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 30px
 
 <script>
 'use strict';
+// @@shared-begin
 // ---------------- 调色 ----------------
 function hsl2hex(h, s, l) {
   const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
@@ -268,19 +269,12 @@ function strokesSvg(list) {
   }).join('');
 }
 
-let S = loadState() || { ...DEFAULT, draw: emptyDraw() };
-const view = { expr: 'calm', age: 'adult', bg: 'day', tab: 'body', picker: null, open: new Set() };
-try { const o = JSON.parse(localStorage.getItem('wulin-open') || '[]'); if (Array.isArray(o)) view.open = new Set(o.map(String)); } catch (e) {}
-
 // 手绘：每层是一串笔画 { c 颜色, w 粗细, p 点 [[x, y], ...] }。脸上的层以头的中心为原点、以头的半高为 1；花纹和图案以 0–1 的方块为准
 const DRAW_LAYERS = [['face', '脸上（一直显示）'], ['h1', '手绘表情 1'], ['h2', '手绘表情 2'], ['h3', '手绘表情 3'], ['h4', '手绘表情 4'], ['cloth', '衣服花纹'], ['emblem', '胸前图案']];
 function emptyDraw() { return { face: [], h1: [], h2: [], h3: [], h4: [], cloth: [], emblem: [], hide: { h1: true, h2: true, h3: true, h4: true } }; }
 function normDraw(d) { const e = emptyDraw(); if (!d || typeof d !== 'object') return e; for (const [k] of DRAW_LAYERS) e[k] = Array.isArray(d[k]) ? d[k] : []; e.hide = { ...e.hide, ...(d.hide || {}) }; return e; }
-function loadState() {
-  try { const raw = localStorage.getItem('wulin-creator'); if (raw) { const o = JSON.parse(raw); return { ...DEFAULT, ...o, draw: normDraw(o.draw) }; } } catch (e) {}
-  return null;
-}
-function saveState() { try { localStorage.setItem('wulin-creator', JSON.stringify(S)); } catch (e) {} }
+function encode(s) { return 'WULIN1:' + btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
+function decode(t) { const m = /WULIN1:([A-Za-z0-9+/=]+)/.exec(t.trim()); if (!m) throw new Error('bad'); return JSON.parse(decodeURIComponent(escape(atob(m[1])))); }
 
 // ---------------- 画人（画板 240 × 400，脚底 y = 392） ----------------
 function headGeom(s) { const h = 372 / (3 + s.heads); return { cx: 120, hcy: 20 + h / 2, ry: h / 2 }; }
@@ -288,6 +282,8 @@ const INK = '#2B2233';
 const lerp = (a, b, t) => a + (b - a) * t;
 
 function drawPerson(s0, expr, age, opt = {}) {
+  // opt.uid：同一页画好几个人时，给裁切和花纹的 id 加后缀，免得互相串
+  const U = opt.uid || '';
   const s = { ...s0 };
   const D = s.draw || emptyDraw();
   if (age === 'elder') { s.hairColor = '#E6E4DE'; s.streak = 'none'; }
@@ -368,8 +364,8 @@ function drawPerson(s0, expr, age, opt = {}) {
   // 花纹（剪在衣身里）
   if (s.pattern === 'custom') {
     const T = 16 + 48 * s.tileSize;
-    body.push(`<pattern id="cp" patternUnits="userSpaceOnUse" x="${cx - T / 2}" y="${shoulderY}" width="${T}" height="${T}"><g transform="scale(${T})">${strokesSvg(D.cloth)}</g></pattern><clipPath id="tc2"><path d="${torsoPath}"/></clipPath><rect clip-path="url(#tc2)" x="${cx - hw - 40}" y="${shoulderY - 10}" width="${(hw + 40) * 2}" height="${topBottom - shoulderY + 20}" fill="url(#cp)"/>`);
-  } else if (s.pattern !== 'none') body.push(`<clipPath id="tc"><path d="${torsoPath}"/></clipPath><g clip-path="url(#tc)" opacity="0.55">${pattern(s.pattern, s.patternColor, cx - hw - 30, shoulderY - 10, (hw + 30) * 2, topBottom - shoulderY + 20)}</g>`);
+    body.push(`<pattern id="cp${U}" patternUnits="userSpaceOnUse" x="${cx - T / 2}" y="${shoulderY}" width="${T}" height="${T}"><g transform="scale(${T})">${strokesSvg(D.cloth)}</g></pattern><clipPath id="tc2${U}"><path d="${torsoPath}"/></clipPath><rect clip-path="url(#tc2${U})" x="${cx - hw - 40}" y="${shoulderY - 10}" width="${(hw + 40) * 2}" height="${topBottom - shoulderY + 20}" fill="url(#cp${U})"/>`);
+  } else if (s.pattern !== 'none') body.push(`<clipPath id="tc${U}"><path d="${torsoPath}"/></clipPath><g clip-path="url(#tc${U})" opacity="0.55">${pattern(s.pattern, s.patternColor, cx - hw - 30, shoulderY - 10, (hw + 30) * 2, topBottom - shoulderY + 20)}</g>`);
   // 领口
   if (s.top === 'yuanling') body.push(`<path d="M${cx - 16} ${shoulderY + 2} Q${cx} ${shoulderY + 18} ${cx + 16} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
   else if (s.top === 'duangua') body.push(`<path d="M${cx} ${shoulderY + 4} V${topBottom}" stroke="${s.trimColor}" stroke-width="3"/>${[0.35, 0.55, 0.75].map((t) => `<rect x="${cx - 7}" y="${lerp(shoulderY, topBottom, t)}" width="14" height="4" rx="2" fill="${s.trimColor}"/>`).join('')}`);
@@ -414,7 +410,7 @@ function drawPerson(s0, expr, age, opt = {}) {
   if (s.streak === 'tips') {
     const longStyle = ['highpony', 'lowpony', 'long', 'twintails', 'halfup'].includes(s.hairBack);
     const tipY = longStyle ? hcy + ry * (0.75 + 1.7 * len) : hcy + ry * 0.55;
-    backHair.push(`<clipPath id="bh">${backHair.join('').replace(/ fill="[^"]*"/g, '')}</clipPath><rect clip-path="url(#bh)" x="-100" y="${tipY}" width="440" height="400" fill="${s.streakColor}"/>`);
+    backHair.push(`<clipPath id="bh${U}">${backHair.join('').replace(/ fill="[^"]*"/g, '')}</clipPath><rect clip-path="url(#bh${U})" x="-100" y="${tipY}" width="440" height="400" fill="${s.streakColor}"/>`);
   }
 
   // 脸
@@ -660,6 +656,18 @@ function background(kind) {
     <rect x="-600" y="170" width="1440" height="70" fill="#F4EEE2"/><rect x="-600" y="160" width="1440" height="14" fill="#4A4F5C"/>
     <rect x="-600" y="240" width="1440" height="160" fill="#D8CDB9"/><path d="M-600 290 H840 M-600 340 H840" stroke="#C4B8A2" stroke-width="2"/>`;
 }
+
+// @@shared-end（从“调色”到这里的画人代码会被 scripts/sync-shared-draw.mjs 复制进 docs/proto/loop/index.html，改完要跑一下）
+
+// ---------------- 状态 ----------------
+let S = loadState() || { ...DEFAULT, draw: emptyDraw() };
+const view = { expr: 'calm', age: 'adult', bg: 'day', tab: 'body', picker: null, open: new Set() };
+try { const o = JSON.parse(localStorage.getItem('wulin-open') || '[]'); if (Array.isArray(o)) view.open = new Set(o.map(String)); } catch (e) {}
+function loadState() {
+  try { const raw = localStorage.getItem('wulin-creator'); if (raw) { const o = JSON.parse(raw); return { ...DEFAULT, ...o, draw: normDraw(o.draw) }; } } catch (e) {}
+  return null;
+}
+function saveState() { try { localStorage.setItem('wulin-creator', JSON.stringify(S)); } catch (e) {} }
 
 // ---------------- 面板定义 ----------------
 const TABS = [
@@ -1086,8 +1094,6 @@ function afterDraw() {
 }
 
 // ---------------- 灵感和捏人码 ----------------
-function encode(s) { return 'WULIN1:' + btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
-function decode(t) { const m = /WULIN1:([A-Za-z0-9+/=]+)/.exec(t.trim()); if (!m) throw new Error('bad'); return JSON.parse(decodeURIComponent(escape(atob(m[1])))); }
 function sharePane() {
   return `<div class="ctrl"><div class="name">造型灵感：一键换成现成的造型，再接着改（只是外观，不是职业）</div><div class="opts">${INSPIRE.map(([n], i) => `<button type="button" class="opt" id="ins-${i}">${n}</button>`).join('')}</div></div>
   <div class="code"><div class="sub">捏人码</div><p class="note">把这串码发给朋友，对方粘贴进来就能看到一模一样的人。</p>
