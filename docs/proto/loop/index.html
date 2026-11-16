@@ -119,6 +119,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .kt td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
 .kt tr.total td { font-weight: 700; border-bottom: 0; }
 .fams { display: grid; gap: 8px; }
+.hall { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.pt { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.pt svg { width: 100%; height: auto; border: 6px solid #5A3A2E; border-radius: 4px; box-sizing: border-box; background: #E8DCC2; }
+.pt figcaption { display: flex; flex-direction: column; font-size: 12px; text-align: center; }
+.pt figcaption span { color: var(--muted); font-size: 11px; }
 textarea { width: 100%; box-sizing: border-box; min-height: 64px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); padding: 8px; font: 12px/1.4 ui-monospace, Menlo, monospace; }
 .toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30; max-width: min(440px, calc(100vw - 32px)); padding: 9px 14px; border-radius: 12px; background: #1E2A2C; color: #F4F7F5; font-size: 13px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); pointer-events: none; }
 
@@ -784,7 +789,13 @@ const GIVEN = ['太爷爷', '老祖宗', '大娘', '三叔', '二姑奶奶', '�
 const ghostName = () => `${pick(SURNAMES)}家的${pick(GIVEN)}`;
 const AGE_NAME = { child: '童年', adult: '成年', elder: '老年' };
 const AGE_FX = { child: { dmg: 0.8, fight: -0.1, walk: 1 }, adult: { dmg: 1, fight: 0, walk: 1 }, elder: { dmg: 0.85, fight: -0.05, walk: 1.2 } };
-const THREADS = [['相识', '相知'], ['相知', '情深'], ['情深', '挚爱']];
+const THREADS = [['相识', '知己'], ['知己', '倾心'], ['倾心', '挚爱']];
+// 红线等级（一辈子内最多到挚爱）和孩子品级。品级主要给面子，强弱最多差三成：孩子是别人投胎来的新玩家，不能让陌生人的感情决定他弱好几倍
+const THREAD_LV = [[0, '相识'], [20, '知己'], [45, '倾心'], [70, '挚爱']];
+const threadName = (v) => THREAD_LV.filter(([m]) => v >= m).pop()[1];
+const GRADES = { 相识: ['寻常', 1], 知己: ['良才', 1.05], 倾心: ['上等', 1.1], 挚爱: ['奇才', 1.2] };
+const GIVEN_ME = ['小石', '阿青', '明月', '长风', '书安', '云舟', '念慈', '怀瑾', '星河', '如意', '晚晴', '子衿'];
+const surnameOf = (fam) => (fam === '你家' ? '林' : fam[0]);
 const TIER_NAME = ['寻常人家', '殷实人家', '名门望族'];
 function ageOf(day) { const f = (day - 1) / Math.max(1, CFG.lifeDays - 1); return f < 0.2 ? 'child' : f < 0.7 ? 'adult' : 'elder'; }
 
@@ -820,10 +831,13 @@ function ghostSvg(s, expr, age, x, y, k) {
 
 // ---------------- 存档 ----------------
 let G = null;
-const FIRST_FAMILY = { name: '你家', money: 20, door: 0, treasures: [], friends: { wang: 26, li: 8, zhao: 0 }, thread: '相知' };
+const FIRST_FAMILY = { name: '林家', money: 20, door: 0, treasures: [], friends: { wang: 26, li: 8, zhao: 0 }, thread: '知己' };
 function freshLife(fam, prev) {
   return {
-    v: 1, lifeNo: prev ? prev.lifeNo + 1 : 1, fam: fam.name, thread: fam.thread, phase: 'home', day: 1, time: CFG.dayStart, hp: CFG.hpMax,
+    v: 2, lifeNo: prev ? prev.lifeNo + 1 : 1, fam: fam.name, thread: fam.thread, phase: 'home', day: 1, time: CFG.dayStart, hp: CFG.hpMax,
+    name: surnameOf(fam.name) + pick(GIVEN_ME), grade: GRADES[fam.thread][0], power: GRADES[fam.thread][1],
+    parents: fam.parents || [{ name: surnameOf(fam.name) + '大郎', look: randomLook(), rel: '爹' }, { name: '娘', look: randomLook(), rel: '娘' }],
+    spouse: null, love: 0, kids: [], ancestors: fam.ancestors || [], offered: false, own: !!fam.own,
     money: fam.money, door: fam.door, traps: { crossbow: fam.crossbow || 0, lamp: fam.lamp || 0, talisman: fam.talisman || 0 },
     treasures: [...(fam.treasures || [])], store: {}, bag: [], at: 'home', buddy: null, target: null, item: 'sword',
     friends: { ...fam.friends }, held: 0, broken: 0, earned: 0, kills: 0, deathKind: null, deathMsg: '', afterlife: null, reborn: null,
@@ -831,7 +845,7 @@ function freshLife(fam, prev) {
   };
 }
 function save() { try { localStorage.setItem('wulin-loop', JSON.stringify(G)); } catch (e) {} }
-function loadGame() { try { const r = localStorage.getItem('wulin-loop'); if (r) { const o = JSON.parse(r); if (o && o.v === 1) return o; } } catch (e) {} return null; }
+function loadGame() { try { const r = localStorage.getItem('wulin-loop'); if (r) { const o = JSON.parse(r); if (o && o.v === 2) return o; } } catch (e) {} return null; }
 
 // ---------------- 小工具 ----------------
 const SHI = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
@@ -887,13 +901,13 @@ const lionSvg = (x, y, flip) => `<g transform="translate(${x} ${y}) scale(${flip
 function renderHud() {
   const ghostly = ['death', 'haunt', 'reborn', 'guard'].includes(G.phase);
   const age = ageOf(G.day);
-  $('hud').innerHTML = `<div class="hud-l"><b>${G.phase === 'guard' ? '护家神' : G.phase === 'haunt' ? '厉鬼' : ghostly ? '阴间' : `第 ${G.day} 天`}</b><span>${ghostly ? `第 ${G.lifeNo} 世走完了` : `${AGE_NAME[age]} · 一辈子 ${CFG.lifeDays} 天 · 第 ${G.lifeNo} 世`}</span></div>
+  $('hud').innerHTML = `<div class="hud-l"><b>${G.phase === 'guard' ? '护家神' : G.phase === 'haunt' ? '厉鬼' : ghostly ? '阴间' : `第 ${G.day} 天`}</b><span>${ghostly ? `第 ${G.lifeNo} 世走完了` : `${G.name} · ${AGE_NAME[age]} · 第 ${G.lifeNo} 世`}</span></div>
     <div class="hud-r">${ghostly ? '' : `<span class="hp" role="img" aria-label="体力 ${G.hp} / ${CFG.hpMax}">${'<i class="on"></i>'.repeat(Math.max(0, G.hp))}${'<i></i>'.repeat(Math.max(0, CFG.hpMax - G.hp))}</span><span>${G.money} 文</span><span>宝物 ${G.treasures.length}</span>`}<button type="button" class="icon" id="menu">设置</button></div>`;
   $('menu').onclick = openMenu;
 }
 function clockHtml() {
   const left = CFG.dusk - G.time;
-  return `<div class="clock${left < 120 ? ' late' : ''}"><div><b>${shichen(G.time)} ${hm(G.time)}</b><span>${left > 0 ? `离天黑还有 ${dur(left)}` : '天黑了'}</span></div><div class="sun"><i style="width:${(dayFrac() * 100).toFixed(1)}%"></i></div></div>`;
+  return `<div class="clock${left < 120 ? ' late' : ''}"><div><b>${shichen(G.time)} ${hm(G.time)}</b><span>${left > 0 ? `今天还剩 ${(left / 120).toFixed(1).replace('.0', '')} 个时辰` : '天黑了'}</span></div><div class="sun"><i style="width:${(dayFrac() * 100).toFixed(1)}%"></i></div></div>`;
 }
 function render() {
   document.body.dataset.phase = G.phase;
@@ -928,6 +942,9 @@ function homeSvg() {
   // 人
   const expr = G.hp <= 1 ? 'sad' : f > 0.8 ? 'surprised' : f < 0.2 ? 'happy' : 'calm';
   s += person(ME, expr, ageOf(G.day), 220, 236, 0.24);
+  if (G.spouse) s += person(G.spouse.look, 'happy', ageOf(G.day) === 'elder' ? 'elder' : 'adult', 258, 238, 0.23);
+  G.kids.slice(0, 3).forEach((k, i) => { s += person(k.look, 'happy', k.kind === '徒' ? 'adult' : 'child', 150 - i * 30, 240, k.kind === '徒' ? 0.21 : 0.23); });
+  if (G.own && !G.kids.length) s += person(G.parents[0].look, 'calm', 'adult', 150, 238, 0.22);
   // 前墙和门
   s += `<rect x="0" y="252" width="360" height="48" fill="#CBBFA8"/><rect x="0" y="246" width="360" height="8" fill="#4A4F5C"/>${doorSvg(G.door, 180, 300, 62, 58)}`;
   if (G.door >= 2) s += lanternSvg(136, 252) + lanternSvg(224, 252);
@@ -949,11 +966,12 @@ function renderHome() {
       ${left > 0 ? `<button type="button" class="big main" data-a="out">出门找东西<small>越远东西越好，也越危险。天黑前要回来</small></button>` : ''}
       <button type="button" class="big" data-a="market">去集市卖货<small>仓库 ${storeCount()} 件，值 ${storeValue()} 文</small></button>
       <button type="button" class="big" data-a="build">修院子<small>${DOORS[G.door].name}（门血 ${DOORS[G.door].hp}）${trapSummary()}</small></button>
+      <button type="button" class="big" data-a="family">家和祠堂<small>${familySummary()}</small></button>
       <button type="button" class="big" data-a="friends">邻居和交情<small>${NEIGHBORS.map((n) => `${n.who} ${G.friends[n.id]}`).join(' · ')}</small></button>
       ${canHeal ? `<button type="button" class="big" data-a="heal">用草药疗伤<small>体力 +1（仓库还有 ${G.store['草药']} 份）</small></button>` : ''}
       <button type="button" class="big ${left > 0 ? 'ghosty' : 'main'}" data-a="night">${left > 0 ? '在家歇到天黑' : '天黑了，去守夜'}<small>${left > 0 ? `还有 ${dur(left)} 天黑，鬼会来砸门` : '鬼要来砸门了'}</small></button>
     </div>`;
-  bindActs({ out: askBuddy, market: openMarket, build: openBuild, friends: openFriends, heal, night: () => { G.time = Math.max(G.time, CFG.dusk); startNight(false); } });
+  bindActs({ out: askBuddy, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, heal, night: () => { G.time = Math.max(G.time, CFG.dusk); startNight(false); } });
 }
 function heal() { G.store['草药']--; G.hp = Math.min(CFG.hpMax, G.hp + 1); save(); render(); toast('敷了草药，体力 +1'); }
 
@@ -1194,6 +1212,92 @@ function arriveHome() {
 }
 function afterArrive() { if (G.time >= CFG.dusk) startNight(false); else render(); }
 
+// ================= 家：结缘、孩子、徒弟、祠堂 =================
+function familySummary() {
+  const parts = [];
+  if (G.spouse) parts.push(`${G.spouse.name} · 红线${threadName(G.love)}`);
+  const kids = G.kids.filter((k) => k.kind !== '徒').length, dis = G.kids.filter((k) => k.kind === '徒').length;
+  if (kids) parts.push(`孩子 ${kids}`);
+  if (dis) parts.push(`徒弟 ${dis}`);
+  return parts.join(' · ') || (ageOf(G.day) === 'child' ? '长大以后可以结缘、收徒' : '还没有成家，也没有徒弟');
+}
+function maybeBirth() {
+  const kids = G.kids.filter((k) => k.kind !== '徒');
+  if (!G.spouse || G.love < 20 || kids.length >= 2 || G.day < 3 || G.bornToday === G.day) return null;
+  const [grade, power] = GRADES[threadName(G.love)];
+  const kid = { name: surnameOf(G.fam) + pick(GIVEN_ME), look: randomLook(), grade, power, kind: Math.random() < 0.5 ? '子' : '女' };
+  G.kids.push(kid); G.bornToday = G.day;
+  return kid;
+}
+function candidates() {
+  return [0, 1].map(() => ({ name: pick(SURNAMES) + pick(GIVEN_ME), look: randomLook() }));
+}
+// 两条路都能成家：红线（结缘生孩子）或者师徒（收徒弟）。不想谈恋爱也能有后人
+function offerMatch() {
+  const c = candidates();
+  sheet({
+    title: '你长大了',
+    body: `<p>可以找个有缘人牵红线，以后生孩子；也可以收个徒弟。两条路都能有后人，以后都能投胎回自己家。</p><p class="note">真游戏里，有缘人和徒弟都是真人玩家；好友点你的分享链接，就能生在你家或者拜你为师。</p>`,
+    buttons: [...c.map((p) => [`和${p.name}牵红线`, () => { G.spouse = p; G.love = 10; save(); render(); toast(`和${p.name}牵上了红线`); }, 'main']), ['收个徒弟（30 文）', takeDisciple, '', G.money < 30], ['先不急', null]],
+  });
+}
+function takeDisciple() {
+  if (G.money < 30) return toast('钱不够');
+  G.money -= 30;
+  const [grade, power] = G.held >= 3 ? ['上等', 1.1] : G.held >= 1 ? ['良才', 1.05] : ['寻常', 1];
+  const d = { name: pick(SURNAMES) + pick(GIVEN_ME), look: randomLook(), grade, power, kind: '徒' };
+  G.kids.push(d);
+  save(); render();
+  toast(`${d.name}拜你为师，品级${grade}（看你守住了几夜）`);
+}
+function openFamily() {
+  const adult = ageOf(G.day) !== 'child';
+  const fam = G.kids.map((k) => `<li>${k.name}<span>${k.kind === '徒' ? '徒弟' : k.kind === '子' ? '儿子' : '女儿'} · ${k.grade}</span></li>`).join('');
+  sheet({
+    title: `${G.fam} · ${G.name}`, dismiss: true,
+    body: `<p>你出生时爹娘红线是<b>${G.thread}</b>，品级<b>${G.grade}</b>（强弱 ×${G.power}）。${G.own ? '你是回自己家投胎的。' : ''}</p>
+      <ul class="list">${G.parents.map((p) => `<li>${p.name}<span>${p.rel}</span></li>`).join('')}</ul>
+      ${G.spouse ? `<div class="fr"><div class="fr-top"><b>${G.spouse.name}</b><span class="note">红线 ${threadName(G.love)}（${G.love}）</span></div><div class="fbar" role="img" aria-label="红线 ${G.love}"><i style="width:${G.love}%"></i><s style="left:20%"></s><s style="left:45%"></s><s style="left:70%"></s></div><p class="note">红线到知己以后会生孩子；越浓，孩子品级越好（最多差三成）。一辈子里最多到挚爱。</p></div>` : `<p class="note">${adult ? '还没牵红线。' : '长大以后可以结缘、收徒。'}</p>`}
+      ${fam ? `<div class="sub">后人</div><ul class="list">${fam}</ul><p class="note">夜里，一家人会帮着守门。</p>` : ''}`,
+    buttons: [
+      ...(G.spouse ? [['陪伴（花 1 个时辰，红线 +12）', () => { if (G.time + 120 > CFG.dusk) return toast('天快黑了，没时间了'); G.time += 120; G.love = Math.min(100, G.love + 12); save(); render(); toast('陪了一个时辰，红线 +12'); openFamily(); }, 'main', CFG.dusk - G.time < 120]] : []),
+      ...(adult && !G.spouse ? [['找有缘人', offerMatch, 'main']] : []),
+      ...(adult && G.kids.filter((k) => k.kind === '徒').length < 2 ? [['收个徒弟（30 文）', takeDisciple, '', G.money < 30]] : []),
+      ['去祠堂', openHall],
+      ['回去', null],
+    ],
+  });
+}
+// 祠堂：一代代的祖宗画像。回自家投胎的话，前几世的你也挂在这里
+function portrait(a) {
+  return `<figure class="pt"><svg viewBox="30 -6 180 190" role="img" aria-label="${a.name}的画像"><rect x="30" y="-6" width="180" height="190" fill="#E8DCC2"/>${personSvg(a.look, 'calm', 'elder')}</svg><figcaption><b>${a.name}</b><span>${a.note}</span></figcaption></figure>`;
+}
+function openHall() {
+  const list = G.ancestors;
+  sheet({
+    title: `${G.fam}祠堂`, dismiss: true,
+    body: list.length ? `<div class="hall">${list.map(portrait).join('')}</div><p class="note">一个人死了，他捏的那张脸就画进家里的祖宗画像。祖宗当护家神时，夜里会显灵。</p>` : '<p class="note">祠堂还空着。你会是这家的第一幅画像。</p>',
+    buttons: [['回去', openFamily]],
+  });
+}
+function familyHelpers() {
+  const out = [];
+  const xs = [262, 296, 326];
+  if (G.spouse && !N_guard()) out.push({ look: G.spouse.look, age: 'adult', x: xs[0], dmg: 6, rate: 0.8, cd: 1 });
+  G.kids.slice(0, 2).forEach((k, i) => out.push({ look: k.look, age: k.kind === '徒' ? 'adult' : 'child', x: xs[out.length] || 326, dmg: Math.round(4 * k.power), rate: 1.2, cd: 1.2 + i * 0.3 }));
+  return out;
+}
+function N_guard() { return G.phase === 'guard'; }
+function ownFamily(heir) {
+  const t = threadName(ri([20, 60]));
+  return {
+    own: true, name: G.fam, door: G.door, money: Math.floor(G.money * 0.6), crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
+    treasures: G.treasures.slice(), thread: t,
+    parents: [{ name: heir.name, look: heir.look, rel: heir.kind === '女' ? '娘（上一世你的女儿）' : heir.kind === '徒' ? '师父（上一世你的徒弟）' : '爹（上一世你的儿子）' }, { name: pick(SURNAMES) + '氏', look: randomLook(), rel: heir.kind === '女' ? '爹' : '娘' }],
+    ancestors: [...G.ancestors, { name: G.name, look: { ...ME }, note: `第 ${G.lifeNo} 世的你` }],
+  };
+}
+
 // ================= 夜里守门 =================
 let N = null, raf = 0, gidN = 0;
 // 一波一波来：这一波清完才挑本事，挑完下一波才来
@@ -1246,7 +1350,8 @@ function startNight(guardian) {
     d, guardian, t: 0, door: doorMax, doorMax, ghosts: [], spawns: [], ally: null, helpUsed: false, names: [], kills: 0, coins: 0,
     pk: {}, offer: [], picking: false, rainCount: 0, burnT: 0,
     over: false, wave: -1, lastHit: '', hintT: 0, bows: [[40, 410], [320, 410], [92, 410], [268, 410]].slice(0, G.traps.crossbow).map(([x, y], i) => ({ x, y, cd: 1 + i * 0.35 })),
-    kid: guardian ? randomLook() : null,
+    kid: guardian ? (G.kids[0] ? G.kids[0].look : randomLook()) : null,
+    fam: familyHelpers(),
   };
   N.lights = nightLights();
   document.body.dataset.phase = G.phase;
@@ -1258,6 +1363,7 @@ function startNight(guardian) {
   drawPlayer();
   const svg = $('nsvg');
   svg.addEventListener('pointerdown', (e) => { if (N.over) return; e.preventDefault(); const p = toSvg(svg, e); hitAt(p.x, p.y); });
+  $('nfam').innerHTML = N.fam.map((f) => person(f.look, 'angry', f.age, f.x, 498, f.age === 'child' ? 0.2 : 0.19)).join('');
   updateDoor();
   startWave(0);
   if (guardian) toast('你是护家神：子孙在守门，你在旁边显灵。');
@@ -1322,7 +1428,7 @@ function nightSvg() {
     ${bigLantern(180, 108, 4)}${bigLantern(180, 382, 15)}`;
   if (G.door >= 2) s += lanternSvg(124, 420, 8) + lanternSvg(236, 420, 8);
   if (G.traps.lamp) for (const x of [30, 80, 280, 330]) s += lanternSvg(x, 426, 6);
-  s += `<g id="nbows"></g><g id="glayer"></g><g id="nplayer"></g><g id="nally"></g>`;
+  s += `<g id="nbows"></g><g id="glayer"></g><g id="nplayer"></g><g id="nfam"></g><g id="nally"></g>`;
   if (N.guardian) s += `<g class="float">${ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22)}</g>`;
   s += `<g pointer-events="none"><g class="rain1"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainA)"/></g><g class="rain2"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainB)"/></g></g><g id="fx"></g>`;
   return s;
@@ -1361,8 +1467,8 @@ function callHelp(n) {
   N.helpUsed = true;
   N.ally = { n, t: 18, cd: 0.4 };
   addFriend(n.id, 2);
-  $('nally').innerHTML = person(lookOf(INSPIRE[n.look][1]), 'angry', 'adult', 252, 498, 0.2);
-  floatText(252, 400, `${n.who}来了！`, 'good');
+  $('nally').innerHTML = person(lookOf(INSPIRE[n.look][1]), 'angry', 'adult', 60, 498, 0.2);
+  floatText(60, 400, `${n.who}来了！`, 'good');
   renderNightPanel();
 }
 function toSvg(svg, e) { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
@@ -1431,7 +1537,7 @@ function hitAt(x, y) {
   const hurt = N.guardian ? 1 : G.hp >= CFG.hpMax ? 1 : G.hp <= 1 ? 0.6 : 0.85;
   const age = N.guardian ? AGE_FX.child : AGE_FX[ageOf(G.day)];
   const crit = Math.random() < Math.min(0.75, 0.25 * (N.pk.crit || 0));
-  const dmg = Math.max(1, Math.round(NIGHT.tap * m * age.dmg * hurt * (N.guardian ? 1.25 : 1) * (crit ? 3 : 1)));
+  const dmg = Math.max(1, Math.round(NIGHT.tap * m * age.dmg * hurt * (N.guardian ? 1.25 : G.power || 1) * (crit ? 3 : 1)));
   if (m < 0.7 && !crit && N.t > N.hintT) { N.hintT = N.t + 1.5; floatText(g.x + g.ox, g.y - 124 * g.k, '打不动', 'weak'); }
   const c = ghostCenter(g);
   hurtGhost(g, dmg, crit || m >= 1.5 ? 'crit' : m < 0.7 ? 'weak' : '', true);
@@ -1525,12 +1631,23 @@ function nightStep(dt) {
       for (const g of N.ghosts.slice()) { const c = ghostCenter(g); if (c.y > 150 && Math.hypot(c.x - LAMP.x, c.y - LAMP.y) < LAMP.r) hurtGhost(g, 2.5 * N.pk.burn, '', false, true); }
     }
   }
+  // 自家人帮着守门
+  for (const f of N.fam) {
+    f.cd -= dt;
+    if (f.cd > 0) continue;
+    const tg = N.ghosts.filter(revealed).sort((a, c) => c.y - a.y)[0];
+    if (!tg) { f.cd = 0.2; continue; }
+    f.cd = f.rate;
+    const tc = ghostCenter(tg);
+    line(f.x, 450, tc.x, tc.y, '#F2C14E', 2);
+    hurtGhost(tg, f.dmg, '', false);
+  }
   // 驰援的邻居
   if (N.ally) {
     N.ally.t -= dt; N.ally.cd -= dt;
     if (N.ally.cd <= 0) {
       const tg = N.ghosts.filter(revealed).sort((a, c) => c.y - a.y)[0];
-      if (tg) { N.ally.cd = 0.45; const tc = ghostCenter(tg); line(252, 440, tc.x, tc.y, '#7FD6C2', 3); hurtGhost(tg, NIGHT.allyDmg, '', false); } else N.ally.cd = 0.15;
+      if (tg) { N.ally.cd = 0.45; const tc = ghostCenter(tg); line(60, 440, tc.x, tc.y, '#7FD6C2', 3); hurtGhost(tg, NIGHT.allyDmg, '', false); } else N.ally.cd = 0.15;
     }
     if (N.ally.t <= 0) { N.ally = null; $('nally').innerHTML = ''; }
   }
@@ -1569,8 +1686,12 @@ function endNight(won) {
 }
 function nextMorning() {
   G.day++; G.time = CFG.dayStart; G.hp = Math.min(CFG.hpMax, G.hp + 1); G.phase = 'home';
+  if (G.spouse) G.love = Math.min(100, G.love + 8);
+  const born = maybeBirth();
   save(); render();
   toast(`第 ${G.day} 天，${AGE_NAME[ageOf(G.day)]}。` + (ageOf(G.day) !== ageOf(G.day - 1) ? '你长大了一些。' : ''));
+  if (born) sheet({ title: '孩子出生了！', body: `<p>${born.name}出生了，品级<b>${born.grade}</b>（爹娘红线：${threadName(G.love)}）。</p><p class="note">真游戏里，这个孩子是一个新玩家投胎来的。品级主要是面子，强弱最多差三成。</p>`, buttons: [['好', null, 'main']] });
+  else if (ageOf(G.day) === 'adult' && !G.spouse && !G.offered) { G.offered = true; save(); offerMatch(); }
 }
 
 // ================= 死后 =================
@@ -1699,6 +1820,8 @@ function karmaRows() {
     ['门被砸破', `${G.broken} 次`, -G.broken * 4],
     ['赚的钱', `${G.earned} 文`, Math.floor(G.earned / 20)],
     ['交情', `合计 ${fr}`, Math.floor(fr / 10)],
+    ['养育', `${G.kids.length} 个孩子或徒弟`, Math.min(40, G.kids.length * 10)],
+    ['红线', G.spouse ? threadName(G.love) : '没有', G.spouse ? { 相识: 0, 知己: 5, 倾心: 15, 挚爱: 25 }[threadName(G.love)] : 0],
   ];
   const A = G.afterlife;
   if (A && A.kind === 'guard') rows.push(['当护家神', A.won ? '守住了' : '没守住', A.won ? 20 : 5]);
@@ -1718,6 +1841,8 @@ function goReborn() {
   const rows = karmaRows(), total = rows.reduce((a, r) => a + r[2], 0);
   const tier = total < 30 ? 0 : total < 70 ? 1 : 2;
   const fams = [newFamily(tier), newFamily(tier), newFamily(Math.max(0, tier - 1))];
+  const heir = G.kids[0];
+  if (heir) fams[0] = ownFamily(heir);
   G.reborn = { rows, total, tier, fams };
   G.phase = 'reborn';
   save(); render();
@@ -1729,12 +1854,12 @@ function renderReborn() {
     ${[70, 120, 180, 240, 290].map((x) => `<line x1="${x}" y1="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 - 12}" x2="${x}" y2="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 + 4}" stroke="#B49AB8" stroke-width="2"/>`).join('')}
     <text x="180" y="40" text-anchor="middle" font-size="18" fill="#E3B341" font-family="var(--font-display)">奈何桥</text>
     <g class="float">${ghostSvg(ME, 'calm', 'elder', 180, 112, 0.18)}</g></svg>`;
-  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">投胎到${f.name}<small>爹娘红线：${f.thread} · ${DOORS[f.door].name} · ${f.money} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
+  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? '院子、机关、宝物都还在；祠堂里挂着你的画像 · ' : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · ${f.money} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
   const loot = G.afterlife && G.afterlife.won && G.afterlife.loot;
   const keep = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt);
   $('panel').innerHTML = `<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>
     <table class="kt"><tbody>${R.rows.map(([a, b, c]) => `<tr><td>${a}</td><td>${b}</td><td>${c > 0 ? '+' : ''}${c}</td></tr>`).join('')}<tr class="total"><td>合计</td><td></td><td>${R.total}</td></tr></tbody></table>
-    <p class="note">按因果分，系统给你三户人家挑。${loot ? `前世抢来的${loot.n}和 30 文会跟着你。` : ''}${keep.length ? `${keep.map((n) => n.who).join('、')}和你交情深，下一世还记得你（交情留一半）。` : ''}</p>
+    <p class="note">${G.kids.length ? '' : '你没有留下孩子或徒弟，这一世的院子会荒掉。'}按因果分，系统给你三户人家挑。${loot ? `前世抢来的${loot.n}和 30 文会跟着你。` : ''}${keep.length ? `${keep.map((n) => n.who).join('、')}和你交情深，下一世还记得你（交情留一半）。` : ''}</p>
     <div class="fams">${R.fams.map(famCard).join('')}</div>`;
   $('panel').querySelectorAll('[data-fam]').forEach((b) => { b.onclick = () => reborn(R.fams[+b.dataset.fam]); });
 }
@@ -1744,6 +1869,7 @@ function reborn(f) {
   for (const n of NEIGHBORS) fam.friends[n.id] = prev.friends[n.id] >= CFG.helpAt ? Math.floor(prev.friends[n.id] / 2) : ri([0, 15]);
   const A = prev.afterlife;
   if (A && A.won && A.loot) { fam.treasures.push(A.loot); fam.money += 30; }
+  if (!fam.own) fam.ancestors = Array.from({ length: 2 }, (_, i) => ({ name: surnameOf(fam.name) + ['老太公', '太奶奶'][i], look: randomLook(), note: '祖上' }));
   G = freshLife(fam, prev);
   G.history.push({ life: prev.lifeNo, fam: prev.fam, days: prev.day, held: prev.held, karma: prev.reborn.total });
   save(); render();
@@ -1775,8 +1901,8 @@ function openMenu() {
 function intro() {
   sheet({
     title: '一日一夜（样机）',
-    body: `<p>白天<b>出门找东西</b>，走得越远东西越好，但<b>天黑前一定要回家</b>。</p><p>夜里鬼来<b>砸门</b>。门破了，钱和宝物真的会被抢走。</p><p>一辈子 ${CFG.lifeDays} 天。老死以后，可以当<b>护家神</b>守自己家，或者当<b>厉鬼</b>去砸别人家的门，然后投胎。</p>
-      <p class="note">一句话：砸你家门的鬼，是别人家的祖宗。样机里，别的玩家都用电脑代替。</p>`,
+    body: `<p>白天<b>出门找东西</b>，走得越远东西越好，但<b>天黑前一定要回家</b>。</p><p>夜里鬼来<b>砸门</b>。门破了，钱和宝物真的会被抢走。</p><p>真游戏里一个现实日就是一天一夜：白天的时辰花完就天黑，什么时候玩你自己定。样机里一辈子 ${CFG.lifeDays} 天，长大以后可以结缘生孩子，也可以收徒弟。老死以后，可以当<b>护家神</b>守自己家，或者当<b>厉鬼</b>去砸别人家的门，然后投胎。</p>
+      <p class="note">一句话：砸你家门的鬼，是别人家的祖宗（大部分是电脑鬼，偶尔是死去的真人玩家）。样机里，别的玩家都用电脑代替。</p>`,
     buttons: [['开始', null, 'main'], ['先换成我捏的人', openMenu]],
   });
 }
