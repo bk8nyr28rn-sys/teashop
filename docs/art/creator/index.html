@@ -55,6 +55,7 @@ header.top p { margin: 0; color: var(--muted); font-size: 13px; }
   .prefs .rowbar { flex-wrap: nowrap; flex: none; }
   .chip { min-height: 32px; padding: 0 10px; }
   .act { min-height: 36px; }
+  body.drawing .stage { position: static; }
 }
 .rowbar .lab { font-size: 12px; color: var(--muted); margin-right: 2px; }
 .chip { min-height: 34px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 13px; }
@@ -90,6 +91,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); min-height: 30px
 .code { display: grid; gap: 8px; }
 .code textarea { width: 100%; min-height: 68px; box-sizing: border-box; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); padding: 8px 10px; font: 12px/1.4 ui-monospace, Menlo, monospace; resize: vertical; }
 .note { font-size: 12px; color: var(--muted); }
+.drawbox { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .drawbox { grid-template-columns: minmax(0, 340px) minmax(0, 1fr); align-items: start; } }
+.pad { width: 100%; max-width: 340px; aspect-ratio: 1; border-radius: 14px; border: 2px dashed var(--line); background: var(--stage); touch-action: none; cursor: crosshair; display: block; }
+.drawtools { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .toast { min-height: 18px; font-size: 12.5px; color: var(--accent); }
 .count { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -142,6 +147,7 @@ const PRESETS = {
   cloth: ['#3E6E8E', '#C8402E', '#7FA36B', '#E3A33B', '#E9ECF2', '#2A2D36', '#9B5DA8', '#D97A8E', '#5A3A2E', '#7FC4C9'],
   eye: ['#2B2233', '#5A3A2E', '#3E6E8E', '#7FA36B', '#B8402F', '#9B5DA8', '#C9A066'],
   accent: ['#E3A33B', '#E9ECF2', '#C8402E', '#7FA36B', '#2A2D36', '#9B5DA8', '#C9D2E2'],
+  brush: ['#2B2233', '#FFFFFF', '#C8402E', '#E3A33B', '#7FA36B', '#3E6E8E', '#9B5DA8', '#FF8FA3', '#7FC8FF', '#F6D2BA'],
 };
 
 // ---------------- 部件和参数 ----------------
@@ -157,7 +163,7 @@ const OPT = {
   streak: [['none', '无'], ['left', '左边挑染'], ['right', '右边挑染'], ['tips', '发梢挑染']],
   top: [['jin', '劲装'], ['changshan', '长衫'], ['duangua', '短褂'], ['daopao', '广袖袍'], ['vest', '背心短打'], ['ru', '上襦'], ['armor', '轻甲'], ['yuanling', '圆领袍']],
   sleeve: [['narrow', '窄袖'], ['wide', '广袖']],
-  pattern: [['none', '无'], ['cloud', '云纹'], ['check', '格纹'], ['floral', '碎花'], ['dots', '圆点']],
+  pattern: [['none', '无'], ['cloud', '云纹'], ['check', '格纹'], ['floral', '碎花'], ['dots', '圆点'], ['custom', '手绘花纹']],
   bottom: [['pants', '长裤'], ['wrap', '绑腿裤'], ['skirt', '长裙'], ['pleat', '马面裙']],
   shoes: [['cloth', '布鞋'], ['boots', '靴子'], ['straw', '草鞋']],
   cape: [['none', '无'], ['short', '短披风'], ['long', '长披风']],
@@ -178,6 +184,7 @@ const DEFAULT = {
   bottom: 'pants', bottomColor: '#2E3446', shoes: 'boots', shoeColor: '#3A2C26', cape: 'none', capeColor: '#C8402E',
   head: 'band', headColor: '#C8402E', ear: 'none', earColor: '#E3A33B', neck: 'none', neckColor: '#7FA36B',
   weapon: 'sword', weaponPos: 'back', weaponColor: '#C9D2E2',
+  brushColor: '#2B2233', brushSize: 0.05, tileSize: 0.5,
 };
 
 const INSPIRE = [
@@ -219,23 +226,42 @@ const EXPRESSIONS = [
   ['gloomy', '郁闷', { eye: 'half', mouth: 'frown', brow: 'knit', fx: ['gloom'] }],
 ];
 let myExpr = { eye: 'arc', mouth: 'tongue', brow: 'up', fx: ['blush'] };
-function exprOf(id) { if (id === 'mine') return myExpr; const e = EXPRESSIONS.find((x) => x[0] === id); return e ? e[2] : EXPRESSIONS[0][2]; }
+function exprOf(id) {
+  if (id === 'mine') return myExpr;
+  if (/^h[1-4]$/.test(id)) return { eye: 'open', mouth: 'base', brow: 'normal', fx: [], hand: id };
+  const e = EXPRESSIONS.find((x) => x[0] === id); return e ? e[2] : EXPRESSIONS[0][2];
+}
+// 笔画转成 SVG
+function strokesSvg(list) {
+  return (list || []).map((st) => {
+    const pts = st.p || [];
+    if (!pts.length) return '';
+    const d = pts.length === 1 ? `M${pts[0][0]} ${pts[0][1]} l0.0001 0` : 'M' + pts.map((q) => `${q[0]} ${q[1]}`).join(' L');
+    return `<path d="${d}" stroke="${st.c}" stroke-width="${st.w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }).join('');
+}
 
-let S = loadState() || { ...DEFAULT };
+let S = loadState() || { ...DEFAULT, draw: emptyDraw() };
 const view = { expr: 'calm', age: 'adult', bg: 'day', tab: 'body', picker: null };
 
+// 手绘：每层是一串笔画 { c 颜色, w 粗细, p 点 [[x, y], ...] }。脸上的层以头的中心为原点、以头的半高为 1；花纹和图案以 0–1 的方块为准
+const DRAW_LAYERS = [['face', '脸上（一直显示）'], ['h1', '手绘表情 1'], ['h2', '手绘表情 2'], ['h3', '手绘表情 3'], ['h4', '手绘表情 4'], ['cloth', '衣服花纹'], ['emblem', '胸前图案']];
+function emptyDraw() { return { face: [], h1: [], h2: [], h3: [], h4: [], cloth: [], emblem: [], hide: { h1: true, h2: true, h3: true, h4: true } }; }
+function normDraw(d) { const e = emptyDraw(); if (!d || typeof d !== 'object') return e; for (const [k] of DRAW_LAYERS) e[k] = Array.isArray(d[k]) ? d[k] : []; e.hide = { ...e.hide, ...(d.hide || {}) }; return e; }
 function loadState() {
-  try { const raw = localStorage.getItem('wulin-creator'); if (raw) return { ...DEFAULT, ...JSON.parse(raw) }; } catch (e) {}
+  try { const raw = localStorage.getItem('wulin-creator'); if (raw) { const o = JSON.parse(raw); return { ...DEFAULT, ...o, draw: normDraw(o.draw) }; } } catch (e) {}
   return null;
 }
 function saveState() { try { localStorage.setItem('wulin-creator', JSON.stringify(S)); } catch (e) {} }
 
 // ---------------- 画人（画板 240 × 400，脚底 y = 392） ----------------
+function headGeom(s) { const h = 372 / (3 + s.heads); return { cx: 120, hcy: 20 + h / 2, ry: h / 2 }; }
 const INK = '#2B2233';
 const lerp = (a, b, t) => a + (b - a) * t;
 
-function drawPerson(s0, expr, age) {
+function drawPerson(s0, expr, age, opt = {}) {
   const s = { ...s0 };
+  const D = s.draw || emptyDraw();
   if (age === 'elder') { s.hairColor = '#E6E4DE'; s.streak = 'none'; }
   const browColor = age === 'elder' ? '#D8D4CC' : s.browFollow ? s.hairColor : s.browColor;
   const cx = 120;
@@ -312,7 +338,10 @@ function drawPerson(s0, expr, age) {
   body.push(`<rect x="${cx - 9}" y="${hcy + ry * 0.7}" width="18" height="${shoulderY - hcy - ry * 0.7 + 6}" fill="${s.skin}"/>`);
   body.push(`<path d="${torsoPath}" fill="${s.topColor}"/>`);
   // 花纹（剪在衣身里）
-  if (s.pattern !== 'none') body.push(`<clipPath id="tc"><path d="${torsoPath}"/></clipPath><g clip-path="url(#tc)" opacity="0.55">${pattern(s.pattern, s.patternColor, cx - hw - 30, shoulderY - 10, (hw + 30) * 2, topBottom - shoulderY + 20)}</g>`);
+  if (s.pattern === 'custom') {
+    const T = 16 + 48 * s.tileSize;
+    body.push(`<pattern id="cp" patternUnits="userSpaceOnUse" x="${cx - T / 2}" y="${shoulderY}" width="${T}" height="${T}"><g transform="scale(${T})">${strokesSvg(D.cloth)}</g></pattern><clipPath id="tc2"><path d="${torsoPath}"/></clipPath><rect clip-path="url(#tc2)" x="${cx - hw - 40}" y="${shoulderY - 10}" width="${(hw + 40) * 2}" height="${topBottom - shoulderY + 20}" fill="url(#cp)"/>`);
+  } else if (s.pattern !== 'none') body.push(`<clipPath id="tc"><path d="${torsoPath}"/></clipPath><g clip-path="url(#tc)" opacity="0.55">${pattern(s.pattern, s.patternColor, cx - hw - 30, shoulderY - 10, (hw + 30) * 2, topBottom - shoulderY + 20)}</g>`);
   // 领口
   if (s.top === 'yuanling') body.push(`<path d="M${cx - 16} ${shoulderY + 2} Q${cx} ${shoulderY + 18} ${cx + 16} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
   else if (s.top === 'duangua') body.push(`<path d="M${cx} ${shoulderY + 4} V${topBottom}" stroke="${s.trimColor}" stroke-width="3"/>${[0.35, 0.55, 0.75].map((t) => `<rect x="${cx - 7}" y="${lerp(shoulderY, topBottom, t)}" width="14" height="4" rx="2" fill="${s.trimColor}"/>`).join('')}`);
@@ -325,6 +354,8 @@ function drawPerson(s0, expr, age) {
   }
   // 腰带
   if (s.top !== 'duangua' && s.top !== 'vest') body.push(`<rect x="${cx - hw - (longRobe ? 4 : 2)}" y="${waistY - 5}" width="${(hw + (longRobe ? 4 : 2)) * 2}" height="10" rx="4" fill="${s.beltColor}"/>`);
+  // 胸前图案（手绘）
+  if (D.emblem.length && opt.skip !== 'emblem') { const E = sw * 0.95; body.push(`<g transform="translate(${cx - E / 2} ${lerp(shoulderY, waistY, 0.22)}) scale(${E})">${strokesSvg(D.emblem)}</g>`); }
   // 颈饰
   if (s.neck === 'scarf') body.push(`<path d="M${cx - 18} ${shoulderY} Q${cx} ${shoulderY + 14} ${cx + 18} ${shoulderY} L${cx + 16} ${shoulderY + 12} Q${cx} ${shoulderY + 22} ${cx - 16} ${shoulderY + 12} Z" fill="${s.neckColor}"/><path d="M${cx + 8} ${shoulderY + 14} q6 22 -2 40 l10 -2 q6 -20 2 -38 Z" fill="${s.neckColor}"/>`);
   if (s.neck === 'pendant') body.push(`<path d="M${cx - 12} ${shoulderY} Q${cx} ${shoulderY + 30} ${cx + 12} ${shoulderY}" stroke="#2A2A33" stroke-width="1.5" fill="none"/><circle cx="${cx}" cy="${shoulderY + 24}" r="7" fill="${s.neckColor}"/><circle cx="${cx}" cy="${shoulderY + 24}" r="2.5" fill="${s.topColor}"/>`);
@@ -380,6 +411,7 @@ function drawPerson(s0, expr, age) {
   if (eyeState === 'arc') eyeStyle = 'smile';
   if (eyeState === 'star') eyeStyle = 'sparkle';
   const fx = new Set(X.fx || []);
+  const hideFace = X.hand && D.hide[X.hand] && (D[X.hand].length > 0 || opt.forceHide);
   const es = (0.72 + 0.6 * s.eyeSize) * (ry / 52) * eyeScale;
   const egap = rx * (0.28 + 0.2 * s.eyeGap);
   const ey = hcy + ry * (0.06 + 0.24 * (s.eyeY - 0.5));
@@ -393,7 +425,7 @@ function drawPerson(s0, expr, age) {
   if (s.mark === 'freckles') for (const [dx, dy] of [[-1.3, 1.3], [-0.9, 1.6], [-0.5, 1.4], [0.5, 1.4], [0.9, 1.6], [1.3, 1.3]]) headParts.push(`<circle cx="${cx + dx * egap * 0.9}" cy="${ey + dy * 10 * es + 6}" r="1.4" fill="${mc}" opacity="0.8"/>`);
   if (s.mark === 'paint') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 2)} ${ey + 14 * es} l${sd * 14} -4 M${cx + sd * (egap + 2)} ${ey + 20 * es} l${sd * 14} -4" stroke="${mc}" stroke-width="3" stroke-linecap="round"/>`);
   // 眼睛
-  for (const sd of [-1, 1]) headParts.push(`<g transform="translate(${cx + sd * egap} ${ey}) scale(${sd * es} ${es})">${eyeWithState(eyeState, eyeStyle, s.eyeColor, s.skin)}</g>`);
+  if (!hideFace) for (const sd of [-1, 1]) headParts.push(`<g transform="translate(${cx + sd * egap} ${ey}) scale(${sd * es} ${es})">${eyeWithState(eyeState, eyeStyle, s.eyeColor, s.skin)}</g>`);
   if (age === 'elder') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 12 * es)} ${ey - 2} l${sd * 6} -3 M${cx + sd * (egap + 12 * es)} ${ey + 3} l${sd * 6} 2" stroke="#C9A58F" stroke-width="1.2"/>`);
   // 表情特效
   if (fx.has('blush')) for (const sd of [-1, 1]) headParts.push(`<ellipse cx="${cx + sd * (egap + 2)}" cy="${ey + 16 * es + 4}" rx="${12 * es + 2}" ry="${6 * es + 1}" fill="#FF6B81" opacity="0.55"/><path d="M${cx + sd * (egap - 4)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 2)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 8)} ${ey + 14 * es + 4} l${sd * 3} 5" stroke="#E2475F" stroke-width="1.6" opacity="0.7"/>`);
@@ -404,7 +436,7 @@ function drawPerson(s0, expr, age) {
   const browsSvg = [-1, 1].map((sd) => `<g transform="translate(${cx + sd * egap} ${ey - 15 * es - 4 - browLift}) scale(${sd} 1) rotate(${-tilt * 18})">${brow(s.brows, browColor, bth, es)}</g>`).join('');
   // 嘴
   const my = hcy + ry * (0.5 + 0.2 * (s.mouthY - 0.5));
-  headParts.push(`<g transform="translate(${cx} ${my}) scale(${ry / 52})">${mouth(mouthStyle)}</g>`);
+  if (!hideFace) headParts.push(`<g transform="translate(${cx} ${my}) scale(${ry / 52})">${mouth(mouthStyle)}</g>`);
   // 胡子
   const bc = age === 'elder' ? '#E6E4DE' : hc;
   if (s.beard === 'mustache') headParts.push(`<path d="M${cx} ${my - 6} q-8 -4 -16 2 q8 0 16 -1 q8 1 16 1 q-8 -6 -16 -2 Z" fill="${bc}"/>`);
@@ -412,7 +444,10 @@ function drawPerson(s0, expr, age) {
   if (s.beard === 'full') headParts.push(`<path d="M${cx - rx * 0.92} ${hcy + ry * 0.1} Q${cx - rx * 0.8} ${hcy + ry * 1.05} ${cx} ${hcy + ry * 1.12} Q${cx + rx * 0.8} ${hcy + ry * 1.05} ${cx + rx * 0.92} ${hcy + ry * 0.1} Q${cx + rx * 0.6} ${hcy + ry * 0.75} ${cx} ${my + 4} Q${cx - rx * 0.6} ${hcy + ry * 0.75} ${cx - rx * 0.92} ${hcy + ry * 0.1} Z" fill="${bc}"/>`);
   // 前发
   headParts.push(frontHair(s.hairFront, cx, hcy, rx, ry, hc));
-  headParts.push(browsSvg);
+  if (!hideFace) headParts.push(browsSvg);
+  // 手绘：脸上一直显示的层 + 当前手绘表情的层，画在头发上面，画什么就是什么
+  const handLayers = ['face', X.hand].filter((k) => k && k !== opt.skip);
+  for (const k of handLayers) headParts.push(`<g transform="translate(${cx} ${hcy}) scale(${ry})">${strokesSvg(D[k])}</g>`);
   if (s.streak === 'left' || s.streak === 'right') {
     const sd = s.streak === 'left' ? -1 : 1;
     headParts.push(`<path d="M${cx + sd * rx * 0.25} ${hcy - ry * 1.02} Q${cx + sd * rx * 0.75} ${hcy - ry * 0.7} ${cx + sd * rx * 0.62} ${hcy - ry * 0.22} L${cx + sd * rx * 0.46} ${hcy - ry * 0.3} Q${cx + sd * rx * 0.5} ${hcy - ry * 0.75} ${cx + sd * rx * 0.1} ${hcy - ry * 1.0} Z" fill="${s.streakColor}"/>`);
@@ -632,6 +667,7 @@ const TABS = [
     { t: 'color', k: 'weaponColor', n: '兵刃颜色', p: 'accent', when: (s) => ['sword', 'saber'].includes(s.weapon) },
   ]],
   ['expr', '表情', []],
+  ['draw', '手绘', []],
   ['share', '灵感', []],
 ];
 
@@ -663,8 +699,11 @@ function fmtPct(v, min = 0, max = 1) { return Math.round(((v - min) / (max - min
 function renderPane() {
   const pane = $('pane');
   const tab = TABS.find((t) => t[0] === view.tab);
+  // 手绘时，手机上的预览台不再固定在顶部，免得盖住画板（画板里本来就有头像）
+  document.body.classList.toggle('drawing', view.tab === 'draw');
   if (view.tab === 'share') { pane.innerHTML = sharePane(); bindShare(); return; }
   if (view.tab === 'expr') { pane.innerHTML = exprPane(); bindExpr(); return; }
+  if (view.tab === 'draw') { pane.innerHTML = drawPane(); bindDraw(); return; }
   const items = tab[2].filter((c) => !c.when || c.when(S));
   pane.innerHTML = `<div class="grid2">${items.map(ctrlHtml).join('')}</div>`;
   for (const c of items) bindCtrl(c);
@@ -712,10 +751,114 @@ function bindExpr() {
 function showMine() {
   view.expr = 'mine';
   try { localStorage.setItem('wulin-myexpr', JSON.stringify(myExpr)); } catch (e) {}
-  chipRow('expr', [...EXPRESSIONS.map(([id, n]) => [id, n]), ['mine', '我的表情']], 'expr');
+  refreshExprChips();
   renderView(); renderPane();
 }
+function refreshExprChips() {
+  const hand = ['h1', 'h2', 'h3', 'h4'].filter((k) => S.draw[k].length).map((k) => [k, '手绘表情 ' + k[1]]);
+  if (/^h[1-4]$/.test(view.expr) && !S.draw[view.expr].length) view.expr = 'calm';
+  chipRow('expr', [...EXPRESSIONS.map(([id, n]) => [id, n]), ['mine', '我的表情'], ...hand], 'expr');
+}
 try { const m = localStorage.getItem('wulin-myexpr'); if (m) myExpr = { ...myExpr, ...JSON.parse(m) }; } catch (e) {}
+
+// ---------------- 手绘 ----------------
+const drawUI = { layer: 'face', erase: false, history: [] };
+function drawPane() {
+  const L = drawUI.layer;
+  const isFace = L === 'face' || /^h[1-4]$/.test(L);
+  const brushCtrl = ctrlHtml({ t: 'color', k: 'brushColor', n: '画笔颜色', p: 'brush' });
+  return `<p class="note">在画板上用手指或鼠标直接画。画的笔画是矢量的，跟着人物一起缩放，也会跟着捏人码一起分享。“恢复默认”和“随机”不会清掉你画的东西。</p>
+    <div class="ctrl"><div class="name">画在哪</div><div class="opts">${DRAW_LAYERS.map(([k, n]) => `<button type="button" class="opt" id="dl-${k}" aria-pressed="${L === k}">${n}${S.draw[k].length ? ' ·' + S.draw[k].length : ''}</button>`).join('')}</div></div>
+    <div class="drawbox">
+      <svg id="pad" class="pad" role="img" aria-label="画板"></svg>
+      <div class="drawtools">
+        ${/^h[1-4]$/.test(L) ? `<div class="ctrl"><div class="name">原来的眼睛、眉毛、嘴</div><div class="opts"><button type="button" class="opt" id="d-hide" aria-pressed="${S.draw.hide[L]}">${S.draw.hide[L] ? '盖掉，整张脸自己画' : '保留，在上面加'}</button></div></div>` : ''}
+        ${L === 'cloth' ? `<div class="ctrl"><label class="name" for="r-tileSize">花纹大小<b id="v-tileSize">${fmtPct(S.tileSize)}</b></label><input type="range" id="r-tileSize" min="0" max="1" step="0.01" value="${S.tileSize}"></div>` : ''}
+        ${brushCtrl}
+        <div class="ctrl"><label class="name" for="r-brushSize">笔的粗细<b id="v-brushSize">${Math.round(S.brushSize * 100)}</b></label><input type="range" id="r-brushSize" min="0.01" max="0.18" step="0.005" value="${S.brushSize}"></div>
+        <div class="opts"><button type="button" class="opt" id="d-erase" aria-pressed="${drawUI.erase}">${drawUI.erase ? '橡皮（点笔画就擦掉）' : '画笔'}</button><button type="button" class="opt" id="d-undo">撤销</button><button type="button" class="opt" id="d-clear">清空这一层</button></div>
+        <p class="note">${isFace ? '画板上是你的头像：画在脸上、头发上都行。' : L === 'cloth' ? '画一小块，会自动平铺满整件上衣。画完记得在“服装”里把花纹选成“手绘花纹”（已自动帮你选上）。' : '画一个徽记，会贴在胸口。'}${/^h[1-4]$/.test(L) ? ' 画好后，上面表情那一排会多出这个手绘表情。' : ''}</p>
+      </div>
+    </div>`;
+}
+function padBox() {
+  const L = drawUI.layer;
+  if (L === 'cloth' || L === 'emblem') return { vb: '-0.05 -0.05 1.1 1.1', toLocal: (x, y) => [x, y] };
+  const g = headGeom(S);
+  return { vb: `${g.cx - g.ry * 1.45} ${g.hcy - g.ry * 1.5} ${g.ry * 2.9} ${g.ry * 2.9}`, toLocal: (x, y) => [(x - g.cx) / g.ry, (y - g.hcy) / g.ry], g };
+}
+function renderPad() {
+  const pad = $('pad');
+  if (!pad) return;
+  const L = drawUI.layer, box = padBox();
+  pad.setAttribute('viewBox', box.vb);
+  let base = '';
+  if (L === 'cloth') {
+    base = `<rect x="-0.05" y="-0.05" width="1.1" height="1.1" fill="${S.topColor}"/><rect x="0" y="0" width="1" height="1" fill="none" stroke="#000" stroke-opacity="0.25" stroke-width="0.006" stroke-dasharray="0.03 0.02"/>`;
+  } else if (L === 'emblem') {
+    base = `<rect x="-0.05" y="-0.05" width="1.1" height="1.1" rx="0.08" fill="${S.topColor}"/>`;
+  } else {
+    const expr = /^h[1-4]$/.test(L) ? L : 'calm';
+    base = `<rect x="-100" y="-100" width="500" height="600" style="fill:var(--stage)"/>${drawPerson(S, expr, 'adult', { skip: L, forceHide: true })}`;
+  }
+  const g = box.g;
+  const wrapOpen = g ? `<g transform="translate(${g.cx} ${g.hcy}) scale(${g.ry})">` : '<g>';
+  pad.innerHTML = `${base}${wrapOpen}<g id="pad-strokes">${strokesSvg(S.draw[L])}</g><path id="pad-live" fill="none" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+}
+function bindDraw() {
+  for (const [k] of DRAW_LAYERS) $(`dl-${k}`).addEventListener('click', () => { drawUI.layer = k; drawUI.history = []; renderPane(); });
+  bindCtrl({ t: 'color', k: 'brushColor', n: '画笔颜色', p: 'brush' });
+  $('r-brushSize').addEventListener('input', (e) => { S.brushSize = Number(e.target.value); $('v-brushSize').textContent = Math.round(S.brushSize * 100); saveState(); });
+  if ($('r-tileSize')) $('r-tileSize').addEventListener('input', (e) => { S.tileSize = Number(e.target.value); $('v-tileSize').textContent = fmtPct(S.tileSize); saveState(); renderView(); });
+  if ($('d-hide')) $('d-hide').addEventListener('click', () => { S.draw.hide[drawUI.layer] = !S.draw.hide[drawUI.layer]; saveState(); renderPane(); renderView(); });
+  $('d-erase').addEventListener('click', () => { drawUI.erase = !drawUI.erase; renderPane(); });
+  $('d-undo').addEventListener('click', () => { const prev = drawUI.history.pop(); if (prev) { S.draw[drawUI.layer] = prev; afterDraw(); } });
+  $('d-clear').addEventListener('click', () => { if (!S.draw[drawUI.layer].length) return; drawUI.history.push(S.draw[drawUI.layer]); S.draw[drawUI.layer] = []; afterDraw(); });
+  renderPad();
+  const pad = $('pad');
+  let cur = null;
+  const local = (ev) => {
+    const pt = pad.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    const q = pt.matrixTransform(pad.getScreenCTM().inverse());
+    const [u, v] = padBox().toLocal(q.x, q.y);
+    return [Math.round(u * 1000) / 1000, Math.round(v * 1000) / 1000];
+  };
+  const eraseAt = (p) => {
+    const list = S.draw[drawUI.layer];
+    const keep = list.filter((st) => !st.p.some((q) => Math.hypot(q[0] - p[0], q[1] - p[1]) < st.w / 2 + 0.04));
+    if (keep.length !== list.length) { drawUI.history.push(list); S.draw[drawUI.layer] = keep; $('pad-strokes').innerHTML = strokesSvg(keep); }
+  };
+  pad.addEventListener('pointerdown', (ev) => {
+    ev.preventDefault();
+    pad.setPointerCapture(ev.pointerId);
+    const p = local(ev);
+    if (drawUI.erase) { cur = { erase: true }; eraseAt(p); return; }
+    cur = { c: S.brushColor, w: S.brushSize, p: [p] };
+    const live = $('pad-live'); live.setAttribute('stroke', cur.c); live.setAttribute('stroke-width', cur.w); live.setAttribute('d', `M${p[0]} ${p[1]} l0.0001 0`);
+  });
+  pad.addEventListener('pointermove', (ev) => {
+    if (!cur) return;
+    const p = local(ev);
+    if (cur.erase) { eraseAt(p); return; }
+    const last = cur.p[cur.p.length - 1];
+    if (Math.hypot(p[0] - last[0], p[1] - last[1]) < 0.008) return;
+    cur.p.push(p);
+    $('pad-live').setAttribute('d', 'M' + cur.p.map((q) => `${q[0]} ${q[1]}`).join(' L'));
+  });
+  const end = () => {
+    if (!cur) return;
+    if (!cur.erase) { drawUI.history.push(S.draw[drawUI.layer]); S.draw[drawUI.layer] = [...S.draw[drawUI.layer], cur]; }
+    cur = null;
+    afterDraw();
+  };
+  pad.addEventListener('pointerup', end);
+  pad.addEventListener('pointercancel', end);
+}
+function afterDraw() {
+  if (drawUI.layer === 'cloth' && S.draw.cloth.length && S.pattern !== 'custom') S.pattern = 'custom';
+  if (/^h[1-4]$/.test(drawUI.layer) && S.draw[drawUI.layer].length) view.expr = drawUI.layer;
+  saveState(); refreshExprChips(); renderView(); renderPane();
+}
 
 // ---------------- 灵感和捏人码 ----------------
 function encode(s) { return 'WULIN1:' + btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
@@ -729,13 +872,13 @@ function sharePane() {
     <div class="opts"><button type="button" class="act" id="load">载入</button></div><div class="toast" id="msg" role="status"></div></div>`;
 }
 function bindShare() {
-  INSPIRE.forEach(([, o], i) => $(`ins-${i}`).addEventListener('click', () => { S = { ...DEFAULT, ...o }; saveState(); renderView(); renderPane(); }));
+  INSPIRE.forEach(([, o], i) => $(`ins-${i}`).addEventListener('click', () => { S = { ...DEFAULT, ...o, draw: S.draw }; saveState(); renderView(); renderPane(); }));
   $('copy').addEventListener('click', () => {
     const t = $('code-out');
     navigator.clipboard?.writeText(t.value).then(() => { $('msg').textContent = '已复制'; }, () => { t.select(); $('msg').textContent = '已选中，长按或 Ctrl+C 复制'; });
   });
   $('load').addEventListener('click', () => {
-    try { S = { ...DEFAULT, ...decode($('code-in').value) }; saveState(); renderView(); $('msg').textContent = '已载入'; $('code-out').value = encode(S); }
+    try { const o = decode($('code-in').value); S = { ...DEFAULT, ...o, draw: normDraw(o.draw) }; saveState(); refreshExprChips(); renderView(); $('msg').textContent = '已载入'; $('code-out').value = encode(S); }
     catch (e) { $('msg').textContent = '这串码读不出来：请确认整串都复制了，开头是 WULIN1:'; }
   });
 }
@@ -760,6 +903,8 @@ function randomize() {
   if (Math.random() < 0.6) n.streak = 'none';
   if (Math.random() < 0.6) n.cape = 'none';
   n.browFollow = true;
+  n.draw = S.draw; n.brushColor = S.brushColor; n.brushSize = S.brushSize; n.tileSize = S.tileSize;
+  if (n.pattern === 'custom' && !S.draw.cloth.length) n.pattern = 'cloud';
   S = n; saveState(); renderView(); renderPane();
 }
 
@@ -773,10 +918,10 @@ function countParts() {
 
 // ---------------- 启动 ----------------
 try { const t = localStorage.getItem('wulin-tab'); if (t && TABS.some((x) => x[0] === t)) view.tab = t; } catch (e) {}
-chipRow('expr', [...EXPRESSIONS.map(([id, n]) => [id, n]), ['mine', '我的表情']], 'expr');
+refreshExprChips();
 chipRow('age', [['child', '童年'], ['adult', '成年'], ['elder', '老年']], 'age');
 chipRow('bg', [['day', '院子白天'], ['night', '守夜'], ['plain', '纯色']], 'bg');
 $('random').addEventListener('click', randomize);
-$('reset').addEventListener('click', () => { S = { ...DEFAULT }; saveState(); renderView(); renderPane(); });
+$('reset').addEventListener('click', () => { S = { ...DEFAULT, draw: S.draw }; saveState(); renderView(); renderPane(); });
 renderTabs(); renderPane(); renderView(); countParts();
 </script>
