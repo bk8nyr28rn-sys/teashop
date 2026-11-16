@@ -140,10 +140,15 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; border-radius:
 @keyframes fadeout { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 @keyframes blink { 50% { opacity: 0.5; } }
 .token { transition: transform 0.55s ease-in-out; }
+#nsvg { background: #03050B; }
+.rain1 { animation: rain1 0.38s linear infinite; }
+.rain2 { animation: rain2 0.62s linear infinite; }
+@keyframes rain1 { to { transform: translate(-16px, 90px); } }
+@keyframes rain2 { to { transform: translate(-23px, 140px); } }
 .ghost .gb { transition: opacity 0.25s; }
 .spot { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
-  .shake, .hurt, .glow, .float, .bar.low i { animation: none !important; }
+  .shake, .hurt, .glow, .float, .bar.low i, .rain1, .rain2 { animation: none !important; }
   .token, .ghost .gb { transition: none !important; }
 }
 </style>
@@ -1181,6 +1186,7 @@ function startNight(guardian) {
     over: false, wave: -1, lastHit: '', hintT: 0, bows: [[40, 410], [320, 410], [92, 410], [268, 410]].slice(0, G.traps.crossbow).map(([x, y], i) => ({ x, y, cd: 1 + i * 0.35 })),
     kid: guardian ? randomLook() : null,
   };
+  N.lights = nightLights();
   document.body.dataset.phase = G.phase;
   renderHud();
   $('scene').innerHTML = `<div class="doorbar"><span>门 · ${DOORS[G.door].name}</span><div class="bar" id="nd-bar"><i></i></div><b id="nd-num"></b></div>
@@ -1194,31 +1200,81 @@ function startNight(guardian) {
   N.last = performance.now();
   raf = requestAnimationFrame(nightLoop);
 }
+// 雨夜小巷：越远越暗，只有灯照到的地方看得清。鬼自己发一点冷光；鬼头上的图标和血条永远最亮
+const LAMP = { x: 122, y: 466, r: 330 };
+function nightLights() {
+  const L = [{ x: 180, y: 368, r: 140, g: 'tRed' }, { x: 180, y: 108, r: 44, g: 'tRed' }];
+  if (G.door >= 2) L.push({ x: 124, y: 420, r: 72, g: 'tRed' }, { x: 236, y: 420, r: 72, g: 'tRed' });
+  if (G.traps.lamp) for (const x of [30, 80, 280, 330]) L.push({ x, y: 426, r: 46, g: 'tWarm' });
+  if (N.guardian) L.push({ x: 300, y: 430, r: 150, g: 'tBlue' });
+  return L;
+}
+function bigLantern(x, y, r) {
+  return `<g transform="translate(${x} ${y})"><line y1="${-r * 1.9}" y2="${-r * 1.1}" stroke="#1E1416" stroke-width="2"/><rect x="${-r * 0.55}" y="${-r * 1.18}" width="${r * 1.1}" height="${r * 0.22}" fill="#2A1A14"/>
+    <ellipse rx="${r * 1.15}" ry="${r}" fill="#C8301F"/><ellipse rx="${r * 0.8}" ry="${r * 0.92}" fill="none" stroke="#7E1A10" stroke-width="1" opacity="0.6"/><ellipse rx="${r * 0.4}" ry="${r * 0.95}" fill="none" stroke="#7E1A10" stroke-width="1" opacity="0.6"/>
+    <ellipse rx="${r * 0.42}" ry="${r * 0.62}" fill="#FFB45E" opacity="0.75"/><rect x="${-r * 0.5}" y="${r * 0.92}" width="${r}" height="${r * 0.2}" fill="#2A1A14"/>
+    <path d="M${-r * 0.25} ${r * 1.1} V${r * 2.1} M0 ${r * 1.1} V${r * 2.3} M${r * 0.25} ${r * 1.1} V${r * 2.1}" stroke="#D9A441" stroke-width="1.5" opacity="0.85"/></g>`;
+}
 function nightSvg() {
-  let s = `<rect width="360" height="500" fill="url(#nsky)"/><circle cx="300" cy="52" r="20" fill="#F4F1E3"/><circle cx="291" cy="46" r="18" fill="#141C33" opacity="0.25"/>
-    <path d="M0 122 Q40 92 70 120 Q100 82 140 114 Q190 86 230 112 Q280 88 320 114 Q345 102 360 110 V170 H0 Z" fill="#121A30"/>
-    <path d="M150 150 H210 L300 420 H60 Z" fill="#2A3350" opacity="0.7"/>
-    <ellipse id="lampglow" cx="110" cy="470" rx="270" ry="340" fill="url(#lampg)" opacity="0"/>`;
-  if (N.guardian) s += `<ellipse cx="180" cy="400" rx="190" ry="120" fill="url(#auraG)"/>`;
-  s += `<g id="glayer"></g>`;
-  s += `<rect x="0" y="414" width="360" height="62" fill="#3A4652"/><rect x="0" y="408" width="360" height="8" fill="#252D3A"/><g id="ndoor">${doorSvg(G.door, 180, 476, 82, 82)}</g>`;
-  if (G.door >= 2) s += lanternSvg(124, 420, 8) + lanternSvg(236, 420, 8);
+  const L = N.lights;
+  // 透视：远处巷口 x 140–220、y 88–152；近处到院墙 y 414
+  const edge = (y, side) => { const t = (y - 152) / (414 - 152); return side < 0 ? 140 - 114 * t : 220 + 114 * t; };
+  let floor = '';
+  for (let i = 1; i < 10; i++) { const y = 152 + (414 - 152) * Math.pow(i / 9, 1.7); floor += `M${edge(y, -1).toFixed(1)} ${y.toFixed(1)} H${edge(y, 1).toFixed(1)} `; }
+  for (const fx of [156, 172, 188, 204]) floor += `M${fx} 152 L${(26 + ((fx - 140) / 80) * 308).toFixed(1)} 414 `;
+  let bricks = '';
+  for (let j = 1; j < 12; j++) { const y0 = j * 36; bricks += `M0 ${y0} L140 ${(88 + (y0 / 414) * 64).toFixed(1)} M360 ${y0} L220 ${(88 + (y0 / 414) * 64).toFixed(1)} `; }
+  let tiles = '';
+  for (let x = -9; x < 370; x += 18) tiles += `M${x} 24 a9 9 0 0 0 18 0 `;
+  let s = `<defs>
+      <radialGradient id="holeG"><stop offset="0" stop-color="#000"/><stop offset="0.25" stop-color="#111"/><stop offset="0.62" stop-color="#7A7A7A"/><stop offset="1" stop-color="#fff"/></radialGradient>
+      <radialGradient id="tRed"><stop offset="0" stop-color="#FF5A3C" stop-opacity="0.42"/><stop offset="1" stop-color="#FF5A3C" stop-opacity="0"/></radialGradient>
+      <radialGradient id="tWarm"><stop offset="0" stop-color="#FFB45E" stop-opacity="0.34"/><stop offset="1" stop-color="#FFB45E" stop-opacity="0"/></radialGradient>
+      <radialGradient id="tBlue"><stop offset="0" stop-color="#9BB0E8" stop-opacity="0.3"/><stop offset="1" stop-color="#9BB0E8" stop-opacity="0"/></radialGradient>
+      <radialGradient id="gglow"><stop offset="0" stop-color="#BFD3FF" stop-opacity="0.32"/><stop offset="1" stop-color="#BFD3FF" stop-opacity="0"/></radialGradient>
+      <linearGradient id="reflG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF5A3C" stop-opacity="0.5"/><stop offset="1" stop-color="#FF5A3C" stop-opacity="0"/></linearGradient>
+      <pattern id="rainA" patternUnits="userSpaceOnUse" width="60" height="90"><path d="M10 0 l-4 22 M40 30 l-4 22 M25 60 l-4 22 M54 74 l-3 15" stroke="#C9D6EA" stroke-width="1" stroke-opacity="0.32" stroke-linecap="round"/></pattern>
+      <pattern id="rainB" patternUnits="userSpaceOnUse" width="90" height="140"><path d="M20 0 l-5 30 M70 52 l-5 30 M44 100 l-4 26" stroke="#DCE6F5" stroke-width="1.4" stroke-opacity="0.22" stroke-linecap="round"/></pattern>
+      <mask id="darkmask" maskUnits="userSpaceOnUse" x="0" y="0" width="360" height="500"><rect width="360" height="500" fill="#fff"/>${L.map((l) => `<circle cx="${l.x}" cy="${l.y}" r="${l.r}" fill="url(#holeG)"/>`).join('')}<circle id="lampHole" cx="${LAMP.x}" cy="${LAMP.y}" r="0" fill="url(#holeG)"/></mask>
+    </defs>
+    <rect width="360" height="500" fill="#151A25"/>
+    <rect x="140" y="88" width="80" height="64" fill="#1C2333"/>
+    <path d="M140 152 H220 L334 414 H26 Z" fill="#262D3A"/><path d="${floor}" stroke="#323A4A" stroke-width="1.2" fill="none"/>
+    <path d="M150 220 L120 330 M210 220 L245 340 M178 170 L182 300" stroke="#5A6378" stroke-width="5" stroke-linecap="round" opacity="0.12"/>
+    <path d="M0 0 L140 88 V152 L26 414 H0 Z" fill="#1A1F2A"/><path d="M360 0 L220 88 V152 L334 414 H360 Z" fill="#1A1F2A"/>
+    <path d="${bricks}" stroke="#262C38" stroke-width="1.2" fill="none"/>
+    <path d="M0 0 H360 L220 88 H140 Z" fill="#0E121B"/><path d="${tiles}" fill="#0A0D14"/><rect width="360" height="24" fill="#0A0D14"/>
+    <rect x="0" y="414" width="360" height="62" fill="#3A4250"/><rect x="0" y="408" width="360" height="8" fill="#20262F"/>
+    <rect x="124" y="350" width="9" height="126" fill="#2A1A14"/><rect x="227" y="350" width="9" height="126" fill="#2A1A14"/><path d="M110 352 Q180 336 250 352 V360 H110 Z" fill="#1E1416"/>
+    <g id="ndoor">${doorSvg(G.door, 180, 476, 82, 82)}</g>`;
   if (G.door >= 3) s += lionSvg(110, 476) + lionSvg(250, 476, true);
   for (const b of N.bows) s += crossbowSvg(b.x, b.y, 1.2);
-  if (G.traps.lamp) { s += `<path d="M0 414 Q70 426 130 416 M230 416 Q290 426 360 414" stroke="#1E1416" fill="none"/>`; for (const x of [30, 80, 280, 330]) s += lanternSvg(x, 426, 6); }
+  if (G.traps.lamp) s += `<path d="M0 414 Q70 426 130 416 M230 416 Q290 426 360 414" stroke="#1E1416" fill="none"/>`;
   for (let i = 0; i < G.traps.talisman; i++) s += talismanSvg(164 + i * 32, 444);
-  s += `<rect x="0" y="476" width="360" height="24" fill="#20283A"/><g id="nplayer"></g><g id="nally"></g>`;
+  s += `<rect x="0" y="476" width="360" height="24" fill="#1A2030"/>
+    <rect width="360" height="500" fill="#03050B" opacity="0.84" mask="url(#darkmask)"/>
+    ${L.map((l) => `<circle cx="${l.x}" cy="${l.y}" r="${l.r}" fill="url(#${l.g})"/>`).join('')}<circle id="lampTint" cx="${LAMP.x}" cy="${LAMP.y}" r="0" fill="url(#tWarm)"/>
+    <ellipse cx="180" cy="396" rx="11" ry="20" fill="url(#reflG)"/><ellipse cx="180" cy="160" rx="4" ry="10" fill="url(#reflG)"/>
+    ${bigLantern(180, 108, 4)}${bigLantern(180, 382, 15)}`;
+  if (G.door >= 2) s += lanternSvg(124, 420, 8) + lanternSvg(236, 420, 8);
+  if (G.traps.lamp) for (const x of [30, 80, 280, 330]) s += lanternSvg(x, 426, 6);
+  s += `<g id="glayer"></g><g id="nplayer"></g><g id="nally"></g>`;
   if (N.guardian) s += `<g class="float">${ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22)}</g>`;
-  s += `<g id="fx"></g>`;
+  s += `<g pointer-events="none"><g class="rain1"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainA)"/></g><g class="rain2"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainB)"/></g></g><g id="fx"></g>`;
   return s;
 }
+// 远小近大：鬼从巷子深处走到院门口
+const depthK = (y) => 0.55 + 0.45 * clamp((y - 90) / (424 - 90), 0, 1);
+function ghostCenter(g) { return { x: g.x + g.ox, y: g.y - 44 * (g.k || 1) }; }
+function litAt(x, y) { return (G.item === 'lamp' && Math.hypot(x - LAMP.x, y - LAMP.y) < LAMP.r) || N.lights.some((l) => Math.hypot(x - l.x, y - l.y) < l.r * 0.8); }
 function drawPlayer() {
   const it = G.item;
   const base = N.guardian ? N.kid : ME;
   const look = { ...base, weapon: it === 'sword' ? 'sword' : it === 'bow' ? 'bow' : 'none', weaponPos: 'hand' };
   const age = N.guardian ? 'child' : ageOf(G.day);
   $('nplayer').innerHTML = person(look, G.hp <= 1 && !N.guardian ? 'sad' : 'angry', age, 108, 498, 0.2) + (it === 'lamp' ? lanternSvg(128, 470, 7) : '');
-  $('lampglow').setAttribute('opacity', it === 'lamp' ? '1' : '0');
+  $('lampHole').setAttribute('r', it === 'lamp' ? LAMP.r : 0);
+  $('lampTint').setAttribute('r', it === 'lamp' ? LAMP.r * 0.85 : 0);
 }
 function renderNightPanel() {
   const helper = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt).sort((a, b) => G.friends[b.id] - G.friends[a.id])[0];
@@ -1248,18 +1304,18 @@ function toSvg(svg, e) { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y
 function revealed(g) { return g.type !== 'shade' || (G.item === 'lamp' && g.y > 150) || (G.traps.lamp && g.y > 330) || g.flash > 0; }
 function spawnGhost(sp) {
   const T = GHOSTS[sp.type], hpMul = 1 + NIGHT.hpPerDay * (N.d - 1);
-  const g = { id: ++gidN, type: sp.type, hp: T.hp * hpMul, max: T.hp * hpMul, x: rnd(40, 320), y: rnd(80, 120), ox: 0, tx: 180 + rnd(-36, 36), ty: 424 + rnd(-6, 4), speed: T.speed * rnd(0.85, 1.15), state: 'walk', bashT: rnd(0.2, 0.8), name: ghostName(), ph: rnd(0, 6.28), hit: T.hit, flash: 0 };
+  const g = { id: ++gidN, type: sp.type, hp: T.hp * hpMul, max: T.hp * hpMul, lane: rnd(-0.85, 0.85), x: 180, y: rnd(96, 122), ox: 0, k: 0.55, tx: 180 + rnd(-48, 48), ty: 424 + rnd(-6, 4), speed: T.speed * rnd(0.85, 1.15), state: 'walk', bashT: rnd(0.2, 0.8), name: ghostName(), ph: rnd(0, 6.28), hit: T.hit, flash: 0, lit: null };
   if (sp.type === 'fly') g.ty -= 34;
   N.names.push(g.name);
   const el = document.createElementNS(NS, 'g');
   el.setAttribute('class', 'ghost ' + sp.type);
   const ic = ITEM[T.counter];
-  el.innerHTML = `<g class="gb">${ghostSvg(randomLook(), pick(['angry', 'rage', 'gloomy']), Math.random() < 0.5 ? 'elder' : 'adult', 0, 0, 0.2)}</g>
-    <g transform="translate(0 -96)"><g class="hpw"><rect x="-17" y="-3" width="34" height="6" rx="3" fill="#0B0F1E" opacity="0.85"/><rect class="hpb" x="-17" y="-3" width="34" height="6" rx="3" fill="#FF6B6B"/></g>
+  el.innerHTML = `<g class="gb"><ellipse cx="0" cy="-44" rx="32" ry="48" fill="url(#gglow)"/>${ghostSvg(randomLook(), pick(['angry', 'rage', 'gloomy']), Math.random() < 0.5 ? 'elder' : 'adult', 0, 0, 0.2)}</g>
+    <g class="tg"><g class="hpw"><rect x="-17" y="-3" width="34" height="6" rx="3" fill="#0B0F1E" opacity="0.85"/><rect class="hpb" x="-17" y="-3" width="34" height="6" rx="3" fill="#FF6B6B"/></g>
       <g transform="translate(0 -15)"><circle r="10" fill="${ic.c}" stroke="#0B0F1E" stroke-width="1.5"/><text y="4.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1E2A2C">${ic.g}</text></g>
       <text class="nametag" y="-32" text-anchor="middle" font-size="10" fill="#DCE8F7" paint-order="stroke" stroke="#0B0F1E" stroke-width="3">${g.name}</text></g>`;
   $('glayer').appendChild(el);
-  g.el = el; g.gb = el.querySelector('.gb'); g.hpb = el.querySelector('.hpb'); g.hpw = el.querySelector('.hpw');
+  g.el = el; g.gb = el.querySelector('.gb'); g.tg = el.querySelector('.tg'); g.hpb = el.querySelector('.hpb'); g.hpw = el.querySelector('.hpw');
   N.ghosts.push(g);
   refreshGhost(g);
   if (sp.wave !== N.wave) {
@@ -1269,8 +1325,10 @@ function spawnGhost(sp) {
   }
 }
 function refreshGhost(g) {
-  const vis = revealed(g);
-  g.gb.setAttribute('opacity', g.type === 'shade' ? (vis ? '0.9' : '0.07') : '1');
+  const vis = revealed(g), c = ghostCenter(g);
+  g.lit = litAt(c.x, c.y);
+  // 暗处的鬼只剩一层冷光；灯照到才看得清
+  g.gb.setAttribute('opacity', g.type === 'shade' ? (vis ? '0.9' : '0.07') : g.lit ? '1' : '0.62');
   g.hpw.setAttribute('opacity', vis ? '1' : '0');
   g.hpb.setAttribute('width', (34 * clamp(g.hp / g.max, 0, 1)).toFixed(1));
 }
@@ -1289,7 +1347,7 @@ function line(x1, y1, x2, y2, color, w = 2) {
 }
 function ghostAt(x, y) {
   let best = null, bd = 1e9;
-  for (const g of N.ghosts) { const d = Math.hypot(x - (g.x + g.ox), y - (g.y - 44)); if (d < 36 && d < bd) { best = g; bd = d; } }
+  for (const g of N.ghosts) { const c = ghostCenter(g), d = Math.hypot(x - c.x, y - c.y); if (d < 36 * Math.max(g.k, 0.8) && d < bd) { best = g; bd = d; } }
   return best;
 }
 function hitAt(x, y) {
@@ -1300,14 +1358,14 @@ function hitAt(x, y) {
   const hurt = N.guardian ? 1 : G.hp >= CFG.hpMax ? 1 : G.hp <= 1 ? 0.6 : 0.85;
   const age = N.guardian ? AGE_FX.child : AGE_FX[ageOf(G.day)];
   const dmg = Math.max(1, Math.round(NIGHT.tap * m * age.dmg * hurt * (N.guardian ? 1.25 : 1)));
-  if (m < 0.7 && N.t > N.hintT) { N.hintT = N.t + 1.5; floatText(g.x + g.ox, g.y - 120, `该用${ITEM[GHOSTS[g.type].counter].g === '灯' ? '灯笼' : ITEM[GHOSTS[g.type].counter].g}`, 'weak'); }
+  if (m < 0.7 && N.t > N.hintT) { N.hintT = N.t + 1.5; floatText(g.x + g.ox, g.y - 124 * g.k, `该用${ITEM[GHOSTS[g.type].counter].g === '灯' ? '灯笼' : ITEM[GHOSTS[g.type].counter].g}`, 'weak'); }
   hurtGhost(g, dmg, m >= 1.5 ? 'crit' : m < 0.7 ? 'weak' : '', true);
 }
 // 空格：打离门最近、看得见的鬼
-function autoHit() { const g = N.ghosts.filter(revealed).sort((a, b) => b.y - a.y)[0]; if (g) hitAt(g.x + g.ox, g.y - 44); }
+function autoHit() { const g = N.ghosts.filter(revealed).sort((a, b) => b.y - a.y)[0]; if (g) { const c = ghostCenter(g); hitAt(c.x, c.y); } }
 function hurtGhost(g, dmg, cls, byPlayer) {
   g.hp -= dmg; g.flash = 0.25;
-  floatText(g.x + g.ox + rnd(-8, 8), g.y - 70, '-' + dmg, cls);
+  floatText(g.x + g.ox + rnd(-8, 8), g.y - 70 * g.k, '-' + dmg, cls);
   if (g.hp <= 0) {
     g.el.remove();
     N.ghosts = N.ghosts.filter((x) => x !== g);
@@ -1339,9 +1397,13 @@ function nightStep(dt) {
     const wasVis = revealed(g);
     g.flash = Math.max(0, g.flash - dt);
     if (g.state === 'walk') {
+      // 在巷子里散开走（lane = 占巷子宽度的哪一条），快到门口才往门上挤，免得图标叠成一串
       const slow = g.y > 300 ? slowNear : 1;
-      const dx = g.tx - g.x, dy = g.ty - g.y, dist = Math.hypot(dx, dy), step = g.speed * slow * dt;
-      if (dist <= step) { g.x = g.tx; g.y = g.ty; g.state = 'bash'; } else { g.x += (dx / dist) * step; g.y += (dy / dist) * step; }
+      g.y = Math.min(g.ty, g.y + g.speed * slow * dt);
+      const t = clamp((g.y - 90) / (g.ty - 90), 0, 1), hw = 40 + 114 * clamp((g.y - 152) / 262, 0, 1);
+      const merge = clamp((t - 0.72) / 0.28, 0, 1);
+      g.x = 180 + g.lane * hw * (1 - merge) + (g.tx - 180) * merge;
+      if (g.y >= g.ty) g.state = 'bash';
       g.ox = g.type === 'fly' ? Math.sin(N.t * 2.2 + g.ph) * 22 * clamp((g.ty - g.y) / 80, 0, 1) : 0;
     } else {
       g.bashT -= dt;
@@ -1353,8 +1415,12 @@ function nightStep(dt) {
       }
     }
     const bob = Math.sin(N.t * 3 + g.ph) * 3;
+    g.k = depthK(g.y);
     g.el.setAttribute('transform', `translate(${(g.x + g.ox).toFixed(1)} ${(g.y + bob).toFixed(1)})`);
-    if (revealed(g) !== wasVis || g.type === 'shade') refreshGhost(g);
+    g.gb.setAttribute('transform', `scale(${g.k.toFixed(3)})`);
+    g.tg.setAttribute('transform', `translate(0 ${(-96 * g.k).toFixed(1)})`);
+    const c = ghostCenter(g);
+    if (revealed(g) !== wasVis || g.type === 'shade' || litAt(c.x, c.y) !== g.lit) refreshGhost(g);
   }
   if (bashed) { updateDoor(); shake($('nsvg')); }
   // 弩机
@@ -1364,7 +1430,8 @@ function nightStep(dt) {
     const tg = N.ghosts.filter((g) => revealed(g) && g.y > 150).sort((a, c) => Math.hypot(a.x - b.x, a.y - b.y) - Math.hypot(c.x - b.x, c.y - b.y))[0];
     if (!tg) { b.cd = 0.2; continue; }
     b.cd = NIGHT.bowCd;
-    line(b.x, b.y - 14, tg.x + tg.ox, tg.y - 44, '#FFE7A3');
+    const tc = ghostCenter(tg);
+    line(b.x, b.y - 14, tc.x, tc.y, '#FFE7A3');
     hurtGhost(tg, NIGHT.bowDmg, '', false);
   }
   // 驰援的邻居
@@ -1372,7 +1439,7 @@ function nightStep(dt) {
     N.ally.t -= dt; N.ally.cd -= dt;
     if (N.ally.cd <= 0) {
       const tg = N.ghosts.filter(revealed).sort((a, c) => c.y - a.y)[0];
-      if (tg) { N.ally.cd = 0.45; line(252, 440, tg.x + tg.ox, tg.y - 44, '#7FD6C2', 3); hurtGhost(tg, NIGHT.allyDmg, '', false); } else N.ally.cd = 0.15;
+      if (tg) { N.ally.cd = 0.45; const tc = ghostCenter(tg); line(252, 440, tc.x, tc.y, '#7FD6C2', 3); hurtGhost(tg, NIGHT.allyDmg, '', false); } else N.ally.cd = 0.15;
     }
     if (N.ally.t <= 0) { N.ally = null; $('nally').innerHTML = ''; }
   }
