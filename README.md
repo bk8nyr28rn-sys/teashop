@@ -2,7 +2,7 @@
 
 《融合玩法方案汇总（v2.1）》的规则实现、数值模拟器和竖屏网页可玩原型。
 
-**接手调试先读 [`docs/HANDOFF.md`](docs/HANDOFF.md)**；美术规格见 [`docs/ART_SPEC.md`](docs/ART_SPEC.md)；方案文档离线副本见 [`docs/DESIGN_v2.1.md`](docs/DESIGN_v2.1.md)；各页面参考截图在 `docs/art/screens/`。
+**现在的方向先看 [`docs/ROADMAP.md`](docs/ROADMAP.md)**（路线图：最前面是已定、待定、点子池的总表）；**接手调试读 [`docs/HANDOFF.md`](docs/HANDOFF.md)**；美术规格见 [`docs/ART_SPEC.md`](docs/ART_SPEC.md)；方案文档离线副本见 [`docs/DESIGN_v2.1.md`](docs/DESIGN_v2.1.md)；各页面参考截图在 `docs/art/screens/`。
 
 ## 目录
 
