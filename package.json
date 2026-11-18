@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "融合玩法（红线 × 守宅 × 修仙家族）的逻辑核心与数值模拟器",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --dir test",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.sim.json",
     "sim": "tsx src/sim/cli.ts",
     "build:web": "node scripts/build-web.mjs",
