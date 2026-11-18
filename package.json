@@ -7,7 +7,10 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.sim.json",
     "sim": "tsx src/sim/cli.ts",
     "build:web": "node scripts/build-web.mjs",
-    "sync:draw": "node scripts/sync-shared-draw.mjs"
+    "sync:draw": "node scripts/sync-shared-draw.mjs",
+    "test:proto": "node scripts/proto-tests/run-all.cjs",
+    "balance:night": "node scripts/proto-tests/night-balance.cjs",
+    "balance:haunt": "node scripts/proto-tests/haunt-balance.cjs"
   },
   "repository": {
     "type": "git",
