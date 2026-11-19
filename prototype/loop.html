@@ -1,0 +1,2174 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>一日一夜</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="../assets/fonts/prototype.css">
+<script src="../assets/avatar.js"></script>
+<style>
+/* 一日一夜（样机）：白天出门找东西、天黑前回家；夜里守门；老死后当一晚鬼；投胎。
+   白天是暖米色的人间，夜里和阴间整页换成深蓝。朱砂只给主要动作，金色只给“手里拿的东西”和宝物。 */
+:root {
+  --bg: #ECEFEA;
+  --panel: #FAFBF8;
+  --ink: #1E2A2C;
+  --muted: #5B6B68;
+  --line: #CAD5D0;
+  --accent: #2E7D6B;
+  --seal: #B8402F;
+  --on-seal: #FFF7F2;
+  --gold: #B7862A;
+  --font-display: 'ZCOOL KuaiLe', 'Songti SC', 'STSong', serif;
+  --font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #11181B; --panel: #19232A; --ink: #E3EBE7; --muted: #94A6A1; --line: #2C3B40; --accent: #55B99F; --seal: #E0654F; --on-seal: #1A1010; --gold: #E0B456; color-scheme: dark; }
+}
+:root[data-theme="dark"] { --bg: #11181B; --panel: #19232A; --ink: #E3EBE7; --muted: #94A6A1; --line: #2C3B40; --accent: #55B99F; --seal: #E0654F; --on-seal: #1A1010; --gold: #E0B456; color-scheme: dark; }
+/* 夜里、阴间：不管系统是亮是暗，都用深色 */
+body[data-phase="night"], body[data-phase="guard"], body[data-phase="haunt"], body[data-phase="death"], body[data-phase="reborn"] {
+  --bg: #0E1424; --panel: #182035; --ink: #E6ECF5; --muted: #9AA8C0; --line: #2A3552; --seal: #E0654F; --on-seal: #1A1010; --gold: #E8BE5C; --accent: #7FD6C2; color-scheme: dark;
+}
+
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; -webkit-tap-highlight-color: transparent; transition: background 0.4s; }
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:focus-visible, textarea:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.app { max-width: 540px; margin: 0 auto; padding: 0 max(16px, env(safe-area-inset-right, 0px)) 28px max(16px, env(safe-area-inset-left, 0px)); display: flex; flex-direction: column; gap: 10px; }
+.hud { position: sticky; top: 0; z-index: 5; background: var(--bg); display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: max(8px, env(safe-area-inset-top, 0px)) 0 8px; transition: background 0.4s; }
+.hud-l { min-width: 0; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+.hud-l b { font-family: var(--font-display); font-weight: 400; font-size: 22px; white-space: nowrap; }
+.hud-l span { font-size: 12px; color: var(--muted); }
+.hud-r { display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.hp { display: inline-flex; gap: 3px; }
+.hp i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--seal); }
+.hp i.on { background: var(--seal); }
+.icon { min-height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); font-size: 12.5px; }
+
+.scene { display: flex; flex-direction: column; gap: 8px; }
+.stage { display: block; width: 100%; height: auto; max-height: 50svh; border-radius: 16px; border: 1px solid var(--line); background: #1A2132; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.stage.tall { max-height: calc(100svh - 270px); min-height: 300px; }
+.panel { display: flex; flex-direction: column; gap: 10px; }
+.acts { display: grid; gap: 8px; grid-template-columns: 1fr; }
+@media (min-width: 460px) { .acts { grid-template-columns: 1fr 1fr; } }
+.big { min-height: 56px; padding: 8px 14px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); text-align: left; display: flex; flex-direction: column; gap: 2px; font-weight: 500; }
+.big small { font-weight: 400; font-size: 12px; color: var(--muted); }
+.big.main { background: var(--seal); border-color: var(--seal); color: var(--on-seal); }
+.big.main small { color: inherit; opacity: 0.85; }
+.big.ghosty { border-style: dashed; }
+.note { font-size: 12px; color: var(--muted); margin: 0; }
+.warn { color: var(--seal); font-weight: 700; }
+
+.clock { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.clock > div:first-child { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.clock b { font-family: var(--font-display); font-weight: 400; font-size: 18px; }
+.clock span { font-size: 12.5px; color: var(--muted); }
+.clock.late b, .clock.late span { color: var(--seal); }
+.sun { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; }
+.sun i { display: block; height: 100%; background: linear-gradient(90deg, #F2C14E, #E07B39); }
+
+.where { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.where b { font-family: var(--font-display); font-weight: 400; font-size: 20px; }
+.where span { font-size: 12.5px; color: var(--muted); }
+.tag { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--panel); border: 1px solid var(--line); font-size: 12px; }
+.bag { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bag .lab { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.bag .tre { border-color: var(--gold); color: var(--gold); }
+.plan { padding: 10px 12px; border-radius: 14px; border: 1px dashed var(--line); font-size: 13px; }
+
+.doorbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
+.doorbar b { font-variant-numeric: tabular-nums; }
+.bar { height: 16px; border-radius: 8px; background: rgba(0, 0, 0, 0.35); overflow: hidden; border: 1px solid var(--line); }
+.bar i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #E0654F, #F2A65A); transition: width 0.15s; }
+.bar.low i { background: #FF4D4D; animation: blink 0.6s infinite; }
+.bar.soul i { background: linear-gradient(90deg, #7FD6C2, #9BB0E8); }
+.wave { min-height: 20px; font-size: 13px; color: var(--muted); }
+.items { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.item { min-height: 66px; border-radius: 14px; border: 2px solid var(--line); background: var(--panel); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 4px; }
+.item .g { width: 28px; height: 28px; border-radius: 50%; background: var(--c); color: #1E2A2C; font-weight: 700; display: grid; place-items: center; font-size: 14px; }
+.item small { font-size: 11.5px; color: var(--muted); }
+.item[aria-pressed="true"] { border-color: var(--gold); background: color-mix(in srgb, var(--gold) 16%, var(--panel)); }
+.help { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+.sheet { position: fixed; inset: 0; z-index: 20; background: rgba(8, 12, 22, 0.55); display: flex; align-items: flex-end; justify-content: center; padding: 16px max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+@media (min-width: 600px) { .sheet { align-items: center; } }
+.card { width: 100%; max-width: 460px; max-height: 84svh; overflow: auto; background: var(--panel); color: var(--ink); border: 1px solid var(--line); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3); }
+.card h2 { margin: 0; font-family: var(--font-display); font-weight: 400; font-size: 24px; }
+.card p { margin: 0; }
+.sh-body { display: flex; flex-direction: column; gap: 8px; }
+.sh-btns { display: flex; flex-direction: column; gap: 8px; }
+.sh-btns button { min-height: 46px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); padding: 6px 12px; font-weight: 500; }
+.sh-btns button.main { background: var(--seal); border-color: var(--seal); color: var(--on-seal); }
+.sh-btns button.perk { text-align: left; border: 2px solid var(--gold); padding: 8px 12px; }
+.sh-btns button small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
+.list li > span { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mini { min-height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); font-size: 12.5px; }
+.sub { font-family: var(--font-display); font-size: 17px; }
+.fr { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: var(--bg); }
+.fr-top { display: flex; justify-content: space-between; gap: 8px; }
+.fbar { position: relative; height: 10px; border-radius: 5px; background: var(--line); }
+.fbar i { position: absolute; inset: 0 auto 0 0; border-radius: 5px; background: var(--accent); }
+.fbar s { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); opacity: 0.5; }
+.fr-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+.kt { width: 100%; border-collapse: collapse; font-size: 13px; }
+.kt td { padding: 5px 4px; border-bottom: 1px solid var(--line); }
+.kt td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.kt tr.total td { font-weight: 700; border-bottom: 0; }
+.fams { display: grid; gap: 8px; }
+.hall { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; }
+.pt { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.pt svg { width: 100%; height: auto; border: 6px solid #5A3A2E; border-radius: 4px; box-sizing: border-box; background: #E8DCC2; }
+.pt figcaption { display: flex; flex-direction: column; font-size: 12px; text-align: center; }
+.pt figcaption span { color: var(--muted); font-size: 11px; }
+textarea { width: 100%; box-sizing: border-box; min-height: 64px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); padding: 8px; font: 12px/1.4 ui-monospace, Menlo, monospace; }
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); z-index: 30; max-width: min(440px, calc(100vw - 32px)); padding: 9px 14px; border-radius: 12px; background: #1E2A2C; color: #F4F7F5; font-size: 13px; box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25); pointer-events: none; }
+
+/* 画面里的特效 */
+.dmg { font: 700 14px var(--font-body); paint-order: stroke; stroke: #0B0F1E; stroke-width: 3px; fill: #FFFFFF; animation: rise 0.7s ease-out forwards; pointer-events: none; }
+.dmg.crit { fill: #FFD25E; font-size: 18px; }
+.dmg.weak { fill: #AAB4C8; font-size: 12px; }
+.dmg.door { fill: #FF6B6B; font-size: 15px; }
+.dmg.miss { fill: #C9D2E2; font-size: 12px; }
+.dmg.good { fill: #7FD6C2; font-size: 15px; }
+@keyframes rise { to { transform: translateY(-26px); opacity: 0; } }
+.shake { animation: shake 0.18s; }
+@keyframes shake { 25% { transform: translate(-4px, 2px); } 50% { transform: translate(3px, -2px); } 75% { transform: translate(-2px, 1px); } }
+.hurt { animation: hurt 0.35s; }
+@keyframes hurt { 30% { filter: brightness(1.6) saturate(2) hue-rotate(-20deg); } }
+.glow { animation: glow 1.6s ease-in-out infinite; }
+@keyframes glow { 50% { opacity: 0.35; } }
+.float { animation: float 2.6s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-8px); } }
+.nametag { animation: fadeout 3s forwards; pointer-events: none; }
+@keyframes fadeout { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes blink { 50% { opacity: 0.5; } }
+.token { transition: transform 0.55s ease-in-out; }
+#nsvg { background: #03050B; }
+.rain1 { animation: rain1 0.38s linear infinite; }
+.rain2 { animation: rain2 0.62s linear infinite; }
+@keyframes rain1 { to { transform: translate(-16px, 90px); } }
+@keyframes rain2 { to { transform: translate(-23px, 140px); } }
+.ghost .gb { transition: opacity 0.25s; }
+.spot { cursor: pointer; }
+@media (prefers-reduced-motion: reduce) {
+  .shake, .hurt, .glow, .float, .bar.low i, .rain1, .rain2 { animation: none !important; }
+  .token, .ghost .gb { transition: none !important; }
+}
+#avatar-dialog { inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--bg); }
+#avatar-dialog iframe { display: block; width: 100%; height: 100%; border: 0; }
+#game-expressions { box-sizing: border-box; width: min(360px, calc(100% - 32px)); max-height: 72dvh; padding: 16px; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--panel); box-shadow: 0 8px 36px #0003; }
+#game-expressions h2 { font: 20px var(--font-display); margin: 0 0 12px; }
+#game-expressions .choices { display: flex; gap: 6px; flex-wrap: wrap; }
+#game-expressions [aria-pressed="true"] { background: var(--seal); color: var(--on-seal); }
+@media (max-width: 420px) { .hud-r { gap: 5px; flex-wrap: wrap; justify-content: flex-end; } }
+body:has(#avatar-dialog[open]) { overflow: hidden; }
+#share-look { margin: 14px 0; }
+#share-look summary { cursor: pointer; }
+</style>
+</head><body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="nsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B1022"/><stop offset="1" stop-color="#22304E"/></linearGradient>
+    <linearGradient id="hsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#140C26"/><stop offset="1" stop-color="#3A2448"/></linearGradient>
+    <radialGradient id="lampg"><stop offset="0" stop-color="#FFB45E" stop-opacity="0.5"/><stop offset="1" stop-color="#FFB45E" stop-opacity="0"/></radialGradient>
+    <radialGradient id="auraG"><stop offset="0" stop-color="#9BB0E8" stop-opacity="0.35"/><stop offset="1" stop-color="#9BB0E8" stop-opacity="0"/></radialGradient>
+    <!-- 鬼：腰以下慢慢淡掉 -->
+    <linearGradient id="gfade" gradientUnits="userSpaceOnUse" x1="0" y1="225" x2="0" y2="372"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
+    <mask id="gmask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="-80" y="-60" width="400" height="480"><rect x="-80" y="-60" width="400" height="480" fill="url(#gfade)"/></mask>
+  </defs>
+</svg>
+
+<div class="app">
+  <header class="hud" id="hud"></header>
+  <main class="scene" id="scene" aria-live="off"></main>
+  <section class="panel" id="panel"></section>
+</div>
+<div class="sheet" id="sheet" hidden></div>
+<div class="toast" id="toast" role="status" hidden></div>
+<dialog id="avatar-dialog" aria-label="武林捏人台" data-editor="./creator.html?embed=1"></dialog>
+<section id="game-expressions" popover="auto" aria-label="表情栏"><h2>表情</h2><div class="choices"></div></section>
+
+<script>
+'use strict';
+// @@shared-begin
+// ---------------- 调色 ----------------
+function hsl2hex(h, s, l) {
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const f = (n) => { const k = (n + h / 30) % 12; const c = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return Math.round(c * 255).toString(16).padStart(2, '0'); };
+  return ('#' + f(0) + f(8) + f(4)).toUpperCase();
+}
+function hex2hsl(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); const n = m ? parseInt(m[1], 16) : 0;
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  let h = 0; if (d) { h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+  return { h: Math.round(h), s: Math.round(d ? (d / (1 - Math.abs(2 * l - 1))) * 100 : 0), l: Math.round(l * 100) };
+}
+const PRESETS = {
+  skin: ['#FBE3D3', '#F6D2BA', '#E9B996', '#D29A73', '#A9724D', '#7A4E33'],
+  hair: ['#1F1A22', '#4A3125', '#8A5A36', '#C9A066', '#9AA0B8', '#E6E4DE', '#A33A33', '#3E5C86'],
+  cloth: ['#3E6E8E', '#C8402E', '#7FA36B', '#E3A33B', '#E9ECF2', '#2A2D36', '#9B5DA8', '#D97A8E', '#5A3A2E', '#7FC4C9'],
+  eye: ['#2B2233', '#5A3A2E', '#3E6E8E', '#7FA36B', '#B8402F', '#9B5DA8', '#C9A066'],
+  accent: ['#E3A33B', '#E9ECF2', '#C8402E', '#7FA36B', '#2A2D36', '#9B5DA8', '#C9D2E2'],
+  brush: ['#2B2233', '#FFFFFF', '#C8402E', '#E3A33B', '#7FA36B', '#3E6E8E', '#9B5DA8', '#FF8FA3', '#7FC8FF', '#F6D2BA'],
+};
+
+// ---------------- 部件和参数 ----------------
+const OPT = {
+  faceShape: [['round', '圆脸'], ['oval', '鹅蛋'], ['square', '方脸'], ['pointed', '尖脸']],
+  eyes: [['round', '圆眼'], ['almond', '杏眼'], ['phoenix', '丹凤眼'], ['droopy', '下垂眼'], ['smile', '笑眼'], ['sleepy', '慵懒眼'], ['cat', '猫眼'], ['sparkle', '星星眼']],
+  brows: [['sword', '剑眉'], ['willow', '柳叶眉'], ['flat', '平眉'], ['thick', '一字眉'], ['droopy', '八字眉'], ['short', '短眉']],
+  mouth: [['smile', '微笑'], ['o', '小圆嘴'], ['flat', '抿嘴'], ['grin', '咧嘴笑'], ['cat', '猫嘴'], ['smirk', '坏笑']],
+  beard: [['none', '无'], ['mustache', '八字胡'], ['goatee', '山羊胡'], ['full', '络腮胡']],
+  mark: [['none', '无'], ['tearmole', '泪痣'], ['huadian', '花钿'], ['scar', '刀疤'], ['freckles', '雀斑'], ['paint', '面纹']],
+  nose: [['none', '无'], ['dot', '鼻孔'], ['small', '小鼻'], ['hook', '侧影'], ['button', '圆头'], ['line', '直线'], ['round', '大鼻头']],
+  glasses: [['none', '无'], ['round', '圆框'], ['square', '方框'], ['half', '半框'], ['sun', '墨镜'], ['monocle', '单片镜']],
+  hairFront: [['qi', '齐刘海'], ['middle', '中分'], ['side', '偏分'], ['messy', '碎发'], ['air', '空气刘海'], ['bare', '无刘海'], ['longside', '长侧刘海'], ['curly', '卷刘海']],
+  hairBack: [['highpony', '高马尾'], ['lowpony', '低马尾'], ['long', '长直发'], ['buns', '双髻'], ['topknot', '道髻'], ['short', '短发'], ['twintails', '双马尾'], ['halfup', '半扎发']],
+  streak: [['none', '无'], ['left', '左边挑染'], ['right', '右边挑染'], ['tips', '发梢挑染']],
+  top: [['jin', '劲装'], ['changshan', '长衫'], ['duangua', '短褂'], ['daopao', '广袖袍'], ['vest', '背心短打'], ['ru', '上襦'], ['armor', '轻甲'], ['yuanling', '圆领袍']],
+  sleeve: [['narrow', '窄袖'], ['wide', '广袖']],
+  pattern: [['none', '无'], ['cloud', '云纹'], ['check', '格纹'], ['floral', '碎花'], ['dots', '圆点'], ['custom', '手绘花纹']],
+  bottom: [['pants', '长裤'], ['wrap', '绑腿裤'], ['skirt', '长裙'], ['pleat', '马面裙']],
+  shoes: [['cloth', '布鞋'], ['boots', '靴子'], ['straw', '草鞋']],
+  cape: [['none', '无'], ['short', '短披风'], ['long', '长披风']],
+  head: [['none', '无'], ['band', '发带'], ['pin', '发簪'], ['crown', '发冠'], ['hat', '斗笠'], ['veil', '面纱'], ['flower', '簪花']],
+  ear: [['none', '无'], ['stud', '耳钉'], ['drop', '耳坠']],
+  neck: [['none', '无'], ['scarf', '围巾'], ['pendant', '玉佩项链']],
+  weapon: [['none', '无'], ['sword', '剑'], ['saber', '刀'], ['fan', '折扇'], ['umbrella', '油纸伞'], ['gourd', '葫芦'], ['flute', '竹笛'], ['bow', '弓']],
+  weaponPos: [['back', '背着'], ['hand', '拿着']],
+};
+
+const DEFAULT = {
+  heads: 0.45, build: 0.35, height: 0.5, skin: '#F6D2BA',
+  faceShape: 'oval', faceWidth: 0.45, eyes: 'almond', eyeSize: 0.5, eyeGap: 0.45, eyeY: 0.5, eyeColor: '#2B2233',
+  brows: 'sword', browThick: 0.45, browTilt: 0.15, browFollow: true, browColor: '#1F1A22',
+  mouth: 'smile', mouthY: 0.5, blush: 0.55, blushColor: '#FF8FA3', beard: 'none', mark: 'none', markColor: '#C8402E',
+  hairFront: 'side', hairBack: 'highpony', hairLen: 0.55, hairColor: '#1F1A22', streak: 'none', streakColor: '#A33A33',
+  top: 'jin', topColor: '#3E6E8E', trimColor: '#E3A33B', sleeve: 'narrow', pattern: 'none', patternColor: '#E9ECF2', beltColor: '#2A2D36',
+  bottom: 'pants', bottomColor: '#2E3446', shoes: 'boots', shoeColor: '#3A2C26', cape: 'none', capeColor: '#C8402E',
+  head: 'band', headColor: '#C8402E', ear: 'none', earColor: '#E3A33B', neck: 'none', neckColor: '#7FA36B',
+  weapon: 'sword', weaponPos: 'back', weaponColor: '#C9D2E2',
+  eyeRot: 0, eyeSquash: 0.5, browY: 0.5, browGap: 0.5, browSize: 0.5, nose: 'small', noseY: 0.5, noseSize: 0.5,
+  mouthSize: 0.5, mouthSquash: 0.5, mole: false, moleX: 0.45, moleY: 0.35, moleSize: 0.4,
+  glasses: 'none', glassesColor: '#2A2D36', glassesSize: 0.5, glassesY: 0.5,
+  pMove: 3, pTalk: 3, pExpr: 3, pAttitude: 3, pQuirk: 3, vPitch: 0.5, vRate: 0.5,
+  brushColor: '#2B2233', brushSize: 0.05, tileSize: 0.5,
+};
+
+const INSPIRE = [
+  ['剑客', {}],
+  ['书生', { top: 'changshan', topColor: '#E9ECF2', trimColor: '#3E6E8E', hairBack: 'topknot', hairFront: 'bare', head: 'pin', headColor: '#3E6E8E', weapon: 'fan', weaponPos: 'hand', eyes: 'round', brows: 'willow', mouth: 'smile', pattern: 'cloud', patternColor: '#9AB4C8', shoes: 'cloth', build: 0.2 }],
+  ['医者', { top: 'ru', topColor: '#7FA36B', trimColor: '#F4ECDD', bottom: 'skirt', bottomColor: '#E8D7B5', hairBack: 'long', hairFront: 'qi', head: 'flower', headColor: '#D97A8E', weapon: 'gourd', weaponPos: 'hand', eyes: 'droopy', brows: 'willow', mark: 'huadian', shoes: 'cloth' }],
+  ['镖师', { top: 'armor', topColor: '#C8402E', trimColor: '#C9A066', hairBack: 'short', hairFront: 'messy', head: 'hat', headColor: '#C9A066', weapon: 'saber', skin: '#D29A73', eyes: 'phoenix', brows: 'thick', beard: 'goatee', build: 0.85, mark: 'scar', markColor: '#A9724D' }],
+  ['侠女', { top: 'jin', topColor: '#9B5DA8', trimColor: '#E9ECF2', bottom: 'pleat', bottomColor: '#3A2C46', hairBack: 'twintails', hairFront: 'longside', hairColor: '#4A3125', head: 'veil', headColor: '#E9ECF2', weapon: 'umbrella', weaponPos: 'hand', eyes: 'cat', brows: 'sword', cape: 'short', capeColor: '#E9ECF2', ear: 'drop' }],
+  ['小乞儿', { top: 'vest', topColor: '#8A6A4C', trimColor: '#5A3A2E', bottom: 'wrap', bottomColor: '#6B5A48', shoes: 'straw', hairBack: 'buns', hairFront: 'messy', head: 'none', weapon: 'flute', weaponPos: 'hand', eyes: 'sparkle', mouth: 'grin', mark: 'freckles', markColor: '#A9724D', heads: 0.15 }],
+];
+
+// ---------------- 表情：不画死，用五官状态组合 ----------------
+// eye: open（用玩家选的眼睛）| wide | arc | closed | half | cry | star
+// mouth: base（用玩家选的嘴）| smile | grin | open | flat | o | frown | wavy | tongue | smirk
+// brow: 0 正常 | up 上扬 | knit 皱眉 | down 下垂
+const EXPR_PARTS = {
+  eye: [['open', '睁眼'], ['wide', '瞪大'], ['arc', '弯弯'], ['closed', '闭眼'], ['half', '半睁'], ['cry', '泪眼'], ['star', '星星']],
+  mouth: [['base', '原本的嘴'], ['smile', '微笑'], ['grin', '咧嘴'], ['open', '张嘴'], ['flat', '抿嘴'], ['o', '圆嘴'], ['frown', '撇嘴'], ['wavy', '波浪'], ['tongue', '吐舌'], ['smirk', '坏笑']],
+  brow: [['normal', '正常'], ['up', '上扬'], ['knit', '皱眉'], ['down', '下垂']],
+  fx: [['blush', '红晕'], ['sweat', '汗滴'], ['anger', '怒气'], ['tears', '眼泪'], ['sparkle', '闪光'], ['zzz', '困意'], ['heart', '爱心'], ['gloom', '阴影']],
+};
+const EXPRESSIONS = [
+  ['calm', '平静', { eye: 'open', mouth: 'base', brow: 'normal', fx: [] }],
+  ['happy', '开心', { eye: 'arc', mouth: 'grin', brow: 'normal', fx: [] }],
+  ['laugh', '大笑', { eye: 'closed', mouth: 'open', brow: 'up', fx: ['sparkle'] }],
+  ['shy', '害羞', { eye: 'half', mouth: 'wavy', brow: 'down', fx: ['blush', 'sweat'] }],
+  ['love', '心动', { eye: 'arc', mouth: 'smile', brow: 'up', fx: ['heart', 'blush'] }],
+  ['smug', '得意', { eye: 'half', mouth: 'smirk', brow: 'up', fx: ['sparkle'] }],
+  ['angry', '生气', { eye: 'open', mouth: 'flat', brow: 'knit', fx: ['anger'] }],
+  ['rage', '暴怒', { eye: 'wide', mouth: 'open', brow: 'knit', fx: ['anger', 'gloom'] }],
+  ['sad', '难过', { eye: 'open', mouth: 'frown', brow: 'down', fx: ['tears'] }],
+  ['cry', '大哭', { eye: 'cry', mouth: 'open', brow: 'down', fx: ['tears'] }],
+  ['pout', '委屈', { eye: 'half', mouth: 'wavy', brow: 'down', fx: ['tears'] }],
+  ['surprised', '吃惊', { eye: 'wide', mouth: 'o', brow: 'up', fx: [] }],
+  ['helpless', '无奈', { eye: 'half', mouth: 'flat', brow: 'down', fx: ['sweat'] }],
+  ['sleepy', '犯困', { eye: 'closed', mouth: 'o', brow: 'normal', fx: ['zzz'] }],
+  ['starry', '星星眼', { eye: 'star', mouth: 'grin', brow: 'up', fx: ['sparkle'] }],
+  ['cheeky', '调皮', { eye: 'arc', mouth: 'tongue', brow: 'up', fx: [] }],
+  ['gloomy', '郁闷', { eye: 'half', mouth: 'frown', brow: 'knit', fx: ['gloom'] }],
+];
+let myExpr = { eye: 'arc', mouth: 'tongue', brow: 'up', fx: ['blush'] };
+function exprOf(id, draw) {
+  if (id === 'mine') return myExpr;
+  if (HAND_SLOTS.includes(id)) {
+    const base = EXPRESSIONS.find(([key]) => key === draw?.baseExpr?.[id]) || EXPRESSIONS[0];
+    return { ...base[2], hand: id };
+  }
+  const e = EXPRESSIONS.find((x) => x[0] === id); return e ? e[2] : EXPRESSIONS[0][2];
+}
+// 笔画转成 SVG
+function strokesSvg(list) {
+  return (list || []).map((st) => {
+    const pts = st.p || [];
+    if (!pts.length) return '';
+    const d = pts.length === 1 ? `M${pts[0][0]} ${pts[0][1]} l0.0001 0` : 'M' + pts.map((q) => `${q[0]} ${q[1]}`).join(' L');
+    return `<path d="${d}${st.fill ? ' Z' : ''}" stroke="${st.w ? st.c : 'none'}" stroke-width="${st.w}" fill="${st.fill || 'none'}" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }).join('');
+}
+
+// v2 笔画以部位画布为单位。绑定名随存档导出，袖子的第二份渲染在右臂上。
+const HAND_SLOTS = Array.from({ length: 8 }, (_, i) => 'h' + (i + 1));
+const DRAW_LAYERS = [
+  ['hairFront', '前发', 'head'], ['hairBack', '后发', 'head'], ['head', '头饰', 'head'],
+  ['face', '脸上（一直显示）', 'head'], ...HAND_SLOTS.map(key => [key, '手绘表情 ' + key.slice(1), 'head']),
+  ['top', '上衣', 'torso'], ['back', '背后', 'torso'], ['sleeve', '袖子', 'armLeft'],
+  ['bottom', '下装', 'legs'], ['shoes', '鞋', 'legs'], ['cloth', '衣服花纹', 'torso'], ['emblem', '胸前图案', 'torso'],
+];
+function emptyDraw() {
+  const draw = { v: 2, hide: {}, customOnly: {}, baseExpr: {}, omitExpr: {}, bindings: {} };
+  for (const [k,, bone] of DRAW_LAYERS) {
+    draw[k] = [];
+    draw.bindings[k] = bone;
+    draw.customOnly[k] = false;
+  }
+  for (const k of HAND_SLOTS) { draw.hide[k] = true; draw.omitExpr[k] = []; }
+  return draw;
+}
+function hasDrawExpression(draw, key) {
+  return HAND_SLOTS.includes(key) && Boolean(draw?.[key]?.length || draw?.baseExpr?.[key]);
+}
+function normDraw(draw) { return validatedDraw(draw); }
+function encode(s) { return 'WULIN1:' + btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
+function decode(t) { const m = /WULIN1:([A-Za-z0-9+/=]+)/.exec(t.trim()); if (!m) throw new Error('bad'); return JSON.parse(decodeURIComponent(escape(atob(m[1])))); }
+
+// ---------------- 画人（画板 240 × 400，脚底 y = 392） ----------------
+function headGeom(s) { const h = 372 / (3 + s.heads); return { cx: 120, hcy: 20 + h / 2, ry: h / 2 }; }
+const INK = '#2B2233';
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function bodyGeom(s) {
+  const { cx, hcy, ry } = headGeom(s);
+  const rx = ry * (0.9 + 0.2 * s.faceWidth);
+  const shoulderY = hcy + ry + 2;
+  const bodyLen = 392 - shoulderY;
+  const torso = bodyLen * (0.5 - 0.1 * s.height);
+  const waistY = shoulderY + torso * 0.72, hipY = shoulderY + torso;
+  const sw = rx * 0.6 + s.build * 14, hw = sw * 0.92 + s.build * 4;
+  const legW = 15 + s.build * 6, legGap = 5;
+  return { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw, legW, legGap };
+}
+
+function layerBox(s, key, geometry = bodyGeom(s)) {
+  const { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw } = geometry;
+  const centered = (halfWidth, y, bottom) => ({ x: cx - halfWidth, y, w: halfWidth * 2, h: bottom - y });
+  switch (key) {
+    case 'hairFront': return centered(rx * 1.38, 0, hcy + ry * 1.3);
+    case 'hairBack': return centered(rx * 1.65, 0, hcy + ry * 4);
+    case 'head': return centered(rx * 1.75, 0, hcy + ry * 1.4);
+    case 'top': return centered(Math.max(sw, hw) + 25, shoulderY - 8, 392);
+    case 'back': return centered(108, Math.max(0, shoulderY - 85), 392);
+    case 'sleeve': return { x: cx - sw - 36, y: shoulderY - 4, w: 52, h: hipY - shoulderY + 25 };
+    case 'bottom': return centered(hw + 28, waistY - 8, 392);
+    case 'shoes': return centered(hw + 12, 348, 398);
+    case 'emblem': {
+      const e = sw * 0.95;
+      return centered(e / 2, lerp(shoulderY, waistY, 0.22), lerp(shoulderY, waistY, 0.22) + e);
+    }
+    case 'cloth': {
+      const tile = 16 + 48 * s.tileSize;
+      return centered(tile / 2, shoulderY, shoulderY + tile);
+    }
+    default: return { x: cx - 1.45 * ry, y: hcy - 1.5 * ry, w: 2.9 * ry, h: 2.9 * ry };
+  }
+}
+
+function drawPerson(s0, expr, age, opt = {}) {
+  const U = opt.uid || '';
+  const s = { ...s0 };
+  const D = s.draw?.v === 2 && s.draw.bindings ? s.draw : normDraw(s.draw);
+  const only = D.customOnly || {};
+  if (only.head) { s.head = 'none'; s.ear = 'none'; s.neck = 'none'; }
+  if (only.back) { s.cape = 'none'; s.weapon = 'none'; }
+  if (only.face) { s.blush = 0; s.beard = 'none'; s.mark = 'none'; s.mole = false; s.nose = 'none'; s.glasses = 'none'; }
+  if (age === 'elder') { s.hairColor = '#E6E4DE'; s.streak = 'none'; }
+  const browColor = age === 'elder' ? '#D8D4CC' : s.browFollow ? s.hairColor : s.browColor;
+  const geometry = bodyGeom(s);
+  const { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw, legW, legGap } = geometry;
+  function inkLayer(key, mirrored = false) {
+    if (key === opt.skip || !D[key]?.length) return '';
+    const { x, y, w, h } = layerBox(s, key, geometry);
+    const flip = mirrored ? `translate(${2 * cx} 0) scale(-1 1) ` : '';
+    const bone = mirrored ? 'armRight' : D.bindings[key];
+    return `<g data-draw-layer="${key}" data-bone="${bone}" transform="${flip}translate(${x} ${y}) scale(${w} ${h})">${strokesSvg(D[key])}</g>`;
+  }
+
+  // ---- 身体的各层 ----
+  const behind = []; // 披风、背着的兵器
+  const body = [];
+  const front = []; // 手里的兵器、拐杖
+  const hand = { lx: cx - sw - 10, rx: cx + sw + 10, y: hipY + 4 };
+
+  // 披风
+  if (s.cape !== 'none') {
+    const bottom = s.cape === 'long' ? 378 : lerp(shoulderY, 392, 0.55);
+    behind.push(`<path d="M${cx - sw - 2} ${shoulderY + 6} Q${cx - sw - 26} ${lerp(shoulderY, bottom, 0.6)} ${cx - sw - 18} ${bottom} Q${cx} ${bottom + 10} ${cx + sw + 18} ${bottom} Q${cx + sw + 26} ${lerp(shoulderY, bottom, 0.6)} ${cx + sw + 2} ${shoulderY + 6} Z" fill="${s.capeColor}"/>`);
+  }
+  // 背着的兵器
+  const W = s.weapon;
+  const onBack = s.weaponPos === 'back' && ['sword', 'saber', 'umbrella', 'flute', 'bow'].includes(W);
+  if (onBack) behind.push(weaponBack(W, cx, shoulderY, hipY, s.weaponColor, s.trimColor));
+  behind.push(inkLayer('back'));
+
+  // 腿和鞋
+  const legTop = hipY - 8, legBot = 382;
+  const lx1 = cx - legGap / 2 - legW, lx2 = cx + legGap / 2;
+  const longRobe = !only.top && ['changshan', 'daopao'].includes(s.top);
+  const skirt = !only.bottom && ['skirt', 'pleat'].includes(s.bottom);
+  const shoe = (x) => {
+    const c = s.shoeColor;
+    if (s.shoes === 'boots') return `<path d="M${x - 1} ${legBot - 14} h${legW + 2} v10 q8 2 8 9 h-${legW + 10} Z" fill="${c}"/>`;
+    if (s.shoes === 'straw') return `<ellipse cx="${x + legW / 2 + 2}" cy="${legBot + 5}" rx="${legW / 2 + 6}" ry="5" fill="#C9A86A"/><path d="M${x + 2} ${legBot + 1} L${x + legW} ${legBot - 6}" stroke="#8A6A3C" stroke-width="2"/>`;
+    return `<ellipse cx="${x + legW / 2 + 2}" cy="${legBot + 4}" rx="${legW / 2 + 5}" ry="6" fill="${c}"/>`;
+  };
+  if (only.top || only.bottom) {
+    body.push(`<path d="M${cx - sw} ${shoulderY + 9} Q${cx} ${shoulderY - 8} ${cx + sw} ${shoulderY + 9} Q${cx + hw * 0.7} ${waistY} ${cx + hw * 0.8} ${hipY - 7} Q${cx} ${hipY + 15} ${cx - hw * 0.8} ${hipY - 7} Q${cx - hw * 0.7} ${waistY} ${cx - sw} ${shoulderY + 9} Z" fill="${s.skin}"/>`);
+  }
+  if (!skirt) {
+    const legColor = only.bottom ? s.skin : s.bottomColor;
+    body.push(`<rect x="${lx1}" y="${legTop}" width="${legW}" height="${legBot - legTop + 4}" rx="7" fill="${legColor}"/><rect x="${lx2}" y="${legTop}" width="${legW}" height="${legBot - legTop + 4}" rx="7" fill="${legColor}"/>`);
+    if (!only.bottom && s.bottom === 'wrap') {
+      for (const x of [lx1, lx2]) for (let y = legBot - 40; y < legBot - 6; y += 7) body.push(`<path d="M${x} ${y + 5} L${x + legW} ${y}" stroke="#F4ECDD" stroke-width="2.4" opacity="0.8"/>`);
+    }
+  }
+  if (only.shoes) {
+    for (const x of [lx1, lx2]) body.push(`<ellipse cx="${x + legW / 2 + 1}" cy="385" rx="${legW / 2 + 2}" ry="6" fill="${s.skin}"/>`);
+  } else body.push(shoe(lx1 - 3) + shoe(lx2 - 1));
+  body.push(inkLayer('shoes'));
+  if (skirt) {
+    const top = waistY - 2;
+    body.push(`<path d="M${cx - hw} ${top} L${cx + hw} ${top} L${cx + hw + 22} ${legBot} Q${cx} ${legBot + 6} ${cx - hw - 22} ${legBot} Z" fill="${s.bottomColor}"/>`);
+    if (s.bottom === 'pleat') for (let i = -3; i <= 3; i++) body.push(`<path d="M${cx + i * hw * 0.28} ${top + 8} L${cx + i * (hw + 22) * 0.28} ${legBot - 2}" stroke="#000" stroke-opacity="0.15" stroke-width="1.5"/>`);
+  }
+  body.push(inkLayer('bottom'));
+
+  // 上衣
+  let topBottom = hipY + 6;
+  if (longRobe) topBottom = 376;
+  else if (s.top === 'yuanling') topBottom = lerp(hipY, 382, 0.5);
+  else if (s.top === 'ru') topBottom = waistY + 2;
+  else if (s.top === 'duangua' || s.top === 'vest') topBottom = hipY;
+  const flare = longRobe ? 20 : s.top === 'yuanling' ? 12 : 3;
+  const torsoPath = `M${cx - sw} ${shoulderY + 8} Q${cx} ${shoulderY - 6} ${cx + sw} ${shoulderY + 8} L${cx + hw + flare} ${topBottom} Q${cx} ${topBottom + (longRobe ? 6 : 2)} ${cx - hw - flare} ${topBottom} Z`;
+
+  // 袖子（先画，衣身压在上面）
+  const wide = s.sleeve === 'wide' || (!only.top && s.top === 'daopao');
+  const sleeveColor = !only.top && s.top === 'vest' ? lighten(s.topColor, 0.55) : s.topColor;
+  const sleeve = (side) => {
+    const sx = cx + side * (sw - 3), sy = shoulderY + 10, hx = side < 0 ? hand.lx : hand.rx;
+    if (wide) return `<path d="M${sx} ${sy - 4} Q${sx + side * 24} ${lerp(sy, hand.y, 0.5)} ${hx + side * 10} ${hand.y + 6} L${hx - side * 16} ${hand.y + 8} Q${sx - side * 2} ${lerp(sy, hand.y, 0.55)} ${sx - side * 10} ${sy + 8} Z" fill="${sleeveColor}"/><path d="M${hx + side * 10} ${hand.y + 6} L${hx - side * 16} ${hand.y + 8}" stroke="${s.trimColor}" stroke-width="4" stroke-linecap="round"/>`;
+    return `<path d="M${sx} ${sy - 4} Q${sx + side * 14} ${lerp(sy, hand.y, 0.5)} ${hx + side * 6} ${hand.y - 4} L${hx - side * 8} ${hand.y - 2} Q${sx - side * 2} ${lerp(sy, hand.y, 0.5)} ${sx - side * 9} ${sy + 8} Z" fill="${sleeveColor}"/>`
+      + (s.top === 'jin' || s.top === 'armor' ? `<rect x="${Math.min(hx + side * 6, hx - side * 8) - 1}" y="${hand.y - 14}" width="16" height="10" rx="3" fill="#2A2A33"/>` : '');
+  };
+  if (only.sleeve) {
+    for (const side of [-1, 1]) {
+      const wrist = side < 0 ? hand.lx : hand.rx;
+      body.push(`<path d="M${cx + side * (sw - 4)} ${shoulderY + 13} Q${wrist} ${waistY} ${wrist} ${hand.y + 4}" fill="none" stroke="${s.skin}" stroke-width="14" stroke-linecap="round"/>`);
+    }
+  } else body.push(sleeve(-1), sleeve(1));
+  body.push(inkLayer('sleeve'), inkLayer('sleeve', true));
+  body.push(`<circle cx="${hand.lx}" cy="${hand.y + 6}" r="8" fill="${s.skin}"/><circle cx="${hand.rx}" cy="${hand.y + 6}" r="8" fill="${s.skin}"/>`);
+  body.push(`<rect x="${cx - 9}" y="${hcy + ry * 0.7}" width="18" height="${shoulderY - hcy - ry * 0.7 + 6}" fill="${s.skin}"/>`);
+  if (!only.top) body.push(`<path d="${torsoPath}" fill="${s.topColor}"/>`);
+  // 花纹（剪在衣身里）
+  const customPattern = (s.pattern === 'custom' || only.cloth) && opt.skip !== 'cloth' && D.cloth.length;
+  if (customPattern) {
+    const T = 16 + 48 * s.tileSize;
+    body.push(`<defs><pattern id="cp${U}" patternUnits="userSpaceOnUse" x="${cx - T / 2}" y="${shoulderY}" width="${T}" height="${T}"><g data-draw-layer="cloth" data-bone="torso" transform="scale(${T})">${strokesSvg(D.cloth)}</g></pattern></defs>`);
+    if (!only.top) body.push(`<clipPath id="tc2${U}"><path d="${torsoPath}"/></clipPath><rect clip-path="url(#tc2${U})" x="${cx - hw - 40}" y="${shoulderY - 10}" width="${(hw + 40) * 2}" height="${topBottom - shoulderY + 20}" fill="url(#cp${U})"/>`);
+  } else if (!only.top && !only.cloth && s.pattern !== 'custom' && s.pattern !== 'none') body.push(`<clipPath id="tc${U}"><path d="${torsoPath}"/></clipPath><g clip-path="url(#tc${U})" opacity="0.55">${pattern(s.pattern, s.patternColor, cx - hw - 30, shoulderY - 10, (hw + 30) * 2, topBottom - shoulderY + 20)}</g>`);
+  // 领口
+  if (!only.top) {
+    if (s.top === 'yuanling') body.push(`<path d="M${cx - 16} ${shoulderY + 2} Q${cx} ${shoulderY + 18} ${cx + 16} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
+    else if (s.top === 'duangua') body.push(`<path d="M${cx} ${shoulderY + 4} V${topBottom}" stroke="${s.trimColor}" stroke-width="3"/>${[0.35, 0.55, 0.75].map((t) => `<rect x="${cx - 7}" y="${lerp(shoulderY, topBottom, t)}" width="14" height="4" rx="2" fill="${s.trimColor}"/>`).join('')}`);
+    else if (s.top === 'vest') body.push(`<path d="M${cx - 10} ${shoulderY + 2} L${cx} ${hipY - 6} L${cx + 10} ${shoulderY + 2}" fill="${lighten(s.topColor, 0.55)}"/><path d="M${cx - 10} ${shoulderY + 2} L${cx} ${hipY - 6} L${cx + 10} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="3" fill="none"/>`);
+    else body.push(`<path d="M${cx - 12} ${shoulderY + 2} L${cx + 10} ${lerp(shoulderY, waistY, 0.95)}" stroke="#F4ECDD" stroke-width="6" stroke-linecap="round"/><path d="M${cx + 12} ${shoulderY + 2} L${cx - 1} ${lerp(shoulderY, waistY, 0.55)}" stroke="#F4ECDD" stroke-width="6" stroke-linecap="round"/><path d="M${cx - 12} ${shoulderY + 2} L${cx + 10} ${lerp(shoulderY, waistY, 0.95)}" stroke="${s.trimColor}" stroke-width="2" stroke-linecap="round"/>`);
+    if (s.top === 'daopao') body.push(`<path d="M${cx - hw - flare} ${topBottom} Q${cx} ${topBottom + 6} ${cx + hw + flare} ${topBottom}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
+    if (s.top === 'armor') {
+      for (let i = 0; i < 3; i++) body.push(`<path d="M${cx - sw + 6} ${shoulderY + 22 + i * 14} Q${cx} ${shoulderY + 30 + i * 14} ${cx + sw - 6} ${shoulderY + 22 + i * 14}" stroke="${s.trimColor}" stroke-width="7" fill="none"/>`);
+      body.push(`<ellipse cx="${cx - sw}" cy="${shoulderY + 10}" rx="14" ry="9" fill="${s.trimColor}"/><ellipse cx="${cx + sw}" cy="${shoulderY + 10}" rx="14" ry="9" fill="${s.trimColor}"/>`);
+    }
+    // 腰带
+    if (s.top !== 'duangua' && s.top !== 'vest') body.push(`<rect x="${cx - hw - (longRobe ? 4 : 2)}" y="${waistY - 5}" width="${(hw + (longRobe ? 4 : 2)) * 2}" height="10" rx="4" fill="${s.beltColor}"/>`);
+  }
+  const customTop = inkLayer('top');
+  if (customTop && customPattern) {
+    // 由手绘上衣的不透明区域裁出花纹，镂空、衣摆和轮廓均保留。
+    body.push(`<g id="drawnTop${U}">${customTop}</g><mask id="drawnTopMask${U}" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="400"><use href="#drawnTop${U}"/></mask><rect width="240" height="400" fill="url(#cp${U})" mask="url(#drawnTopMask${U})"/>`);
+  } else body.push(customTop);
+  body.push(inkLayer('emblem'));
+  // 颈饰
+  if (s.neck === 'scarf') body.push(`<path d="M${cx - 18} ${shoulderY} Q${cx} ${shoulderY + 14} ${cx + 18} ${shoulderY} L${cx + 16} ${shoulderY + 12} Q${cx} ${shoulderY + 22} ${cx - 16} ${shoulderY + 12} Z" fill="${s.neckColor}"/><path d="M${cx + 8} ${shoulderY + 14} q6 22 -2 40 l10 -2 q6 -20 2 -38 Z" fill="${s.neckColor}"/>`);
+  if (s.neck === 'pendant') body.push(`<path d="M${cx - 12} ${shoulderY} Q${cx} ${shoulderY + 30} ${cx + 12} ${shoulderY}" stroke="#2A2A33" stroke-width="1.5" fill="none"/><circle cx="${cx}" cy="${shoulderY + 24}" r="7" fill="${s.neckColor}"/><circle cx="${cx}" cy="${shoulderY + 24}" r="2.5" fill="${s.topColor}"/>`);
+  // 披风前襟
+  if (s.cape !== 'none') body.push(`<path d="M${cx - sw - 2} ${shoulderY + 6} Q${cx} ${shoulderY + 22} ${cx + sw + 2} ${shoulderY + 6}" stroke="${s.capeColor}" stroke-width="8" fill="none" stroke-linecap="round"/><circle cx="${cx}" cy="${shoulderY + 16}" r="5" fill="${s.trimColor}"/>`);
+  // 手里或腰间的兵器
+  if (W !== 'none' && !onBack) front.push(weaponHand(W, hand, waistY, hipY, s.weaponColor, s.trimColor, cx, hcy - ry * (s.head === 'hat' ? 1.5 : 1.2)));
+  if (age === 'elder') front.push(`<path d="M${hand.lx} ${hand.y + 4} L${hand.lx - 8} 392" stroke="#8A5A3C" stroke-width="6" stroke-linecap="round"/><path d="M${hand.lx} ${hand.y + 4} q4 -10 -8 -12" stroke="#8A5A3C" stroke-width="6" fill="none" stroke-linecap="round"/>`);
+
+  // ---- 头 ----
+  const backHair = [];
+  const headParts = [];
+  const hc = s.hairColor;
+  const len = s.hairLen;
+  // 头发底（盖住头顶，画在脸后面）
+  if (!only.hairBack) backHair.push(`<ellipse cx="${cx}" cy="${hcy - ry * 0.08}" rx="${rx * 1.07}" ry="${ry * 1.04}" fill="${hc}"/>`);
+  if (!only.hairBack) switch (s.hairBack) {
+    case 'highpony': backHair.unshift(`<path d="M${cx + rx * 0.35} ${hcy - ry * 0.85} Q${cx + rx * 1.5} ${hcy - ry * 0.9} ${cx + rx * 1.25} ${hcy + ry * 0.2} Q${cx + rx * 1.05} ${hcy + ry * (0.8 + 1.8 * len)} ${cx + rx * 1.35} ${hcy + ry * (1 + 2.2 * len)} Q${cx + rx * 0.6} ${hcy + ry * (0.8 + 1.8 * len)} ${cx + rx * 0.7} ${hcy + ry * 0.2} Q${cx + rx * 0.6} ${hcy - ry * 0.4} ${cx + rx * 0.2} ${hcy - ry * 0.55} Z" fill="${hc}"/>`); headParts.push(`<circle cx="${cx + rx * 0.45}" cy="${hcy - ry * 0.88}" r="${ry * 0.14}" fill="${s.trimColor}"/>`); break;
+    case 'lowpony': backHair.unshift(`<path d="M${cx - rx * 0.3} ${hcy + ry * 0.5} Q${cx} ${hcy + ry * (1.2 + 2.6 * len)} ${cx + rx * 0.3} ${hcy + ry * 0.5} Z" fill="${hc}"/>`); break;
+    case 'long': backHair.unshift(`<path d="M${cx - rx * 1.05} ${hcy} Q${cx - rx * 1.2} ${hcy + ry * (1 + 2.4 * len)} ${cx - rx * 0.7} ${hcy + ry * (1.3 + 2.6 * len)} L${cx + rx * 0.7} ${hcy + ry * (1.3 + 2.6 * len)} Q${cx + rx * 1.2} ${hcy + ry * (1 + 2.4 * len)} ${cx + rx * 1.05} ${hcy} Z" fill="${hc}"/>`); break;
+    case 'buns': backHair.push(`<circle cx="${cx - rx * 0.78}" cy="${hcy - ry * 0.82}" r="${ry * 0.38}" fill="${hc}"/><circle cx="${cx + rx * 0.78}" cy="${hcy - ry * 0.82}" r="${ry * 0.38}" fill="${hc}"/>`); headParts.push(`<path d="M${cx - rx * 0.98} ${hcy - ry * 0.62} q${rx * 0.2} ${ry * 0.12} ${rx * 0.4} 0 M${cx + rx * 0.58} ${hcy - ry * 0.62} q${rx * 0.2} ${ry * 0.12} ${rx * 0.4} 0" stroke="${s.trimColor}" stroke-width="3" fill="none"/>`); break;
+    case 'topknot': backHair.push(`<circle cx="${cx}" cy="${hcy - ry * 1.08}" r="${ry * 0.34}" fill="${hc}"/>`); headParts.push(`<rect x="${cx - ry * 0.3}" y="${hcy - ry * 0.86}" width="${ry * 0.6}" height="${ry * 0.12}" rx="3" fill="${s.trimColor}"/>`); break;
+    case 'short': break;
+    case 'twintails': for (const sd of [-1, 1]) backHair.unshift(`<path d="M${cx + sd * rx * 0.8} ${hcy - ry * 0.4} Q${cx + sd * rx * 1.7} ${hcy + ry * 0.2} ${cx + sd * rx * 1.3} ${hcy + ry * (0.8 + 2 * len)} Q${cx + sd * rx * 1.05} ${hcy + ry * 0.3} ${cx + sd * rx * 0.8} ${hcy - ry * 0.1} Z" fill="${hc}"/>`); break;
+    case 'halfup': backHair.unshift(`<path d="M${cx - rx * 1.05} ${hcy} Q${cx - rx * 1.15} ${hcy + ry * (1 + 2 * len)} ${cx - rx * 0.6} ${hcy + ry * (1.2 + 2.2 * len)} L${cx + rx * 0.6} ${hcy + ry * (1.2 + 2.2 * len)} Q${cx + rx * 1.15} ${hcy + ry * (1 + 2 * len)} ${cx + rx * 1.05} ${hcy} Z" fill="${hc}"/>`); backHair.push(`<circle cx="${cx}" cy="${hcy - ry * 1.02}" r="${ry * 0.26}" fill="${hc}"/>`); break;
+  }
+  // 发梢挑染：用头发自己的形状做剪切，只给末端上色
+  if (!only.hairBack && s.streak === 'tips') {
+    const longStyle = ['highpony', 'lowpony', 'long', 'twintails', 'halfup'].includes(s.hairBack);
+    const tipY = longStyle ? hcy + ry * (0.75 + 1.7 * len) : hcy + ry * 0.55;
+    backHair.push(`<clipPath id="bh${U}">${backHair.join('').replace(/ fill="[^"]*"/g, '')}</clipPath><rect clip-path="url(#bh${U})" x="-100" y="${tipY}" width="440" height="400" fill="${s.streakColor}"/>`);
+  }
+
+  backHair.push(inkLayer('hairBack'));
+
+  // 脸
+  const facePath = (() => {
+    const t = hcy - ry, b = hcy + ry, l = cx - rx, r = cx + rx;
+    switch (s.faceShape) {
+      case 'round': return `M${l} ${hcy} A${rx} ${ry} 0 1 0 ${r} ${hcy} A${rx} ${ry} 0 1 0 ${l} ${hcy} Z`;
+      case 'square': return `M${l} ${hcy - ry * 0.2} Q${l} ${t} ${cx} ${t} Q${r} ${t} ${r} ${hcy - ry * 0.2} L${r - rx * 0.06} ${hcy + ry * 0.62} Q${r - rx * 0.12} ${b} ${cx} ${b} Q${l + rx * 0.12} ${b} ${l + rx * 0.06} ${hcy + ry * 0.62} Z`;
+      case 'pointed': return `M${l} ${hcy - ry * 0.1} Q${l} ${t} ${cx} ${t} Q${r} ${t} ${r} ${hcy - ry * 0.1} Q${r - rx * 0.08} ${hcy + ry * 0.6} ${cx} ${b + ry * 0.02} Q${l + rx * 0.08} ${hcy + ry * 0.6} ${l} ${hcy - ry * 0.1} Z`;
+      default: return `M${l} ${hcy - ry * 0.05} Q${l} ${t} ${cx} ${t} Q${r} ${t} ${r} ${hcy - ry * 0.05} Q${r} ${hcy + ry * 0.75} ${cx} ${b} Q${l} ${hcy + ry * 0.75} ${l} ${hcy - ry * 0.05} Z`;
+    }
+  })();
+  headParts.unshift(`<path d="${facePath}" fill="${s.skin}"/>`);
+
+  // 表情
+  const X = typeof expr === 'string' ? exprOf(expr, D) : expr;
+  let eyeStyle = s.eyes, mouthStyle = X.mouth === 'base' ? s.mouth : X.mouth, tilt = s.browTilt, browLift = 0, eyeScale = 1, eyeState = X.eye;
+  if (X.brow === 'up') { browLift = 5; tilt = Math.min(1, tilt + 0.2); }
+  if (X.brow === 'knit') { tilt = 1; browLift = -2; }
+  if (X.brow === 'down') { tilt = -0.9; }
+  if (eyeState === 'wide') eyeScale = 1.22;
+  if (eyeState === 'arc') eyeStyle = 'smile';
+  if (eyeState === 'star') eyeStyle = 'sparkle';
+  const omit = D.omitExpr?.[X.hand] || [];
+  const hideSlot = X.hand && (D.hide[X.hand] || only[X.hand]) && (hasDrawExpression(D, X.hand) || opt.forceHide);
+  const hideFace = only.face || hideSlot;
+  const fx = new Set(hideSlot || omit.includes('fx') ? [] : X.fx);
+  const es = (0.72 + 0.6 * s.eyeSize) * (ry / 52) * eyeScale;
+  const egap = rx * (0.28 + 0.2 * s.eyeGap);
+  const ey = hcy + ry * (0.06 + 0.24 * (s.eyeY - 0.5));
+  // 腮红
+  if (s.blush > 0.02) headParts.push(`<ellipse cx="${cx - egap - 2}" cy="${ey + 16 * es + 4}" rx="${10 * es + 2}" ry="${5.5 * es + 1}" fill="${s.blushColor}" opacity="${(0.15 + 0.6 * s.blush).toFixed(2)}"/><ellipse cx="${cx + egap + 2}" cy="${ey + 16 * es + 4}" rx="${10 * es + 2}" ry="${5.5 * es + 1}" fill="${s.blushColor}" opacity="${(0.15 + 0.6 * s.blush).toFixed(2)}"/>`);
+  // 面饰
+  const mc = s.markColor;
+  if (s.mark === 'tearmole') headParts.push(`<circle cx="${cx + egap + 7 * es}" cy="${ey + 11 * es}" r="${1.8 * es + 0.6}" fill="${INK}"/>`);
+  if (s.mark === 'huadian') headParts.push(`<path transform="translate(${cx} ${hcy - ry * 0.42}) scale(${ry / 52})" d="M0 -8 Q4 -2 0 6 Q-4 -2 0 -8 Z M-6 -2 Q0 0 -1 5 Q-6 3 -6 -2 Z M6 -2 Q0 0 1 5 Q6 3 6 -2 Z" fill="${mc}"/>`);
+  if (s.mark === 'scar') headParts.push(`<path d="M${cx - egap - 10 * es} ${ey + 8 * es} L${cx - egap + 6 * es} ${ey + 24 * es}" stroke="${mc}" stroke-width="2.4" stroke-linecap="round"/><path d="M${cx - egap - 6 * es} ${ey + 18 * es} L${cx - egap + 2 * es} ${ey + 13 * es}" stroke="${mc}" stroke-width="1.6"/>`);
+  if (s.mark === 'freckles') for (const [dx, dy] of [[-1.3, 1.3], [-0.9, 1.6], [-0.5, 1.4], [0.5, 1.4], [0.9, 1.6], [1.3, 1.3]]) headParts.push(`<circle cx="${cx + dx * egap * 0.9}" cy="${ey + dy * 10 * es + 6}" r="1.4" fill="${mc}" opacity="0.8"/>`);
+  if (s.mark === 'paint') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 2)} ${ey + 14 * es} l${sd * 14} -4 M${cx + sd * (egap + 2)} ${ey + 20 * es} l${sd * 14} -4" stroke="${mc}" stroke-width="3" stroke-linecap="round"/>`);
+  // 眼睛
+  const eyeRotDeg = (s.eyeRot || 0) * 25, esq = 0.7 + 0.6 * (s.eyeSquash ?? 0.5);
+  if (!hideFace && !omit.includes('eyes')) for (const sd of [-1, 1]) headParts.push(`<g transform="translate(${cx + sd * egap} ${ey}) rotate(${-sd * eyeRotDeg}) scale(${sd * es} ${es * esq})">${eyeWithState(eyeState, eyeStyle, s.eyeColor, s.skin)}</g>`);
+  if (age === 'elder') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 12 * es)} ${ey - 2} l${sd * 6} -3 M${cx + sd * (egap + 12 * es)} ${ey + 3} l${sd * 6} 2" stroke="#C9A58F" stroke-width="1.2"/>`);
+  // 表情特效
+  if (fx.has('blush')) for (const sd of [-1, 1]) headParts.push(`<ellipse cx="${cx + sd * (egap + 2)}" cy="${ey + 16 * es + 4}" rx="${12 * es + 2}" ry="${6 * es + 1}" fill="#FF6B81" opacity="0.55"/><path d="M${cx + sd * (egap - 4)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 2)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 8)} ${ey + 14 * es + 4} l${sd * 3} 5" stroke="#E2475F" stroke-width="1.6" opacity="0.7"/>`);
+  if (fx.has('tears')) headParts.push(`<path d="M${cx + egap + 4 * es} ${ey + 8 * es} q-3 6 0 9 q3 -3 0 -9 Z" fill="#7FC8FF"/>${eyeState === 'cry' ? `<path d="M${cx - egap} ${ey + 4} q-2 ${ry * 0.5} 2 ${ry * 0.8} M${cx + egap} ${ey + 4} q2 ${ry * 0.5} -2 ${ry * 0.8}" stroke="#7FC8FF" stroke-width="${4 * es + 1}" fill="none" stroke-linecap="round" opacity="0.85"/>` : ''}`);
+  // 眉毛
+  const bth = 1.6 + 4.2 * s.browThick;
+  // 眉毛画在头发上层（Q 版常见画法），刘海再厚表情也看得出来
+  const bgap = egap * (0.8 + 0.4 * (s.browGap ?? 0.5)), byy = ey - 15 * es - 4 - browLift - ((s.browY ?? 0.5) - 0.5) * ry * 0.45, bsz = 0.7 + 0.6 * (s.browSize ?? 0.5);
+  const browsSvg = [-1, 1].map((sd) => `<g transform="translate(${cx + sd * bgap} ${byy}) scale(${sd} 1) rotate(${-tilt * 18})">${brow(s.brows, browColor, bth, es * bsz)}</g>`).join('');
+  // 嘴
+  const my = hcy + ry * (0.5 + 0.2 * (s.mouthY - 0.5));
+  const ny = hcy + ry * (0.3 + 0.22 * ((s.noseY ?? 0.5) - 0.5)), nk = (ry / 52) * (0.7 + 0.6 * (s.noseSize ?? 0.5));
+  if (s.nose && s.nose !== 'none') headParts.push(`<g transform="translate(${cx} ${ny}) scale(${nk})">${nose(s.nose, shade(s.skin, -22))}</g>`);
+  const mw = 0.7 + 0.6 * (s.mouthSize ?? 0.5), mh = mw * (0.7 + 0.6 * (s.mouthSquash ?? 0.5));
+  if (!hideFace && !omit.includes('mouth')) headParts.push(`<g transform="translate(${cx} ${my}) scale(${(ry / 52) * mw} ${(ry / 52) * mh})">${mouth(mouthStyle)}</g>`);
+  // 痣：脸上任意位置
+  if (s.mole) headParts.push(`<circle cx="${cx + (s.moleX ?? 0.45) * rx * 0.85}" cy="${hcy + (s.moleY ?? 0.35) * ry * 0.85}" r="${(1.3 + 3 * (s.moleSize ?? 0.4)) * (ry / 52)}" fill="${INK}"/>`);
+  // 胡子
+  const bc = age === 'elder' ? '#E6E4DE' : hc;
+  if (s.beard === 'mustache') headParts.push(`<path d="M${cx} ${my - 6} q-8 -4 -16 2 q8 0 16 -1 q8 1 16 1 q-8 -6 -16 -2 Z" fill="${bc}"/>`);
+  if (s.beard === 'goatee') headParts.push(`<path d="M${cx - 6} ${my + 6} Q${cx} ${my + 26} ${cx + 6} ${my + 6} Z" fill="${bc}"/><path d="M${cx} ${my - 6} q-8 -4 -14 2 q7 0 14 -1 q7 1 14 1 q-6 -6 -14 -2 Z" fill="${bc}"/>`);
+  if (s.beard === 'full') headParts.push(`<path d="M${cx - rx * 0.92} ${hcy + ry * 0.1} Q${cx - rx * 0.8} ${hcy + ry * 1.05} ${cx} ${hcy + ry * 1.12} Q${cx + rx * 0.8} ${hcy + ry * 1.05} ${cx + rx * 0.92} ${hcy + ry * 0.1} Q${cx + rx * 0.6} ${hcy + ry * 0.75} ${cx} ${my + 4} Q${cx - rx * 0.6} ${hcy + ry * 0.75} ${cx - rx * 0.92} ${hcy + ry * 0.1} Z" fill="${bc}"/>`);
+  // 前发
+  if (!only.hairFront) headParts.push(frontHair(s.hairFront, cx, hcy, rx, ry, hc));
+  if (!hideFace && !omit.includes('brows')) headParts.push(browsSvg);
+  if (s.glasses && s.glasses !== 'none') headParts.push(glasses(s.glasses, s.glassesColor, cx, egap, ey + ((s.glassesY ?? 0.5) - 0.5) * ry * 0.25, (11 + 8 * (s.glassesSize ?? 0.5)) * (ry / 52)));
+  // 手绘：脸上一直显示的层 + 当前手绘表情的层，画在头发上面，画什么就是什么
+  headParts.push(inkLayer('face'));
+  if (X.hand) headParts.push(inkLayer(X.hand));
+  if (!only.hairFront && (s.streak === 'left' || s.streak === 'right')) {
+    const sd = s.streak === 'left' ? -1 : 1;
+    headParts.push(`<path d="M${cx + sd * rx * 0.25} ${hcy - ry * 1.02} Q${cx + sd * rx * 0.75} ${hcy - ry * 0.7} ${cx + sd * rx * 0.62} ${hcy - ry * 0.22} L${cx + sd * rx * 0.46} ${hcy - ry * 0.3} Q${cx + sd * rx * 0.5} ${hcy - ry * 0.75} ${cx + sd * rx * 0.1} ${hcy - ry * 1.0} Z" fill="${s.streakColor}"/>`);
+  }
+  headParts.push(inkLayer('hairFront'));
+  // 头饰、耳饰
+  const hd = s.headColor;
+  if (s.head === 'band') headParts.push(`<path d="M${cx - rx * 1.02} ${hcy - ry * 0.42} Q${cx} ${hcy - ry * 0.72} ${cx + rx * 1.02} ${hcy - ry * 0.42}" stroke="${hd}" stroke-width="${ry * 0.14}" fill="none"/><path d="M${cx + rx * 1.0} ${hcy - ry * 0.44} q${rx * 0.5} ${ry * 0.2} ${rx * 0.4} ${ry * 0.8} M${cx + rx * 1.0} ${hcy - ry * 0.44} q${rx * 0.3} ${ry * 0.4} ${rx * 0.1} ${ry * 0.95}" stroke="${hd}" stroke-width="${ry * 0.08}" fill="none" stroke-linecap="round"/>`);
+  if (s.head === 'pin') headParts.push(`<path d="M${cx + rx * 0.1} ${hcy - ry * 0.95} L${cx + rx * 0.95} ${hcy - ry * 1.3}" stroke="${hd}" stroke-width="4" stroke-linecap="round"/><circle cx="${cx + rx * 0.95}" cy="${hcy - ry * 1.3}" r="5" fill="${hd}"/><path d="M${cx + rx * 0.92} ${hcy - ry * 1.26} v14" stroke="${hd}" stroke-width="1.5"/><circle cx="${cx + rx * 0.92}" cy="${hcy - ry * 1.26 + 16}" r="2.5" fill="${hd}"/>`);
+  if (s.head === 'crown') headParts.push(`<path d="M${cx - ry * 0.32} ${hcy - ry * 0.95} L${cx - ry * 0.36} ${hcy - ry * 1.28} L${cx - ry * 0.12} ${hcy - ry * 1.12} L${cx} ${hcy - ry * 1.36} L${cx + ry * 0.12} ${hcy - ry * 1.12} L${cx + ry * 0.36} ${hcy - ry * 1.28} L${cx + ry * 0.32} ${hcy - ry * 0.95} Z" fill="${hd}"/><circle cx="${cx}" cy="${hcy - ry * 1.08}" r="${ry * 0.06}" fill="#7FE0FF"/><path d="M${cx - rx * 0.7} ${hcy - ry * 1.0} H${cx + rx * 0.7}" stroke="${hd}" stroke-width="3" stroke-linecap="round"/>`);
+  if (s.head === 'hat') headParts.push(`<path d="M${cx - rx * 1.7} ${hcy - ry * 0.55} Q${cx} ${hcy - ry * 2.0} ${cx + rx * 1.7} ${hcy - ry * 0.55} Q${cx} ${hcy - ry * 0.8} ${cx - rx * 1.7} ${hcy - ry * 0.55} Z" fill="${hd}"/><path d="M${cx - rx * 1.7} ${hcy - ry * 0.55} Q${cx} ${hcy - ry * 0.8} ${cx + rx * 1.7} ${hcy - ry * 0.55}" stroke="#000" stroke-opacity="0.25" stroke-width="2" fill="none"/>`);
+  if (s.head === 'veil') headParts.push(`<path d="M${cx - rx * 0.92} ${ey + 10 * es} Q${cx} ${ey + 6 * es} ${cx + rx * 0.92} ${ey + 10 * es} L${cx + rx * 0.8} ${hcy + ry * 1.05} Q${cx} ${hcy + ry * 1.2} ${cx - rx * 0.8} ${hcy + ry * 1.05} Z" fill="${hd}" opacity="0.72"/>`);
+  if (s.head === 'flower') headParts.push(`<g transform="translate(${cx - rx * 0.82} ${hcy - ry * 0.62})">${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="0" cy="-7" rx="5" ry="8" fill="${hd}" transform="rotate(${a})"/>`).join('')}<circle r="4" fill="#F4E3A0"/></g>`);
+  if (s.ear !== 'none') for (const sd of [-1, 1]) {
+    const ex = cx + sd * rx * 0.98, eyy = hcy + ry * 0.28;
+    headParts.push(s.ear === 'stud' ? `<circle cx="${ex}" cy="${eyy}" r="3" fill="${s.earColor}"/>` : `<path d="M${ex} ${eyy} v12" stroke="${s.earColor}" stroke-width="1.5"/><circle cx="${ex}" cy="${eyy + 15}" r="4" fill="${s.earColor}"/>`);
+  }
+  headParts.push(inkLayer('head'));
+  const defs = '';
+  if (fx.has('sweat')) headParts.push(`<path d="M${cx + rx * 0.82} ${hcy - ry * 0.55} q-6 10 0 14 q6 -4 0 -14 Z" fill="#9CD8FF" stroke="#5AA9D6" stroke-width="1"/>`);
+  if (fx.has('anger')) headParts.push(`<g transform="translate(${cx + rx * 0.62} ${hcy - ry * 0.62})" stroke="#E23B3B" stroke-width="3" stroke-linecap="round"><path d="M-7 -2 q5 0 5 -5 M7 -2 q-5 0 -5 -5 M-7 2 q5 0 5 5 M7 2 q-5 0 -5 5" fill="none"/></g>`);
+  if (fx.has('gloom')) headParts.push(`<path d="M${cx - rx * 0.5} ${hcy - ry * 0.55} v${ry * 0.3} M${cx - rx * 0.25} ${hcy - ry * 0.6} v${ry * 0.35} M${cx} ${hcy - ry * 0.62} v${ry * 0.36} M${cx + rx * 0.25} ${hcy - ry * 0.6} v${ry * 0.35} M${cx + rx * 0.5} ${hcy - ry * 0.55} v${ry * 0.3}" stroke="#5B6BB0" stroke-width="2.5" opacity="0.55"/>`);
+  if (fx.has('sparkle')) headParts.push(`<g fill="#FFD45E">${[[-1.25, -0.9, 1], [1.3, -0.6, 0.8], [1.05, -1.25, 0.6]].map(([dx, dy, k]) => `<path transform="translate(${cx + dx * rx} ${hcy + dy * ry}) scale(${k})" d="M0 -9 L2.5 -2.5 L9 0 L2.5 2.5 L0 9 L-2.5 2.5 L-9 0 L-2.5 -2.5 Z"/>`).join('')}</g>`);
+  if (fx.has('heart')) headParts.push(`<path transform="translate(${cx + rx * 1.15} ${hcy - ry * 0.95}) scale(${ry / 40})" d="M0 6 C-10 -2 -8 -10 -2 -9 C0 -9 0 -7 0 -6 C0 -7 0 -9 2 -9 C8 -10 10 -2 0 6 Z" fill="#FF5C8A"/>`);
+  if (fx.has('zzz')) headParts.push(`<g fill="#5B6BB0" font-family="sans-serif" font-weight="700"><text x="${cx + rx * 0.9}" y="${hcy - ry * 0.9}" font-size="${ry * 0.3}">z</text><text x="${cx + rx * 1.15}" y="${hcy - ry * 1.15}" font-size="${ry * 0.4}">z</text><text x="${cx + rx * 1.45}" y="${hcy - ry * 1.45}" font-size="${ry * 0.5}">Z</text></g>`);
+
+  // ---- 组合（孩子：身体缩小、头大一点并下移；老人：微微前倾） ----
+  const shadow = `<ellipse cx="${cx}" cy="392" rx="${hw + 28}" ry="7" fill="#000" opacity="0.18"/>`;
+  let headT = '', bodyT = '', allT = '';
+  if (age === 'child') {
+    const k = 0.66;
+    const newShoulder = 392 - (392 - shoulderY) * k;
+    bodyT = `transform="translate(${cx} 392) scale(${k}) translate(${-cx} -392)"`;
+    headT = `transform="translate(0 ${newShoulder - shoulderY}) translate(${cx} ${hcy}) scale(1.04) translate(${-cx} ${-hcy})"`;
+  }
+  if (age === 'elder') allT = `transform="rotate(3 ${cx} 392)"`;
+  return `${defs}${shadow}<g ${allT}><g ${bodyT}>${behind.join('')}</g><g ${headT}>${backHair.join('')}</g><g ${bodyT}>${body.join('')}</g><g ${headT}>${headParts.join('')}</g><g ${bodyT}>${front.join('')}</g></g>`;
+}
+
+function lighten(hex, t) { const { h, s, l } = hex2hsl(hex); return hsl2hex(h, s * 0.7, l + (100 - l) * t); }
+
+function pattern(kind, c, x, y, w, h) {
+  const out = [];
+  if (kind === 'cloud') for (let yy = y; yy < y + h; yy += 26) for (let xx = x + ((yy / 26) % 2) * 14; xx < x + w; xx += 28) out.push(`<path d="M${xx} ${yy} q6 -8 12 0 q6 -8 12 0 M${xx + 6} ${yy} q0 6 6 6" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round"/>`);
+  if (kind === 'check') { for (let xx = x; xx < x + w; xx += 16) out.push(`<path d="M${xx} ${y} V${y + h}" stroke="${c}" stroke-width="3"/>`); for (let yy = y; yy < y + h; yy += 16) out.push(`<path d="M${x} ${yy} H${x + w}" stroke="${c}" stroke-width="3"/>`); }
+  if (kind === 'floral') for (let yy = y + 8; yy < y + h; yy += 22) for (let xx = x + ((yy / 22) % 2) * 11 + 6; xx < x + w; xx += 22) out.push(`<g transform="translate(${xx} ${yy})">${[0, 90, 180, 270].map((a) => `<circle cx="0" cy="-3.5" r="3" fill="${c}" transform="rotate(${a})"/>`).join('')}</g>`);
+  if (kind === 'dots') for (let yy = y + 6; yy < y + h; yy += 14) for (let xx = x + ((yy / 14) % 2) * 7 + 4; xx < x + w; xx += 14) out.push(`<circle cx="${xx}" cy="${yy}" r="2.6" fill="${c}"/>`);
+  return out.join('');
+}
+
+// 眼睛：以眼睛中心为原点，右眼方向画，左眼由外面镜像
+function eyeWithState(state, style, c, skin) {
+  if (state === 'closed') return `<path d="M-8 -1 Q0 4 8 -1" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  if (state === 'cry') return `<path d="M-8 2 Q0 -6 8 2" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  if (state === 'half') return `${eye(style, c)}<path d="M-12 -12 H12 V-1 Q0 -3 -12 -1 Z" fill="${skin}"/><path d="M-10 -1 Q0 -3 10 -1" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+  return eye(style, c);
+}
+function eye(style, c) {
+  const hl = '<circle cx="2.5" cy="-3" r="2" fill="#fff"/>';
+  switch (style) {
+    case 'round': return `<circle r="7" fill="${c}"/><circle r="3.6" fill="${INK}"/>${hl}`;
+    case 'almond': return `<ellipse rx="8" ry="6.5" fill="${c}"/><circle r="3.4" fill="${INK}"/>${hl}<path d="M-9 -3 Q0 -10 9 -4" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    case 'phoenix': return `<path d="M-9 1 Q-2 -7 10 -5 Q4 4 -9 1 Z" fill="${c}"/><circle cx="1" cy="-1.5" r="3" fill="${INK}"/><circle cx="2.5" cy="-3" r="1.4" fill="#fff"/><path d="M-9 1 Q-2 -8 11 -6" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    case 'droopy': return `<path d="M-8 -3 Q2 -9 9 2 Q0 6 -8 -3 Z" fill="${c}"/><circle cx="0" cy="-1" r="3.2" fill="${INK}"/><circle cx="1.5" cy="-2.5" r="1.4" fill="#fff"/><path d="M-8 -4 Q2 -10 10 2" stroke="${INK}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+    case 'smile': return `<path d="M-8 2 Q0 -7 8 2" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    case 'sleepy': return `<ellipse cy="1" rx="7.5" ry="5" fill="${c}"/><circle cy="2" r="3" fill="${INK}"/><path d="M-9 -1 H9" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><path d="M-8 -1 Q0 -3 8 -1 L8 -6 L-8 -6 Z" fill="var(--skin)"/>`;
+    case 'cat': return `<path d="M-8 2 Q-2 -6 9 -6 Q6 4 -8 2 Z" fill="${c}"/><ellipse cx="1" cy="-1" rx="1.8" ry="3.8" fill="${INK}"/><path d="M-9 2 Q-2 -7 10 -7 L14 -10" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    case 'sparkle': return `<ellipse rx="8.5" ry="9" fill="${c}"/><circle r="4" fill="${INK}"/><path d="M3 -5 l1 -3 l1 3 l3 1 l-3 1 l-1 3 l-1 -3 l-3 -1 Z" fill="#fff"/><circle cx="-3" cy="4" r="1.4" fill="#fff"/>`;
+  }
+  return '';
+}
+function brow(style, c, th, es) {
+  const w = 10 * es + 4;
+  switch (style) {
+    case 'sword': return `<path d="M${-w} 2 L${w} -3" stroke="${c}" stroke-width="${th}" stroke-linecap="round"/><path d="M${w - 3} -3 L${w + 2} -6" stroke="${c}" stroke-width="${th * 0.7}" stroke-linecap="round"/>`;
+    case 'willow': return `<path d="M${-w} 1 Q0 -${4 + th} ${w + 2} 0" stroke="${c}" stroke-width="${Math.max(1.4, th * 0.55)}" fill="none" stroke-linecap="round"/>`;
+    case 'flat': return `<path d="M${-w} 0 H${w}" stroke="${c}" stroke-width="${th}" stroke-linecap="round"/>`;
+    case 'thick': return `<rect x="${-w}" y="${-th}" width="${w * 2}" height="${th * 2}" rx="${th}" fill="${c}"/>`;
+    case 'droopy': return `<path d="M${-w} -2 Q0 -4 ${w} 3" stroke="${c}" stroke-width="${th}" fill="none" stroke-linecap="round"/>`;
+    case 'short': return `<path d="M${-w * 0.4} 0 H${w * 0.4}" stroke="${c}" stroke-width="${th + 1}" stroke-linecap="round"/>`;
+  }
+  return '';
+}
+function shade(hex, dl) { const { h, s, l } = hex2hsl(hex); return hsl2hex(h, Math.min(100, s + 8), Math.max(5, Math.min(95, l + dl))); }
+function nose(style, c) {
+  switch (style) {
+    case 'dot': return `<circle cx="-2.5" cy="0" r="1.3" fill="${c}"/><circle cx="2.5" cy="0" r="1.3" fill="${c}"/>`;
+    case 'small': return `<path d="M-2.5 1 Q0 3 2.5 1" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    case 'hook': return `<path d="M0 -7 Q4 -1 1 2 L-1 2" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    case 'button': return `<circle r="3" fill="${c}" opacity="0.55"/>`;
+    case 'line': return `<path d="M0 -7 V1" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`;
+    case 'round': return `<ellipse rx="5" ry="4" fill="${c}" opacity="0.4"/><circle cx="-2.5" cy="1.5" r="1.2" fill="${c}"/><circle cx="2.5" cy="1.5" r="1.2" fill="${c}"/>`;
+  }
+  return '';
+}
+function glasses(style, c, cx, gap, y, r) {
+  const L = cx - gap, R = cx + gap;
+  const bridge = `<path d="M${L + r} ${y} Q${cx} ${y - r * 0.35} ${R - r} ${y}" stroke="${c}" stroke-width="2" fill="none"/>`;
+  switch (style) {
+    case 'round': return `<circle cx="${L}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><circle cx="${R}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/>${bridge}`;
+    case 'square': return `<rect x="${L - r * 1.1}" y="${y - r * 0.8}" width="${r * 2.2}" height="${r * 1.6}" rx="${r * 0.3}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><rect x="${R - r * 1.1}" y="${y - r * 0.8}" width="${r * 2.2}" height="${r * 1.6}" rx="${r * 0.3}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/>${bridge}`;
+    case 'half': return `<path d="M${L - r} ${y} Q${L} ${y + r * 1.1} ${L + r} ${y} M${R - r} ${y} Q${R} ${y + r * 1.1} ${R + r} ${y}" stroke="${c}" stroke-width="2.4" fill="none"/><path d="M${L - r} ${y - 1} H${L + r} M${R - r} ${y - 1} H${R + r}" stroke="${c}" stroke-width="1.2"/>${bridge}`;
+    case 'sun': return `<ellipse cx="${L}" cy="${y}" rx="${r * 1.1}" ry="${r * 0.85}" fill="${c}" stroke="${c}" stroke-width="2"/><ellipse cx="${R}" cy="${y}" rx="${r * 1.1}" ry="${r * 0.85}" fill="${c}" stroke="${c}" stroke-width="2"/><path d="M${L - r * 0.5} ${y - r * 0.35} l${r * 0.4} -${r * 0.2} M${R - r * 0.5} ${y - r * 0.35} l${r * 0.4} -${r * 0.2}" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>${bridge}`;
+    case 'monocle': return `<circle cx="${R}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><path d="M${R + r * 0.7} ${y + r * 0.7} Q${R + r * 1.6} ${y + r * 3} ${R + r * 0.4} ${y + r * 4.5}" stroke="${c}" stroke-width="1.2" fill="none"/>`;
+  }
+  return '';
+}
+function mouth(style) {
+  const lip = '#9C3D46';
+  switch (style) {
+    case 'smile': return `<path d="M-6 0 Q0 5 6 0" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    case 'o': return `<ellipse rx="4" ry="5" fill="${lip}"/>`;
+    case 'flat': return `<path d="M-6 1 H6" stroke="${lip}" stroke-width="2.6" stroke-linecap="round"/>`;
+    case 'grin': return `<path d="M-9 -2 Q0 12 9 -2 Z" fill="${lip}"/><path d="M-7 -1 H7 V2 H-7 Z" fill="#fff"/>`;
+    case 'cat': return `<path d="M-7 -1 Q-3.5 4 0 0 Q3.5 4 7 -1" stroke="${lip}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    case 'smirk': return `<path d="M-6 1 Q2 3 7 -3" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    case 'frown': return `<path d="M-6 3 Q0 -3 6 3" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    case 'open': return `<path d="M-8 -3 Q0 -4 8 -3 Q7 10 0 11 Q-7 10 -8 -3 Z" fill="${lip}"/><ellipse cy="7" rx="4.5" ry="2.5" fill="#E8828F"/>`;
+    case 'wavy': return `<path d="M-8 1 q2 -3 4 0 q2 3 4 0 q2 -3 4 0 q2 3 4 0" stroke="${lip}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    case 'tongue': return `<path d="M-7 -1 Q0 6 7 -1" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M1 2 q3 6 6 0 Z" fill="#E8828F"/>`;
+  }
+  return '';
+}
+function frontHair(style, cx, hcy, rx, ry, c) {
+  const L = cx - rx * 1.04, R = cx + rx * 1.04, T = hcy - ry * 1.08, temple = hcy - ry * 0.05;
+  const cap = (inner) => `<path d="M${L} ${temple} Q${L} ${T} ${cx} ${T} Q${R} ${T} ${R} ${temple} ${inner} Z" fill="${c}"/>`;
+  const locks = `<path d="M${L + 2} ${temple - 8} Q${L - 4} ${hcy + ry * 0.45} ${L + rx * 0.14} ${hcy + ry * 0.7} L${L + rx * 0.2} ${hcy + ry * 0.2} Z M${R - 2} ${temple - 8} Q${R + 4} ${hcy + ry * 0.45} ${R - rx * 0.14} ${hcy + ry * 0.7} L${R - rx * 0.2} ${hcy + ry * 0.2} Z" fill="${c}"/>`;
+  const f = hcy - ry * 0.32; // 刘海下沿
+  switch (style) {
+    case 'qi': return cap(`L${R - rx * 0.08} ${f} L${L + rx * 0.08} ${f}`) + locks;
+    case 'middle': return cap(`Q${cx + rx * 0.5} ${hcy - ry * 0.2} ${cx} ${hcy - ry * 0.78} Q${cx - rx * 0.5} ${hcy - ry * 0.2} ${L} ${temple}`) + locks;
+    case 'side': return cap(`Q${R - rx * 0.2} ${hcy - ry * 0.55} ${cx + rx * 0.3} ${hcy - ry * 0.82} Q${cx - rx * 0.3} ${hcy - ry * 0.25} ${L + rx * 0.05} ${hcy - ry * 0.12}`) + locks;
+    case 'messy': { let d = ''; const n = 7; for (let i = n; i >= 0; i--) { const x = L + rx * 0.08 + ((R - L - rx * 0.16) * i) / n; d += `L${x} ${i % 2 ? f + ry * 0.06 : f - ry * 0.16} `; } return cap(d) + locks; }
+    case 'air': return cap(`L${R - rx * 0.1} ${hcy - ry * 0.6} L${L + rx * 0.1} ${hcy - ry * 0.6}`) + `<path d="M${cx - rx * 0.5} ${hcy - ry * 0.62} q-2 ${ry * 0.2} -4 ${ry * 0.3} M${cx - rx * 0.15} ${hcy - ry * 0.62} q-1 ${ry * 0.22} -2 ${ry * 0.34} M${cx + rx * 0.2} ${hcy - ry * 0.62} q1 ${ry * 0.22} 2 ${ry * 0.32} M${cx + rx * 0.52} ${hcy - ry * 0.62} q2 ${ry * 0.2} 3 ${ry * 0.28}" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>` + locks;
+    case 'bare': return cap(`Q${cx + rx * 0.7} ${hcy - ry * 0.72} ${cx} ${hcy - ry * 0.74} Q${cx - rx * 0.7} ${hcy - ry * 0.72} ${L} ${temple}`);
+    case 'longside': return cap(`Q${R - rx * 0.2} ${hcy - ry * 0.55} ${cx + rx * 0.3} ${hcy - ry * 0.82} Q${cx - rx * 0.3} ${hcy - ry * 0.25} ${L + rx * 0.05} ${hcy - ry * 0.12}`) + locks + `<path d="M${cx - rx * 0.3} ${hcy - ry * 0.75} Q${L - rx * 0.1} ${hcy - ry * 0.1} ${L + rx * 0.05} ${hcy + ry * 0.95} L${L + rx * 0.3} ${hcy + ry * 0.2} Q${L + rx * 0.3} ${hcy - ry * 0.4} ${cx - rx * 0.2} ${hcy - ry * 0.7} Z" fill="${c}"/>`;
+    case 'curly': { let d = ''; const n = 6; for (let i = n; i >= 0; i--) { const x = L + rx * 0.1 + ((R - L - rx * 0.2) * i) / n; d += `Q${x + rx * 0.06} ${f + ry * 0.14} ${x} ${f} `; } return cap(d) + locks; }
+  }
+  return '';
+}
+function weaponBack(w, cx, sy, hy, c, trim) {
+  const x1 = cx + 46, y1 = sy - 34, x2 = cx - 56, y2 = hy + 40;
+  if (w === 'sword') return `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="${c}" stroke-width="7" stroke-linecap="round"/><path d="M${x1 - 10} ${y1 + 2} L${x1 + 4} ${y1 + 14}" stroke="${trim}" stroke-width="7" stroke-linecap="round"/><path d="M${x1 + 4} ${y1 - 12} L${x1 - 2} ${y1 + 4}" stroke="#5A3A2E" stroke-width="7" stroke-linecap="round"/>`;
+  if (w === 'saber') return `<path d="M${x1} ${y1} Q${cx - 4} ${sy - 6} ${x2} ${y2}" stroke="${c}" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M${x1 - 10} ${y1 + 2} L${x1 + 4} ${y1 + 14}" stroke="${trim}" stroke-width="7" stroke-linecap="round"/><path d="M${x1 + 4} ${y1 - 14} L${x1 - 2} ${y1 + 4}" stroke="#5A3A2E" stroke-width="7" stroke-linecap="round"/>`;
+  if (w === 'umbrella') return `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="#5A3A2E" stroke-width="3"/><path d="M${x1 - 6} ${y1 + 10} L${x2 + 16} ${y2 - 30} L${x2 + 30} ${y2 - 22} Z" fill="${trim}"/>`;
+  if (w === 'flute') return `<path d="M${x1} ${y1 + 10} L${x2 + 20} ${y2 - 20}" stroke="#7FA36B" stroke-width="6" stroke-linecap="round"/>`;
+  if (w === 'bow') return `<path d="M${x1 + 4} ${y1} Q${cx - 70} ${sy - 10} ${x2 - 4} ${y2}" stroke="#8A5A3C" stroke-width="5" fill="none"/><path d="M${x1 + 4} ${y1} L${x2 - 4} ${y2}" stroke="#E9ECF2" stroke-width="1.4"/>`;
+  return '';
+}
+function weaponHand(w, hand, wy, hy, c, trim, cx, headTop) {
+  const x = hand.rx, y = hand.y + 6;
+  if (w === 'sword') return `<path d="M${x} ${y} L${x + 18} ${y - 92}" stroke="${c}" stroke-width="6" stroke-linecap="round"/><path d="M${x - 8} ${y - 6} L${x + 10} ${y - 2}" stroke="${trim}" stroke-width="6" stroke-linecap="round"/><path d="M${x} ${y} L${x - 3} ${y + 14}" stroke="#5A3A2E" stroke-width="6" stroke-linecap="round"/>`;
+  if (w === 'saber') return `<path d="M${x} ${y} Q${x + 34} ${y - 50} ${x + 14} ${y - 90}" stroke="${c}" stroke-width="10" fill="none" stroke-linecap="round"/><path d="M${x - 8} ${y - 6} L${x + 10} ${y - 2}" stroke="${trim}" stroke-width="6" stroke-linecap="round"/>`;
+  if (w === 'fan') return `<path d="M${x} ${y} L${x + 34} ${y - 30} A46 46 0 0 1 ${x + 40} ${y + 6} Z" fill="#F4ECDD" stroke="${trim}" stroke-width="2"/><path d="M${x} ${y} L${x + 40} ${y - 18} M${x} ${y} L${x + 44} ${y - 6}" stroke="${trim}" stroke-width="1"/>`;
+  if (w === 'umbrella') {
+    // 伞举过头顶：伞杆从手到头顶上方，伞面罩在头上
+    const tx = cx + 26, ty = headTop - 10, sp = 74;
+    return `<path d="M${x} ${y + 4} L${tx} ${ty}" stroke="#5A3A2E" stroke-width="3"/><path d="M${tx - sp} ${ty + 22} Q${tx} ${ty - 34} ${tx + sp} ${ty + 22} Q${tx} ${ty + 8} ${tx - sp} ${ty + 22} Z" fill="${trim}"/><path d="M${tx} ${ty - 6} L${tx - sp * 0.6} ${ty + 16} M${tx} ${ty - 6} V${ty + 12} M${tx} ${ty - 6} L${tx + sp * 0.6} ${ty + 16}" stroke="#000" stroke-opacity="0.15" stroke-width="1.5"/><circle cx="${tx}" cy="${ty - 8}" r="3" fill="#5A3A2E"/>`;
+  }
+  if (w === 'gourd') return `<path d="M${hand.lx + 30} ${wy} v10" stroke="#5A3A2E" stroke-width="2"/><circle cx="${hand.lx + 30}" cy="${wy + 16}" r="7" fill="#D9A441"/><circle cx="${hand.lx + 30}" cy="${wy + 30}" r="10" fill="#D9A441"/>`;
+  if (w === 'flute') return `<path d="M${x - 14} ${y - 4} L${x + 40} ${y - 30}" stroke="#7FA36B" stroke-width="6" stroke-linecap="round"/><circle cx="${x + 20}" cy="${y - 20}" r="1.5" fill="#2A2A33"/><circle cx="${x + 28}" cy="${y - 24}" r="1.5" fill="#2A2A33"/>`;
+  if (w === 'bow') return `<path d="M${x + 6} ${y - 80} Q${x + 46} ${y} ${x + 6} ${y + 60}" stroke="#8A5A3C" stroke-width="5" fill="none"/><path d="M${x + 6} ${y - 80} L${x + 6} ${y + 60}" stroke="#E9ECF2" stroke-width="1.4"/>`;
+  return '';
+}
+
+// ---------------- 背景 ----------------
+function background(kind) {
+  if (kind === 'night') return `<defs><radialGradient id="lg"><stop offset="0" stop-color="#FF9A4D" stop-opacity="0.45"/><stop offset="1" stop-color="#FF9A4D" stop-opacity="0"/></radialGradient></defs>
+    <rect x="-600" y="-40" width="1440" height="440" fill="#18222F"/><circle cx="250" cy="50" r="22" fill="#F3EBD0"/>
+    <rect x="-600" y="170" width="1440" height="70" fill="#5E6874"/><rect x="-600" y="160" width="1440" height="14" fill="#232831"/>
+    <rect x="-600" y="240" width="1440" height="160" fill="#3A4652"/><circle cx="-20" cy="200" r="46" fill="url(#lg)"/><circle cx="260" cy="200" r="46" fill="url(#lg)"/>
+    <ellipse cx="-20" cy="200" rx="11" ry="14" fill="#D9402E"/><ellipse cx="260" cy="200" rx="11" ry="14" fill="#D9402E"/>
+    <rect x="-600" y="300" width="1440" height="40" fill="#DDE6EF" opacity="0.12"/>`;
+  if (kind === 'plain') return `<rect x="-600" y="-40" width="1440" height="440" fill="var(--stage)"/>`;
+  return `<rect x="-600" y="-40" width="1440" height="440" fill="#F5ECDB"/><path d="M-600 150 Q20 120 100 140 Q180 112 300 136 Q560 120 840 140 V180 H-600Z" fill="#C9D3C0" opacity="0.7"/>
+    <rect x="-600" y="170" width="1440" height="70" fill="#F4EEE2"/><rect x="-600" y="160" width="1440" height="14" fill="#4A4F5C"/>
+    <rect x="-600" y="240" width="1440" height="160" fill="#D8CDB9"/><path d="M-600 290 H840 M-600 340 H840" stroke="#C4B8A2" stroke-width="2"/>`;
+}
+
+// @@shared-end
+
+// ================= 一日一夜 · 样机 =================
+// 别的玩家都用电脑代替：邻居、来砸门的鬼、你当鬼时去砸的人家。所有数字都是占位，只用来试手感。
+const $ = (id) => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const rnd = (a, b) => a + Math.random() * (b - a);
+const ri = ([a, b]) => a + Math.floor(Math.random() * (b - a + 1));
+const pick = (a) => a[Math.floor(Math.random() * a.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const pct = (v) => Math.round(v * 100) + '%';
+let SPEED = 1; // 测试时调快
+
+const CFG = { lifeDays: 5, dayStart: 360, dusk: 1080, hpMax: 3, bag: 6, bagBuddy: 3, buddyAt: 20, helpAt: 40 };
+
+// ---------------- 野外 ----------------
+const RINGS = [
+  { name: '近郊', hint: '安全，东西普通', r: 64, band: 90, gather: 40, danger: 0.06, fight: 0.85, escape: 0.75, death: 0, loot: [['柴', 0.55], ['草药', 0.45]], foes: ['野狗', '毒蛇'], fill: '#CFE3C0' },
+  { name: '山林', hint: '有野兽，东西好', r: 112, band: 136, gather: 50, danger: 0.24, fight: 0.6, escape: 0.45, death: 0, loot: [['草药', 0.3], ['兽皮', 0.35], ['铁矿', 0.35]], foes: ['山狼', '黑熊', '山贼'], fill: '#9FBF8E' },
+  { name: '禁地', hint: '很危险，有宝物', r: 158, band: 180, gather: 60, danger: 0.4, fight: 0.45, escape: 0.2, death: 0.5, loot: [['古物', 0.6], ['宝物', 0.4]], foes: ['凶尸', '古墓机关', '毒瘴'], fill: '#7E6F96' },
+];
+const SPOTS = [['河边', 0, -50], ['竹林', 0, 70], ['菜地', 0, 190], ['松林', 1, -10], ['猎场', 1, 110], ['矿洞', 1, 230], ['古墓', 2, 40], ['乱葬岗', 2, 200]]
+  .map(([name, ring, a], id) => ({ id, name, ring, x: 180 + RINGS[ring].r * Math.cos((a * Math.PI) / 180), y: 180 + RINGS[ring].r * Math.sin((a * Math.PI) / 180) }));
+const HOME = { name: '家', x: 180, y: 180 };
+const GOODS = { 柴: 3, 草药: 6, 兽皮: 14, 铁矿: 18, 古物: 40 };
+const TREASURES = [['古玉', 90], ['夜明珠', 140], ['青铜剑', 110], ['金步摇', 120], ['玉玺残片', 160], ['夜行衣', 80]];
+const TREASURE_COLOR = { 古玉: '#7FC8A9', 夜明珠: '#DDEBFF', 青铜剑: '#6E9E8C', 金步摇: '#E3B341', 玉玺残片: '#C9E3D3', 夜行衣: '#3A3F55' };
+
+// ---------------- 院子 ----------------
+const DOORS = [
+  { name: '柴门', hp: 140, cost: 0 },
+  { name: '木门', hp: 220, cost: 40 },
+  { name: '铁皮门', hp: 340, cost: 100 },
+  { name: '朱漆铜钉门', hp: 500, cost: 200 },
+  { name: '机关大门', hp: 720, cost: 360 },
+];
+const TRAPS = {
+  crossbow: { name: '弩机', cost: 45, max: 4, desc: '每隔一会儿自动射最近的鬼' },
+  lamp: { name: '灯笼串', cost: 30, max: 1, desc: '走到门口的隐身鬼会现形' },
+  talisman: { name: '镇宅符', cost: 40, max: 2, desc: '门口的鬼走得慢' },
+};
+
+// ---------------- 夜里 ----------------
+// 手里的东西只写“它擅长什么”，不写“该打哪种鬼”：怎么对付由玩家自己想
+const ITEMS = [['sword', '剑', '近身，打得狠', '#C9D2E2'], ['bow', '弓', '射得到天上', '#E0B46A'], ['lamp', '灯', '照出看不见的', '#FF9A4D']];
+const ITEM = Object.fromEntries(ITEMS.map(([k, g, hint, c]) => [k, { g, hint, c }]));
+const MULT = { sword: { evil: 1.5, fly: 0.3, shade: 1, armor: 0.5 }, bow: { evil: 0.9, fly: 2, shade: 0.9, armor: 0.5 }, lamp: { evil: 0.6, fly: 0.6, shade: 1.5, armor: 0.4 } };
+// 鬼头上只标特点（tag）。每个特点都有好几种解法：
+// 飞 → 弓、弩机、剑气；隐 → 提灯、灯笼串、火眼、听声辨位；甲 → 弩机（不怕甲）、重手、灯光烧鬼、会心一击
+const GHOSTS = {
+  evil: { name: '恶鬼', hp: 42, speed: 26, hit: 7, tag: null },
+  fly: { name: '飞鬼', hp: 30, speed: 34, hit: 5, tag: ['飞', '#9CC9F0'] },
+  shade: { name: '隐身鬼', hp: 34, speed: 24, hit: 8, tag: ['隐', '#B9A2E8'] },
+  armor: { name: '铁甲鬼', hp: 70, speed: 18, hit: 11, tag: ['甲', '#B8BFC9'] },
+};
+// 守夜的难度：一晚 5 波，守住一波挑一个本事；鬼的血按第几天、第几波变大
+const NIGHT = { waves: 5, spread: 3.5, hpPerDay: 0.2, hpPerWave: 0.06, hitPerDay: 0.12, tap: 10, bowDmg: 12, bowCd: 1.4, allyDmg: 12 };
+function waveCounts(d, w) {
+  return {
+    evil: 3 + w + Math.floor(0.4 * (d - 1)),
+    fly: w >= 1 ? 1 + Math.floor((d + w - 1) / 3) : 0,
+    shade: d >= 2 || w >= 3 ? 1 + Math.floor(Math.max(0, d + w - 3) / 3) : 0,
+    armor: w === 4 || (d >= 3 && w >= 2) ? 1 + Math.floor(Math.max(0, d + w - 5) / 3) : 0,
+  };
+}
+// 本事：每守住一波，从三个里挑一个。stack = 能不能挑好几次
+const PERKS = {
+  heavy: { n: '重手', d: '点一下伤害 +40%，铁甲也挡不住', stack: true },
+  crit: { n: '会心一击', d: '每下有 25% 机会打出三倍伤害', stack: true },
+  sweep: { n: '横扫', d: '点中一个鬼，旁边的鬼也挨一半', stack: false },
+  qi: { n: '剑气', d: '剑能砍到天上的飞鬼', stack: false },
+  pierce: { n: '穿云箭', d: '弓的伤害 +60%', stack: true },
+  burn: { n: '灯光烧鬼', d: '提着灯时，灯光里的鬼一直掉血', stack: true },
+  ear: { n: '听声辨位', d: '看不见的鬼也能打，伤害减半', stack: false },
+  eye: { n: '火眼', d: '隐身鬼走到半路就现形', stack: false },
+  lampstr: { n: '挂灯笼', d: '今晚墙上多挂一串灯笼，门口的隐身鬼现形', stack: false },
+  bowplus: { n: '连弩', d: '每台弩机多射一个鬼；没有弩机就先送你一台', stack: true },
+  bowfast: { n: '快弩', d: '弩机射得快一倍', stack: true },
+  rain: { n: '剑雨', d: '每打散 5 个鬼，全场落一阵剑雨', stack: true },
+  fix: { n: '连夜补门', d: '门马上回 40% 的血', stack: true },
+  bolt: { n: '铁门栓', d: '门挨的打少三成', stack: true },
+  slow: { n: '定身符', d: '门口的鬼走得更慢', stack: true },
+  soul: { n: '吸魂', d: '每打散一个鬼，门回 3 点血', stack: true },
+  coins: { n: '纸钱雨', d: '每打散一个鬼，多掉 3 文纸钱', stack: true },
+};
+
+// ---------------- 人 ----------------
+const NEIGHBORS = [
+  { id: 'wang', fam: '王家', who: '王大哥', look: 3 },
+  { id: 'li', fam: '李家', who: '李二娘', look: 2 },
+  { id: 'zhao', fam: '赵家', who: '赵小六', look: 5 },
+];
+const nb = (id) => NEIGHBORS.find((n) => n.id === id);
+const SURNAMES = ['孙', '周', '吴', '郑', '冯', '陈', '褚', '卫', '蒋', '沈', '韩', '杨', '朱', '秦', '许', '何', '吕', '施', '张', '孔'];
+const GIVEN = ['太爷爷', '老祖宗', '大娘', '三叔', '二姑奶奶', '老太公', '大伯', '小姑', '老掌柜', '大侠', '书生', '镖头'];
+const ghostName = () => `${pick(SURNAMES)}家的${pick(GIVEN)}`;
+const AGE_NAME = { child: '童年', adult: '成年', elder: '老年' };
+const AGE_FX = { child: { dmg: 0.8, fight: -0.1, walk: 1 }, adult: { dmg: 1, fight: 0, walk: 1 }, elder: { dmg: 0.85, fight: -0.05, walk: 1.2 } };
+const THREADS = [['相识', '知己'], ['知己', '倾心'], ['倾心', '挚爱']];
+// 红线等级（一辈子内最多到挚爱）和孩子品级。品级主要给面子，强弱最多差三成：孩子是别人投胎来的新玩家，不能让陌生人的感情决定他弱好几倍
+const THREAD_LV = [[0, '相识'], [20, '知己'], [45, '倾心'], [70, '挚爱']];
+const threadName = (v) => THREAD_LV.filter(([m]) => v >= m).pop()[1];
+const GRADES = { 相识: ['寻常', 1], 知己: ['良才', 1.05], 倾心: ['上等', 1.1], 挚爱: ['奇才', 1.2] };
+const GIVEN_ME = ['小石', '阿青', '明月', '长风', '书安', '云舟', '念慈', '怀瑾', '星河', '如意', '晚晴', '子衿'];
+const surnameOf = (fam) => (fam === '你家' ? '林' : fam[0]);
+const TIER_NAME = ['寻常人家', '殷实人家', '名门望族'];
+function ageOf(day) { const f = (day - 1) / Math.max(1, CFG.lifeDays - 1); return f < 0.2 ? 'child' : f < 0.7 ? 'adult' : 'elder'; }
+
+function lookOf(o) { return { ...DEFAULT, ...(o || {}), draw: normDraw(o && o.draw) }; }
+function loadLook() { try { const r = localStorage.getItem('wulin-loop-look'); if (r) return validatedLook(JSON.parse(r)); } catch (e) {} return lookOf(INSPIRE[0][1]); }
+let ME = loadLook();
+function randomLook() {
+  const o = { ...DEFAULT };
+  for (const k of ['faceShape', 'eyes', 'brows', 'mouth', 'hairFront', 'hairBack', 'top', 'bottom', 'head', 'beard']) o[k] = pick(OPT[k])[0];
+  o.hairColor = pick(PRESETS.hair); o.topColor = pick(PRESETS.cloth); o.skin = pick(PRESETS.skin); o.headColor = pick(PRESETS.accent);
+  o.heads = rnd(0.25, 0.7); o.build = rnd(0.2, 0.8); o.weapon = 'none'; o.cape = 'none';
+  return lookOf(o);
+}
+function mixHex(a, b, t) {
+  const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const x = p(a), y = p(b);
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+// 鬼的样子 = 这个人捏的脸，只是颜色发白
+function ghostOf(s) {
+  const g = { ...s, weapon: 'none', blush: 0 };
+  for (const k of Object.keys(g)) if ((k === 'skin' || /Color$/.test(k)) && /^#[0-9a-f]{6}$/i.test(g[k])) g[k] = mixHex(g[k], '#DCE8F7', 0.62);
+  if (s.draw) {
+    g.draw = { ...s.draw };
+    for (const [layer] of DRAW_LAYERS) {
+      if (!s.draw[layer]?.length) continue;
+      g.draw[layer] = s.draw[layer].map(stroke => ({
+        ...stroke, c: mixHex(stroke.c, '#DCE8F7', 0.62),
+        ...(stroke.fill ? { fill: mixHex(stroke.fill, '#DCE8F7', 0.62) } : {}),
+      }));
+    }
+  }
+  return g;
+}
+let uidN = 0;
+const uid = () => 'p' + ++uidN;
+function placed(x, y, k, inner, attrs = '') { return `<g transform="translate(${(x - 120 * k).toFixed(1)} ${(y - 392 * k).toFixed(1)}) scale(${k})"${attrs}>${inner}</g>`; }
+function personSvg(s, expr, age) { return `<g style="--skin:${s.skin}">${drawPerson(s, expr, age, { uid: uid() })}</g>`; }
+function person(s, expr, age, x, y, k) { return placed(x, y, k, personSvg(s, s === ME ? playerExpression(expr) : expr, age)); }
+function ghostSvg(s, expr, age, x, y, k) {
+  if (s === ME) expr = playerExpression(expr);
+  return placed(x, y, k, `<g mask="url(#gmask)" opacity="0.9">${personSvg(ghostOf(s), expr, age)}</g><path d="M84 236 C70 300 96 352 118 394 C122 362 128 372 138 398 C150 358 170 330 158 236 Z" fill="#DCE8F7" opacity="0.3"/>`);
+}
+
+// ---------------- 存档 ----------------
+let G = null;
+const FIRST_FAMILY = { name: '林家', money: 20, door: 0, treasures: [], friends: { wang: 26, li: 8, zhao: 0 }, thread: '知己' };
+function freshLife(fam, prev) {
+  return {
+    v: 2, lifeNo: prev ? prev.lifeNo + 1 : 1, fam: fam.name, thread: fam.thread, phase: 'home', day: 1, time: CFG.dayStart, hp: CFG.hpMax,
+    name: surnameOf(fam.name) + pick(GIVEN_ME), grade: GRADES[fam.thread][0], power: GRADES[fam.thread][1],
+    parents: fam.parents || [{ name: surnameOf(fam.name) + '大郎', look: randomLook(), rel: '爹' }, { name: '娘', look: randomLook(), rel: '娘' }],
+    spouse: null, love: 0, kids: [], ancestors: fam.ancestors || [], offered: false, own: !!fam.own,
+    money: fam.money, door: fam.door, traps: { crossbow: fam.crossbow || 0, lamp: fam.lamp || 0, talisman: fam.talisman || 0 },
+    treasures: [...(fam.treasures || [])], store: {}, bag: [], at: 'home', buddy: null, target: null, item: 'sword',
+    friends: { ...fam.friends }, held: 0, broken: 0, earned: 0, kills: 0, deathKind: null, deathMsg: '', afterlife: null, reborn: null,
+    history: prev ? [...prev.history] : [], look: ME,
+  };
+}
+function save() { try { localStorage.setItem('wulin-loop', JSON.stringify(G)); } catch (e) {} }
+function loadGame() { try { const r = localStorage.getItem('wulin-loop'); if (r) { const o = JSON.parse(r); if (o && o.v === 2) return o; } } catch (e) {} return null; }
+
+// ---------------- 小工具 ----------------
+const SHI = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
+function shichen(m) { const h = Math.floor(m / 60) % 24; return SHI[Math.floor(((h + 1) % 24) / 2)] + '时'; }
+function hm(m) { m = Math.max(0, Math.round(m)); return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`; }
+function dur(m) { m = Math.max(0, Math.round(m)); const h = Math.floor(m / 60), r = m % 60; return h ? (r ? `${h} 小时 ${r} 分` : `${h} 小时`) : `${r} 分`; }
+function dayFrac() { return clamp((G.time - CFG.dayStart) / (CFG.dusk - CFG.dayStart), 0, 1); }
+function bagCap() { return CFG.bag + (G.buddy ? CFG.bagBuddy : 0); }
+function storeCount() { return Object.values(G.store).reduce((a, n) => a + n, 0); }
+function storeValue() { return Object.entries(G.store).reduce((a, [k, n]) => a + GOODS[k] * n, 0); }
+function posOf(at) { return at === 'home' ? HOME : SPOTS[at]; }
+function walkMin(a, b) { const p = posOf(a), q = posOf(b); return Math.round(Math.hypot(p.x - q.x, p.y - q.y) * AGE_FX[ageOf(G.day)].walk); }
+function addFriend(id, n) { G.friends[id] = clamp((G.friends[id] || 0) + n, 0, 100); }
+let toastT = 0;
+function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600); }
+function bindActs(map) { $('panel').querySelectorAll('[data-a]').forEach((b) => { b.onclick = () => map[b.dataset.a] && map[b.dataset.a](); }); }
+
+function sheet({ title, body = '', buttons = [], bind, dismiss = false }) {
+  const el = $('sheet');
+  el.innerHTML = `<div class="card" role="dialog" aria-modal="true" aria-labelledby="sh-t"><h2 id="sh-t">${title}</h2><div class="sh-body">${body}</div><div class="sh-btns">${buttons.map(([t, , cls, dis], i) => `<button type="button" class="${cls || ''}" data-i="${i}"${dis ? ' disabled' : ''}>${t}</button>`).join('')}</div></div>`;
+  el.hidden = false;
+  el.dataset.dismiss = dismiss ? '1' : '';
+  el.querySelectorAll('[data-i]').forEach((b) => { b.onclick = () => { const fn = buttons[+b.dataset.i][1]; closeSheet(); if (fn) fn(); }; });
+  if (bind) bind(el);
+  const f = el.querySelector('.sh-btns button:not([disabled])');
+  if (f) f.focus({ preventScroll: true });
+}
+function closeSheet() { const el = $('sheet'); el.hidden = true; el.innerHTML = ''; el.dataset.num = ''; }
+$('sheet').addEventListener('click', (e) => { if (e.target === $('sheet') && $('sheet').dataset.dismiss) closeSheet(); });
+
+// ---------------- 画面零件 ----------------
+function doorSvg(t, cx, by, w, h) {
+  const x = cx - w / 2, y = by - h;
+  const fill = ['#8A6A4C', '#9B6B3E', '#7D8794', '#B23A2C', '#6E2A2A'][t];
+  let s = `<rect x="${x - w * 0.08}" y="${y - h * 0.12}" width="${w * 1.16}" height="${h * 1.12}" rx="3" fill="#3A2C26"/><rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${fill}"/>`;
+  if (t === 0) for (let i = 1; i < 6; i++) s += `<line x1="${x + (i * w) / 6}" y1="${y + 3}" x2="${x + (i * w) / 6}" y2="${by}" stroke="#5A3A2E" stroke-width="${w * 0.03}"/>`;
+  if (t === 1) for (let i = 1; i < 4; i++) s += `<line x1="${x}" y1="${y + (i * h) / 4}" x2="${x + w}" y2="${y + (i * h) / 4}" stroke="#6B4A2E" stroke-width="${w * 0.025}"/>`;
+  if (t === 2) for (let r = 0; r < 4; r++) for (const c of [0.15, 0.35, 0.65, 0.85]) s += `<circle cx="${x + c * w}" cy="${y + ((r + 0.6) * h) / 4.4}" r="${w * 0.028}" fill="#4A5260"/>`;
+  if (t >= 3) {
+    for (let r = 0; r < 5; r++) for (const c of [0.12, 0.3, 0.7, 0.88]) s += `<circle cx="${x + c * w}" cy="${y + ((r + 0.6) * h) / 5.4}" r="${w * 0.032}" fill="#E3B341"/>`;
+    for (const d of [-0.12, 0.12]) s += `<circle cx="${cx + d * w}" cy="${y + h * 0.55}" r="${w * 0.065}" fill="none" stroke="#E3B341" stroke-width="${w * 0.022}"/>`;
+  }
+  if (t === 4) s += `<g class="glow"><circle cx="${cx}" cy="${y + h * 0.28}" r="${w * 0.15}" fill="none" stroke="#7FD6C2" stroke-width="${w * 0.025}"/><path d="M${cx} ${y + h * 0.28 - w * 0.1} V${y + h * 0.28 + w * 0.1} M${cx - w * 0.1} ${y + h * 0.28} H${cx + w * 0.1}" stroke="#7FD6C2" stroke-width="${w * 0.02}"/></g>`;
+  s += `<line x1="${cx}" y1="${y}" x2="${cx}" y2="${by}" stroke="#1E1416" stroke-opacity="0.55" stroke-width="${Math.max(1.5, w * 0.025)}"/>`;
+  return s;
+}
+const crossbowSvg = (x, y, k = 1) => `<g transform="translate(${x} ${y}) scale(${k})"><rect x="-7" y="-4" width="14" height="8" rx="2" fill="#5A4636"/><path d="M-13 -5 Q0 -17 13 -5" fill="none" stroke="#C9A066" stroke-width="2.5"/><line x1="0" y1="-2" x2="0" y2="-17" stroke="#E9ECF2" stroke-width="2"/></g>`;
+const lanternSvg = (x, y, r = 7) => `<g transform="translate(${x} ${y})"><line y1="${-r - 4}" y2="${-r}" stroke="#3A2C26" stroke-width="1.5"/><ellipse rx="${r}" ry="${r * 1.15}" fill="#D9452F"/><rect x="${-r * 0.5}" y="${-r * 1.2}" width="${r}" height="${r * 0.3}" fill="#3A2C26"/><rect x="${-r * 0.5}" y="${r * 0.95}" width="${r}" height="${r * 0.3}" fill="#3A2C26"/><ellipse rx="${r * 0.45}" ry="${r * 0.7}" fill="#FFB45E" opacity="0.6"/></g>`;
+const talismanSvg = (x, y) => `<g transform="translate(${x} ${y})"><rect x="-4" y="-9" width="8" height="18" fill="#F2D35B"/><path d="M0 -6 V6 M-2 -2 H2 M-2 2 H2" stroke="#C8402E" stroke-width="1.2"/></g>`;
+const lionSvg = (x, y, flip) => `<g transform="translate(${x} ${y}) scale(${flip ? -1 : 1} 1)"><rect x="-10" y="-6" width="20" height="8" rx="2" fill="#8C8F96"/><path d="M-8 -6 Q-9 -22 0 -24 Q9 -22 8 -12 L8 -6 Z" fill="#A7AAB1"/><circle cx="2" cy="-18" r="5" fill="#8C8F96"/></g>`;
+
+// ---------------- 顶栏 ----------------
+function playerExpression(fallback) {
+  const id = G?.expression;
+  if (EXPRESSIONS.some(([key]) => key === id) || (HAND_SLOTS.includes(id) && hasDrawExpression(ME.draw, id))) return id;
+  return fallback;
+}
+function openExpressions() {
+  const pane = $('game-expressions');
+  const options = [['', '随情境'], ...EXPRESSIONS,
+    ...HAND_SLOTS.filter(k => hasDrawExpression(ME.draw, k)).map(k => [k, '手绘表情 ' + k.slice(1)])];
+  const selected = playerExpression('');
+  pane.querySelector('.choices').innerHTML = options.map(([k, label]) => `<button type="button" class="icon" data-expression="${k}" aria-pressed="${selected === k}">${label}</button>`).join('');
+  pane.showPopover();
+  pane.querySelector('[aria-pressed="true"]').focus({ preventScroll: true });
+}
+$('game-expressions').addEventListener('click', event => {
+  const button = event.target.closest('[data-expression]');
+  if (!button) return;
+  G.expression = button.dataset.expression;
+  save(); $('game-expressions').hidePopover(); refreshAppearance();
+  $('show-expressions').focus({ preventScroll: true });
+});
+function renderHud() {
+  const ghostly = ['death', 'haunt', 'reborn', 'guard'].includes(G.phase);
+  const age = ageOf(G.day);
+  $('hud').innerHTML = `<div class="hud-l"><b>${G.phase === 'guard' ? '护家神' : G.phase === 'haunt' ? '厉鬼' : ghostly ? '阴间' : `第 ${G.day} 天`}</b><span>${ghostly ? `第 ${G.lifeNo} 世走完了` : `${G.name} · ${AGE_NAME[age]} · 第 ${G.lifeNo} 世`}</span></div>
+    <div class="hud-r">${ghostly ? '' : `<span class="hp" role="img" aria-label="体力 ${G.hp} / ${CFG.hpMax}">${'<i class="on"></i>'.repeat(Math.max(0, G.hp))}${'<i></i>'.repeat(Math.max(0, CFG.hpMax - G.hp))}</span><span>${G.money} 文</span><span>宝物 ${G.treasures.length}</span>`}<button type="button" class="icon" id="menu">设置</button></div>`;
+  const expressions = document.createElement('button');
+  expressions.type = 'button'; expressions.className = 'icon'; expressions.id = 'show-expressions';
+  expressions.textContent = '表情'; expressions.setAttribute('aria-controls', 'game-expressions');
+  expressions.onclick = openExpressions; $('menu').before(expressions);
+  $('menu').onclick = openMenu;
+}
+function clockHtml() {
+  const left = CFG.dusk - G.time;
+  return `<div class="clock${left < 120 ? ' late' : ''}"><div><b>${shichen(G.time)} ${hm(G.time)}</b><span>${left > 0 ? `今天还剩 ${(left / 120).toFixed(1).replace('.0', '')} 个时辰` : '天黑了'}</span></div><div class="sun"><i style="width:${(dayFrac() * 100).toFixed(1)}%"></i></div></div>`;
+}
+function render() {
+  document.body.dataset.phase = G.phase;
+  renderHud();
+  if (G.phase === 'home') renderHome();
+  else if (G.phase === 'map') renderMap();
+  else if (G.phase === 'death') renderDeath();
+  else if (G.phase === 'reborn') renderReborn();
+}
+
+// ================= 院子（白天） =================
+function homeSvg() {
+  const f = dayFrac();
+  const sky = f < 0.7 ? '#CFE3EE' : mixHex('#CFE3EE', '#F2A65A', (f - 0.7) / 0.3);
+  const sunX = 30 + f * 300, sunY = 66 - Math.sin(f * Math.PI) * 44;
+  let s = `<rect width="360" height="300" fill="${sky}"/><circle cx="${sunX.toFixed(1)}" cy="${sunY.toFixed(1)}" r="14" fill="#FFE7A3"/>
+    <path d="M0 88 Q60 58 120 80 Q190 52 250 78 Q310 60 360 76 V160 H0 Z" fill="#B9CDB6" opacity="0.8"/>
+    <rect x="0" y="148" width="360" height="152" fill="#E2D4BA"/>
+    <rect x="70" y="64" width="220" height="86" fill="#F1E8D8"/><path d="M52 70 L84 36 H276 L308 70 Z" fill="#4A4F5C"/>
+    <rect x="160" y="100" width="40" height="50" fill="#6B4A3A"/><rect x="98" y="92" width="38" height="28" fill="#C9B48C"/><rect x="224" y="92" width="38" height="28" fill="#C9B48C"/>
+    <path d="M180 150 L170 248 M180 150 L190 248" stroke="#D2C2A4" stroke-width="2"/>`;
+  // 宝物架
+  s += `<rect x="12" y="156" width="102" height="64" rx="3" fill="#8A6A4C"/><rect x="16" y="160" width="94" height="26" fill="#6B4A3A"/><rect x="16" y="190" width="94" height="26" fill="#6B4A3A"/>`;
+  G.treasures.slice(0, 8).forEach((t, i) => { const cx = 28 + (i % 4) * 23, cy = 176 + Math.floor(i / 4) * 30; s += `<circle cx="${cx}" cy="${cy}" r="7" fill="${TREASURE_COLOR[t.n] || '#E3B341'}" stroke="#FFF3C4" stroke-width="1.5"/>`; });
+  s += `<text x="63" y="234" text-anchor="middle" font-size="11" fill="#5B4A3A">宝物架</text>`;
+  // 仓库
+  const n = Math.min(10, storeCount());
+  for (let i = 0; i < n; i++) s += `<rect x="${256 + (i % 5) * 17}" y="${206 - Math.floor(i / 5) * 15}" width="16" height="14" rx="5" fill="${i % 2 ? '#C9A066' : '#B48A55'}" stroke="#7A5A3A"/>`;
+  s += `<text x="298" y="234" text-anchor="middle" font-size="11" fill="#5B4A3A">仓库</text>`;
+  // 大阵
+  if (G.door >= 4) s += `<ellipse cx="180" cy="200" rx="86" ry="18" fill="none" stroke="#7FD6C2" stroke-width="2.5" class="glow"/>`;
+  // 人
+  const expr = G.hp <= 1 ? 'sad' : f > 0.8 ? 'surprised' : f < 0.2 ? 'happy' : 'calm';
+  s += person(ME, expr, ageOf(G.day), 220, 236, 0.24);
+  if (G.spouse) s += person(G.spouse.look, 'happy', ageOf(G.day) === 'elder' ? 'elder' : 'adult', 258, 238, 0.23);
+  G.kids.slice(0, 3).forEach((k, i) => { s += person(k.look, 'happy', k.kind === '徒' ? 'adult' : 'child', 150 - i * 30, 240, k.kind === '徒' ? 0.21 : 0.23); });
+  if (G.own && !G.kids.length) s += person(G.parents[0].look, 'calm', 'adult', 150, 238, 0.22);
+  // 前墙和门
+  s += `<rect x="0" y="252" width="360" height="48" fill="#CBBFA8"/><rect x="0" y="246" width="360" height="8" fill="#4A4F5C"/>${doorSvg(G.door, 180, 300, 62, 58)}`;
+  if (G.door >= 2) s += lanternSvg(136, 252) + lanternSvg(224, 252);
+  if (G.door >= 3) s += lionSvg(120, 298) + lionSvg(240, 298, true);
+  if (G.held) s += `<rect x="146" y="222" width="68" height="16" rx="2" fill="#2B2233"/><text x="180" y="234" text-anchor="middle" font-size="10" fill="#E3B341">守住 ${G.held} 夜</text>`;
+  [40, 320, 92, 268].slice(0, G.traps.crossbow).forEach((x) => { s += crossbowSvg(x, 246); });
+  if (G.traps.lamp) { s += `<path d="M0 250 Q90 262 150 252 M210 252 Q270 262 360 250" stroke="#3A2C26" fill="none"/>`; for (const x of [40, 90, 270, 320]) s += lanternSvg(x, 262, 5); }
+  for (let i = 0; i < G.traps.talisman; i++) s += talismanSvg(166 + i * 28, 272);
+  if (f > 0.75) s += `<rect width="360" height="300" fill="#1B2340" opacity="${(((f - 0.75) / 0.25) * 0.38).toFixed(2)}"/>`;
+  return s;
+}
+function trapSummary() { return Object.entries(TRAPS).filter(([k]) => G.traps[k]).map(([k, t]) => ` · ${t.name} ${G.traps[k]}`).join(''); }
+function renderHome() {
+  const left = CFG.dusk - G.time;
+  $('scene').innerHTML = `<svg viewBox="0 0 360 300" class="stage" role="img" aria-label="${G.fam}的院子：${DOORS[G.door].name}，宝物 ${G.treasures.length} 件">${homeSvg()}</svg>`;
+  const canHeal = G.hp < CFG.hpMax && (G.store['草药'] || 0) > 0;
+  $('panel').innerHTML = `${clockHtml()}
+    <div class="acts">
+      ${left > 0 ? `<button type="button" class="big main" data-a="out">出门找东西<small>越远东西越好，也越危险。天黑前要回来</small></button>` : ''}
+      <button type="button" class="big" data-a="market">去集市卖货<small>仓库 ${storeCount()} 件，值 ${storeValue()} 文</small></button>
+      <button type="button" class="big" data-a="build">修院子<small>${DOORS[G.door].name}（门血 ${DOORS[G.door].hp}）${trapSummary()}</small></button>
+      <button type="button" class="big" data-a="family">家和祠堂<small>${familySummary()}</small></button>
+      <button type="button" class="big" data-a="friends">邻居和交情<small>${NEIGHBORS.map((n) => `${n.who} ${G.friends[n.id]}`).join(' · ')}</small></button>
+      ${canHeal ? `<button type="button" class="big" data-a="heal">用草药疗伤<small>体力 +1（仓库还有 ${G.store['草药']} 份）</small></button>` : ''}
+      <button type="button" class="big ${left > 0 ? 'ghosty' : 'main'}" data-a="night">${left > 0 ? '在家歇到天黑' : '天黑了，去守夜'}<small>${left > 0 ? `还有 ${dur(left)} 天黑，鬼会来砸门` : '鬼要来砸门了'}</small></button>
+    </div>`;
+  bindActs({ out: askBuddy, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, heal, night: () => { G.time = Math.max(G.time, CFG.dusk); startNight(false); } });
+}
+function heal() { G.store['草药']--; G.hp = Math.min(CFG.hpMax, G.hp + 1); save(); render(); toast('敷了草药，体力 +1'); }
+
+function openMarket() {
+  const goods = Object.entries(G.store).filter(([, n]) => n > 0);
+  const rows = goods.map(([k, n]) => `<li>${k} ×${n}<span>${GOODS[k] * n} 文</span></li>`).join('') || '<li class="note">仓库是空的。出门找点东西回来吧。</li>';
+  const tre = G.treasures.map((t, i) => `<li>${t.n}<span>${t.v} 文</span><button type="button" class="mini" data-sell="${i}">卖掉</button></li>`).join('');
+  sheet({
+    title: '集市', dismiss: true,
+    body: `<ul class="list">${rows}</ul>${tre ? `<div class="sub">宝物架</div><p class="note">宝物摆在家里更有面子，但夜里门被砸破，可能被鬼抢走。</p><ul class="list">${tre}</ul>` : ''}`,
+    buttons: [[`货全卖了（+${storeValue()} 文）`, sellAll, 'main', !goods.length], ['回去', null]],
+    bind: (el) => el.querySelectorAll('[data-sell]').forEach((b) => { b.onclick = () => { const t = G.treasures.splice(+b.dataset.sell, 1)[0]; G.money += t.v; G.earned += t.v; save(); render(); toast(`卖了${t.n}，+${t.v} 文`); openMarket(); }; }),
+  });
+}
+function sellAll() { const v = storeValue(); G.money += v; G.earned += v; G.store = {}; save(); render(); toast(`卖了 ${v} 文`); }
+
+function openBuild() {
+  const next = DOORS[G.door + 1];
+  const trapRows = Object.entries(TRAPS).map(([k, t]) => `<li><div><b>${t.name}</b> ${G.traps[k]}/${t.max}<br><small class="note">${t.desc}</small></div><span></span><button type="button" class="mini" data-buy="${k}"${G.traps[k] >= t.max || G.money < t.cost ? ' disabled' : ''}>${G.traps[k] >= t.max ? '满了' : `买 ${t.cost} 文`}</button></li>`).join('');
+  sheet({
+    title: '修院子', dismiss: true,
+    body: `<p>现在是<b>${DOORS[G.door].name}</b>，门血 ${DOORS[G.door].hp}。</p>
+      ${next ? `<button type="button" class="big${G.money >= next.cost ? ' main' : ''}" id="up-door"${G.money < next.cost ? ' disabled' : ''}>换成${next.name}<small>门血 ${next.hp} · ${next.cost} 文</small></button>` : '<p class="note">已经是最气派的门了。</p>'}
+      <div class="sub">机关</div><ul class="list">${trapRows}</ul>
+      <p class="note">院子越修越气派：灯笼、石狮子、护院大阵都会画出来，路过的人都能看到。</p>`,
+    buttons: [['回去', null]],
+    bind: (el) => {
+      const up = el.querySelector('#up-door');
+      if (up) up.onclick = () => { G.money -= next.cost; G.door++; save(); render(); toast(`换成了${next.name}`); openBuild(); };
+      el.querySelectorAll('[data-buy]').forEach((b) => { b.onclick = () => { const t = TRAPS[b.dataset.buy]; G.money -= t.cost; G.traps[b.dataset.buy]++; save(); render(); toast(`装了${t.name}`); openBuild(); }; });
+    },
+  });
+}
+
+function openFriends() {
+  const best = Object.entries(G.store).filter(([, n]) => n > 0).sort((a, b) => GOODS[b[0]] - GOODS[a[0]])[0];
+  const rows = NEIGHBORS.map((n) => {
+    const v = G.friends[n.id];
+    const can = [v >= CFG.buddyAt ? '能结伴' : '', v >= CFG.helpAt ? '能驰援' : ''].filter(Boolean).join(' · ') || '还不熟';
+    return `<div class="fr"><div class="fr-top"><b>${n.fam} · ${n.who}</b><span class="note">交情 ${v} · ${can}</span></div>
+      <div class="fbar" role="img" aria-label="交情 ${v}，20 能结伴，40 能驰援"><i style="width:${v}%"></i><s style="left:${CFG.buddyAt}%"></s><s style="left:${CFG.helpAt}%"></s></div>
+      <div class="fr-btns"><button type="button" class="mini" data-coin="${n.id}"${G.money < 10 ? ' disabled' : ''}>送 10 文（交情 +5）</button><button type="button" class="mini" data-good="${n.id}"${best ? '' : ' disabled'}>送${best ? best[0] : '一件货'}（交情 +8）</button></div></div>`;
+  }).join('');
+  sheet({
+    title: '邻居和交情', dismiss: true,
+    body: `<p class="note">交情靠做过的事攒：一起出门、帮着守门、送东西。交情 20 能<b>结伴</b>出门（更安全、多背 3 件、倒下有人扛你回家）；40 能<b>驰援</b>（夜里被砸门时能喊他来帮忙）。真游戏里邻居是真人玩家。</p>${rows}`,
+    buttons: [['回去', null]],
+    bind: (el) => {
+      el.querySelectorAll('[data-coin]').forEach((b) => { b.onclick = () => { G.money -= 10; addFriend(b.dataset.coin, 5); save(); render(); openFriends(); }; });
+      el.querySelectorAll('[data-good]').forEach((b) => { b.onclick = () => { G.store[best[0]]--; addFriend(b.dataset.good, 8); save(); render(); openFriends(); }; });
+    },
+  });
+}
+
+// ================= 野外（白天） =================
+function askBuddy() {
+  const ok = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.buddyAt);
+  sheet({
+    title: '找人结伴？', dismiss: true,
+    body: ok.length ? '<p>结伴出门：遇到危险更容易打赢，背包多 3 格，倒下了有人扛你回家。平安回来，交情 +5。</p>' : `<p>还没有能结伴的人。交情到 ${CFG.buddyAt} 才能约人一起出门，可以先在「邻居和交情」里送点东西。</p>`,
+    buttons: [...ok.map((n) => [`和${n.who}一起去`, () => goOut(n.id), 'main']), ['一个人去', () => goOut(null), ok.length ? '' : 'main']],
+  });
+}
+function goOut(b) { G.buddy = b; G.phase = 'map'; G.at = 'home'; G.target = null; save(); render(); }
+function rollLoot(ring) {
+  let r = Math.random(), name = ring.loot[ring.loot.length - 1][0];
+  for (const [n, p] of ring.loot) { if (r < p) { name = n; break; } r -= p; }
+  if (name === '宝物') { const [n, v] = pick(TREASURES); return { n, v, tre: true }; }
+  return { n: name };
+}
+function mapSvg() {
+  const f = dayFrac();
+  let s = `<rect width="360" height="360" fill="#2B3440"/>`;
+  for (let i = 2; i >= 0; i--) s += `<circle cx="180" cy="180" r="${RINGS[i].band}" fill="${RINGS[i].fill}"/>`;
+  RINGS.forEach((r, i) => { s += `<text x="180" y="${180 - r.band + 14}" text-anchor="middle" font-size="11" fill="${i === 2 ? '#F1ECF7' : '#2F4A2A'}" opacity="0.85">${r.name} · ${r.hint}</text>`; });
+  s += `<circle cx="180" cy="180" r="24" fill="#F4EEE2" stroke="#4A4F5C" stroke-width="2"/><path d="M164 182 L180 168 L196 182 Z" fill="#4A4F5C"/><rect x="170" y="182" width="20" height="10" fill="#8A6A4C"/>`;
+  const here = G.at;
+  for (const sp of SPOTS) {
+    const sel = G.target === sp.id, cur = here === sp.id;
+    s += `<g class="spot" data-spot="${sp.id}" role="button" aria-label="${sp.name}（${RINGS[sp.ring].name}）"><circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="22" fill="transparent"/><circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="13" fill="${cur ? '#FFF7E0' : '#F4F1E8'}" stroke="${sel ? '#B8402F' : cur ? '#B7862A' : '#4A4F5C'}" stroke-width="${sel || cur ? 3.5 : 1.5}"/><text x="${sp.x.toFixed(1)}" y="${(sp.y + 26).toFixed(1)}" text-anchor="middle" font-size="11.5" font-weight="700" fill="${sp.ring === 2 ? '#FFFFFF' : '#1E2A2C'}" paint-order="stroke" stroke="${sp.ring === 2 ? '#3A2C46' : '#F4F1E8'}" stroke-width="3">${sp.name}</text></g>`;
+  }
+  if (G.target != null && G.target !== G.at) { const p = posOf(G.at), q = SPOTS[G.target]; s += `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" stroke="#B8402F" stroke-width="2.5" stroke-dasharray="6 5"/>`; }
+  const p = posOf(G.at);
+  s += `<g id="token" class="token" style="transform: translate(${p.x.toFixed(1)}px, ${(p.y - 8).toFixed(1)}px)">${person(ME, 'calm', ageOf(G.day), 0, 0, 0.11)}${G.buddy ? person(lookOf(INSPIRE[nb(G.buddy).look][1]), 'happy', 'adult', 16, 2, 0.095) : ''}</g>`;
+  if (f > 0.5) s += `<rect width="360" height="360" fill="#0E1630" opacity="${(((f - 0.5) / 0.5) * 0.45).toFixed(2)}" pointer-events="none"/>`;
+  return s;
+}
+function renderMap() {
+  $('scene').innerHTML = `<svg viewBox="0 0 360 360" class="stage" id="mapsvg" role="group" aria-label="野外地图：中间是家，越往外越危险">${mapSvg()}</svg>`;
+  $('mapsvg').onclick = (e) => { const g = e.target.closest('[data-spot]'); if (!g || busy) return; G.target = +g.dataset.spot === G.at ? null : +g.dataset.spot; renderMap(); };
+  const atHome = G.at === 'home';
+  const here = posOf(G.at);
+  const chips = G.bag.map((it) => `<span class="tag${it.tre ? ' tre' : ''}">${it.n}</span>`).join('');
+  let plan = '<p class="note">点地图上的地方，看看要走多久。</p>';
+  const t = G.target != null && G.target !== G.at ? SPOTS[G.target] : null;
+  if (t) {
+    const go = walkMin(G.at, t.id), arrive = G.time + go, back = walkMin(t.id, 'home');
+    const late = arrive + RINGS[t.ring].gather + back > CFG.dusk;
+    plan = `<div class="plan">去<b>${t.name}</b>（${RINGS[t.ring].name}）：走 ${dur(go)}，到了是 ${hm(arrive)}。从那儿回家要 ${dur(back)}。${late ? '<br><span class="warn">采一次再回来，天就黑了。</span>' : ''}</div><button type="button" class="big main" data-a="go">走过去<small>${RINGS[t.ring].name}：${RINGS[t.ring].hint}</small></button>`;
+  }
+  let acts = '';
+  if (!atHome) {
+    const ring = RINGS[here.ring], back = walkMin(G.at, 'home'), full = G.bag.length >= bagCap();
+    acts = `<div class="acts"><button type="button" class="big${t ? '' : ' main'}" data-a="gather"${full ? ' disabled' : ''}>${full ? '背包满了' : '采集'}<small>${full ? '先回家放东西' : `${ring.gather} 分钟 · 可能遇到${ring.foes.join('、')}`}</small></button>
+      <button type="button" class="big" data-a="home">回家<small>走 ${dur(back)}，到家是 ${hm(G.time + back)}${G.time + back > CFG.dusk ? ' · <b class="warn">路上就天黑了</b>' : ''}</small></button></div>`;
+  } else {
+    acts = `<div class="acts"><button type="button" class="big" data-a="home">不去了，回院子<small>不花时间</small></button></div>`;
+  }
+  $('panel').innerHTML = `<div class="where"><b>${atHome ? '家门口' : here.name}</b><span>${atHome ? '准备出门' : `${RINGS[here.ring].name} · ${RINGS[here.ring].hint}`}</span>${G.buddy ? `<span class="tag">和${nb(G.buddy).who}结伴</span>` : ''}</div>
+    ${clockHtml()}
+    <div class="bag"><span class="lab">背包 ${G.bag.length}/${bagCap()}</span>${chips || '<span class="note">空的</span>'}</div>
+    ${plan}${acts}`;
+  bindActs({ go: () => walkTo(t.id), gather, home: goHome });
+}
+let busy = false;
+function moveToken(p, cb) {
+  const tok = $('token');
+  if (!tok) return cb();
+  busy = true;
+  tok.style.transform = `translate(${p.x.toFixed(1)}px, ${(p.y - 8).toFixed(1)}px)`;
+  setTimeout(() => { busy = false; cb(); }, 560 / SPEED);
+}
+function walkTo(id) {
+  if (busy) return;
+  const m = walkMin(G.at, id);
+  moveToken(SPOTS[id], () => {
+    G.at = id; G.target = null;
+    if (G.time + m >= CFG.dusk) { G.time = CFG.dusk; save(); return dusk('走到半路，天就黑了。'); }
+    G.time += m; save(); render();
+  });
+}
+function gather() {
+  if (busy) return;
+  const ring = RINGS[SPOTS[G.at].ring];
+  G.time += ring.gather;
+  const got = [];
+  const n = Math.random() < 0.35 ? 2 : 1;
+  for (let i = 0; i < n && G.bag.length < bagCap(); i++) { const it = rollLoot(ring); G.bag.push(it); got.push(it); }
+  save();
+  if (got.some((x) => x.tre)) toast(`找到宝物：${got.filter((x) => x.tre).map((x) => x.n).join('、')}！`);
+  else toast(`采到了：${got.map((x) => x.n).join('、')}`);
+  if (G.time >= CFG.dusk) return dusk('采着采着，天黑了。');
+  if (Math.random() < ring.danger * (G.buddy ? 0.6 : 1)) return danger(ring);
+  render();
+}
+function danger(ring) {
+  const foe = pick(ring.foes);
+  const chance = clamp(ring.fight + (G.buddy ? 0.2 : 0) + AGE_FX[ageOf(G.day)].fight - (G.hp < CFG.hpMax ? 0.1 : 0), 0.05, 0.95);
+  render();
+  sheet({
+    title: `${foe}！`,
+    body: `<p>在${SPOTS[G.at].name}遇到了${foe}。</p>${G.buddy ? `<p class="note">${nb(G.buddy).who}在旁边，打赢的机会更大。</p>` : ''}`,
+    buttons: [[`打（成功率 ${pct(chance)}）`, () => fight(chance, ring, foe), 'main'], ['跑（耽误 30 分钟，可能丢一件东西）', flee]],
+  });
+}
+function fight(chance, ring, foe) {
+  if (Math.random() < chance) {
+    const it = rollLoot(ring);
+    let msg = `打赢了${foe}。`;
+    if (!it.tre && G.bag.length < bagCap()) { G.bag.push(it); msg += `还捡到了${it.n}。`; }
+    return afterEvent('赢了', msg);
+  }
+  G.hp -= 1;
+  if (G.hp <= 0) return knocked(ring, `被${foe}打倒了。`);
+  afterEvent('受伤了', `被${foe}伤到了，体力 −1。`);
+}
+function flee() {
+  G.time += 30;
+  let msg = '跑掉了，耽误了 30 分钟。';
+  if (G.bag.length && Math.random() < 0.5) { const it = G.bag.splice(Math.floor(Math.random() * G.bag.length), 1)[0]; msg += `慌乱中丢了${it.n}。`; }
+  afterEvent('跑掉了', msg);
+}
+function afterEvent(title, msg) {
+  save();
+  sheet({ title, body: `<p>${msg}</p>`, buttons: [['知道了', () => { if (G.time >= CFG.dusk && G.at !== 'home') dusk('天黑了。'); else render(); }, 'main']] });
+}
+// 在野外倒下：东西掉在原地，人重伤；只有一个人倒在禁地才可能丢命
+function knocked(ring, why) {
+  const lost = G.buddy ? G.bag.splice(0, Math.ceil(G.bag.length / 2)) : G.bag.splice(0);
+  let msg = why + (lost.length ? `背包里的${lost.map((i) => i.n).join('、')}掉在了原地，别人能捡走。` : '');
+  if (ring.death > 0 && !G.buddy && Math.random() < ring.death) return die('early', `${msg}你一个人倒在了${SPOTS[G.at].name}，再也没能回家。`);
+  const back = walkMin(G.at, 'home');
+  G.time += G.buddy ? back : Math.round(back * 1.6);
+  msg += G.buddy ? `${nb(G.buddy).who}把你扛回了家。` : '你自己一点一点爬回了家。';
+  G.hp = 1;
+  const got = arriveHome();
+  save(); render();
+  sheet({ title: '倒下了', body: `<p>${msg}</p>${got ? `<p>${got}</p>` : ''}<p class="note">在野外倒下不会直接死：东西掉在原地，人受重伤（夜里打得没那么疼）。只有一个人倒在禁地里，才可能丢命。</p>`, buttons: [['知道了', afterArrive, 'main']] });
+}
+function dusk(lead) {
+  const sp = SPOTS[G.at], ring = RINGS[sp.ring], who = ghostName();
+  const chance = clamp(ring.escape + (G.buddy ? 0.25 : 0), 0.05, 0.95);
+  render();
+  sheet({
+    title: '天黑了！',
+    body: `<p>${lead}你还在${sp.name}（${ring.name}）。天黑以后，野外是鬼的地盘：<b>${who}</b>盯上了你。</p><p class="note">真游戏里，这个鬼是死去的真人玩家。</p>`,
+    buttons: [
+      [`背着东西拼命跑（成功率 ${pct(chance)}）`, () => {
+        if (Math.random() < chance) { const got = arriveHome(); save(); render(); sheet({ title: '跑回来了', body: `<p>一路狂奔，总算进了院门。</p>${got ? `<p>${got}</p>` : ''}`, buttons: [['去守夜', afterArrive, 'main']] }); return; }
+        G.hp = Math.max(0, G.hp - 2);
+        if (G.hp <= 0) return knocked(ring, `被${who}追上，打倒了。`);
+        const lost = G.buddy ? G.bag.splice(0, Math.ceil(G.bag.length / 2)) : G.bag.splice(0);
+        const got = arriveHome();
+        save(); render();
+        sheet({ title: '被追上了', body: `<p>被${who}追上，体力 −2。${lost.length ? `背包里的${lost.map((i) => i.n).join('、')}丢了。` : ''}好歹逃回了家。</p>${got ? `<p>${got}</p>` : ''}`, buttons: [['去守夜', afterArrive, 'main']] });
+      }, 'main'],
+      ['扔下背包跑（一定能跑掉）', () => {
+        const n = G.bag.length; G.bag = [];
+        arriveHome(); save(); render();
+        sheet({ title: '跑回来了', body: `<p>扔下了 ${n} 件东西，空着手跑回了家。</p>`, buttons: [['去守夜', afterArrive, 'main']] });
+      }],
+    ],
+  });
+}
+function goHome() {
+  if (busy) return;
+  if (G.at === 'home') { G.phase = 'home'; G.buddy = null; save(); render(); return; }
+  const m = walkMin(G.at, 'home');
+  moveToken(HOME, () => {
+    if (G.time + m > CFG.dusk) { G.time = CFG.dusk; save(); return dusk('走到半路，天就黑了。'); }
+    G.time += m;
+    const got = arriveHome();
+    save(); render();
+    if (got) toast(got);
+    afterArrive();
+  });
+}
+// 进院门：东西放进仓库和宝物架，结伴的交情 +5
+function arriveHome() {
+  const goods = G.bag.filter((x) => !x.tre), tre = G.bag.filter((x) => x.tre);
+  for (const g of goods) G.store[g.n] = (G.store[g.n] || 0) + 1;
+  G.treasures.push(...tre);
+  const parts = [];
+  if (G.bag.length) parts.push(`带回来：${G.bag.map((x) => x.n).join('、')}`);
+  if (G.buddy) { addFriend(G.buddy, 5); parts.push(`和${nb(G.buddy).who}的交情 +5`); }
+  G.bag = []; G.buddy = null; G.at = 'home'; G.target = null; G.phase = 'home';
+  return parts.join('；');
+}
+function afterArrive() { if (G.time >= CFG.dusk) startNight(false); else render(); }
+
+// ================= 家：结缘、孩子、徒弟、祠堂 =================
+function familySummary() {
+  const parts = [];
+  if (G.spouse) parts.push(`${G.spouse.name} · 红线${threadName(G.love)}`);
+  const kids = G.kids.filter((k) => k.kind !== '徒').length, dis = G.kids.filter((k) => k.kind === '徒').length;
+  if (kids) parts.push(`孩子 ${kids}`);
+  if (dis) parts.push(`徒弟 ${dis}`);
+  return parts.join(' · ') || (ageOf(G.day) === 'child' ? '长大以后可以结缘、收徒' : '还没有成家，也没有徒弟');
+}
+function maybeBirth() {
+  const kids = G.kids.filter((k) => k.kind !== '徒');
+  if (!G.spouse || G.love < 20 || kids.length >= 2 || G.day < 3 || G.bornToday === G.day) return null;
+  const [grade, power] = GRADES[threadName(G.love)];
+  const kid = { name: surnameOf(G.fam) + pick(GIVEN_ME), look: randomLook(), grade, power, kind: Math.random() < 0.5 ? '子' : '女' };
+  G.kids.push(kid); G.bornToday = G.day;
+  return kid;
+}
+function candidates() {
+  return [0, 1].map(() => ({ name: pick(SURNAMES) + pick(GIVEN_ME), look: randomLook() }));
+}
+// 两条路都能成家：红线（结缘生孩子）或者师徒（收徒弟）。不想谈恋爱也能有后人
+function offerMatch() {
+  const c = candidates();
+  sheet({
+    title: '你长大了',
+    body: `<p>可以找个有缘人牵红线，以后生孩子；也可以收个徒弟。两条路都能有后人，以后都能投胎回自己家。</p><p class="note">真游戏里，有缘人和徒弟都是真人玩家；好友点你的分享链接，就能生在你家或者拜你为师。</p>`,
+    buttons: [...c.map((p) => [`和${p.name}牵红线`, () => { G.spouse = p; G.love = 10; save(); render(); toast(`和${p.name}牵上了红线`); }, 'main']), ['收个徒弟（30 文）', takeDisciple, '', G.money < 30], ['先不急', null]],
+  });
+}
+function takeDisciple() {
+  if (G.money < 30) return toast('钱不够');
+  G.money -= 30;
+  const [grade, power] = G.held >= 3 ? ['上等', 1.1] : G.held >= 1 ? ['良才', 1.05] : ['寻常', 1];
+  const d = { name: pick(SURNAMES) + pick(GIVEN_ME), look: randomLook(), grade, power, kind: '徒' };
+  G.kids.push(d);
+  save(); render();
+  toast(`${d.name}拜你为师，品级${grade}（看你守住了几夜）`);
+}
+function openFamily() {
+  const adult = ageOf(G.day) !== 'child';
+  const fam = G.kids.map((k) => `<li>${k.name}<span>${k.kind === '徒' ? '徒弟' : k.kind === '子' ? '儿子' : '女儿'} · ${k.grade}</span></li>`).join('');
+  sheet({
+    title: `${G.fam} · ${G.name}`, dismiss: true,
+    body: `<p>你出生时爹娘红线是<b>${G.thread}</b>，品级<b>${G.grade}</b>（强弱 ×${G.power}）。${G.own ? '你是回自己家投胎的。' : ''}</p>
+      <ul class="list">${G.parents.map((p) => `<li>${p.name}<span>${p.rel}</span></li>`).join('')}</ul>
+      ${G.spouse ? `<div class="fr"><div class="fr-top"><b>${G.spouse.name}</b><span class="note">红线 ${threadName(G.love)}（${G.love}）</span></div><div class="fbar" role="img" aria-label="红线 ${G.love}"><i style="width:${G.love}%"></i><s style="left:20%"></s><s style="left:45%"></s><s style="left:70%"></s></div><p class="note">红线到知己以后会生孩子；越浓，孩子品级越好（最多差三成）。一辈子里最多到挚爱。</p></div>` : `<p class="note">${adult ? '还没牵红线。' : '长大以后可以结缘、收徒。'}</p>`}
+      ${fam ? `<div class="sub">后人</div><ul class="list">${fam}</ul><p class="note">夜里，一家人会帮着守门。</p>` : ''}`,
+    buttons: [
+      ...(G.spouse ? [['陪伴（花 1 个时辰，红线 +12）', () => { if (G.time + 120 > CFG.dusk) return toast('天快黑了，没时间了'); G.time += 120; G.love = Math.min(100, G.love + 12); save(); render(); toast('陪了一个时辰，红线 +12'); openFamily(); }, 'main', CFG.dusk - G.time < 120]] : []),
+      ...(adult && !G.spouse ? [['找有缘人', offerMatch, 'main']] : []),
+      ...(adult && G.kids.filter((k) => k.kind === '徒').length < 2 ? [['收个徒弟（30 文）', takeDisciple, '', G.money < 30]] : []),
+      ['去祠堂', openHall],
+      ['回去', null],
+    ],
+  });
+}
+// 祠堂：一代代的祖宗画像。回自家投胎的话，前几世的你也挂在这里
+function portrait(a) {
+  return `<figure class="pt"><svg viewBox="30 -6 180 190" role="img" aria-label="${a.name}的画像"><rect x="30" y="-6" width="180" height="190" fill="#E8DCC2"/>${personSvg(a.look, a.expression || 'calm', 'elder')}</svg><figcaption><b>${a.name}</b><span>${a.note}</span></figcaption></figure>`;
+}
+function openHall() {
+  const list = G.ancestors;
+  sheet({
+    title: `${G.fam}祠堂`, dismiss: true,
+    body: list.length ? `<div class="hall">${list.map(portrait).join('')}</div><p class="note">一个人死了，他捏的那张脸就画进家里的祖宗画像。祖宗当护家神时，夜里会显灵。</p>` : '<p class="note">祠堂还空着。你会是这家的第一幅画像。</p>',
+    buttons: [['回去', openFamily]],
+  });
+}
+function familyHelpers() {
+  const out = [];
+  const xs = [262, 296, 326];
+  if (G.spouse && !N_guard()) out.push({ look: G.spouse.look, age: 'adult', x: xs[0], dmg: 6, rate: 0.8, cd: 1 });
+  G.kids.slice(0, 2).forEach((k, i) => out.push({ look: k.look, age: k.kind === '徒' ? 'adult' : 'child', x: xs[out.length] || 326, dmg: Math.round(4 * k.power), rate: 1.2, cd: 1.2 + i * 0.3 }));
+  return out;
+}
+function N_guard() { return G.phase === 'guard'; }
+function ownFamily(heir) {
+  const t = threadName(ri([20, 60]));
+  return {
+    own: true, name: G.fam, door: G.door, money: Math.floor(G.money * 0.6), crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
+    treasures: G.treasures.slice(), thread: t,
+    parents: [{ name: heir.name, look: heir.look, rel: heir.kind === '女' ? '娘（上一世你的女儿）' : heir.kind === '徒' ? '师父（上一世你的徒弟）' : '爹（上一世你的儿子）' }, { name: pick(SURNAMES) + '氏', look: randomLook(), rel: heir.kind === '女' ? '爹' : '娘' }],
+    ancestors: [...G.ancestors, { name: G.name, look: { ...ME }, expression: playerExpression('calm'), note: `第 ${G.lifeNo} 世的你` }],
+  };
+}
+
+// ================= 夜里守门 =================
+let N = null, raf = 0, gidN = 0;
+// 一波一波来：这一波清完才挑本事，挑完下一波才来
+function startWave(w) {
+  const c = waveCounts(N.d, w);
+  const types = Object.entries(c).flatMap(([t, n]) => Array(n).fill(t)).sort(() => Math.random() - 0.5);
+  N.spawns = types.map((type, i) => ({ at: N.t + 1.5 + (i * NIGHT.spread) / types.length, type, wave: w, c }));
+  N.wave = w;
+  N.picking = false;
+  $('nwave').textContent = `第 ${w + 1} 波 / 共 ${NIGHT.waves} 波：` + Object.entries(c).filter(([, n]) => n).map(([t, n]) => `${GHOSTS[t].name} ×${n}`).join(' · ');
+}
+function perkAvailable(id) {
+  const p = PERKS[id], have = N.pk[id] || 0;
+  if (have && !p.stack) return false;
+  if (id === 'bowfast' && !N.bows.length) return false;
+  if (id === 'lampstr' && G.traps.lamp) return false;
+  if (id === 'fix' && N.door > N.doorMax * 0.8) return false;
+  return true;
+}
+function offerPerks() {
+  N.picking = true;
+  const pool = Object.keys(PERKS).filter(perkAvailable).sort(() => Math.random() - 0.5);
+  N.offer = pool.slice(0, 3);
+  const have = Object.entries(N.pk).map(([id, n]) => PERKS[id].n + (n > 1 ? ` ×${n}` : '')).join('、');
+  sheet({
+    title: `第 ${N.wave + 1} 波守住了！挑一个本事`,
+    body: `<p class="note">本事只在今晚有用。${have ? `已经有：${have}` : '想怎么打，就挑什么。'}</p>`,
+    buttons: N.offer.map((id, i) => [`${i + 1} · ${PERKS[id].n}<small>${PERKS[id].d}</small>`, () => choosePerk(id), 'perk']),
+  });
+  $('sheet').dataset.num = '1';
+}
+function choosePerk(id) {
+  closeSheet();
+  N.pk[id] = (N.pk[id] || 0) + 1;
+  if (id === 'fix') { N.door = Math.min(N.doorMax, N.door + N.doorMax * 0.4); updateDoor(); }
+  if (id === 'bowplus' && !N.bows.length) { N.bows.push({ x: 40, y: 410, cd: 0.5 }); $('nbows').innerHTML += crossbowSvg(40, 410, 1.2); }
+  $('perkline').textContent = '今晚的本事：' + Object.entries(N.pk).map(([k, n]) => PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、');
+  floatText(180, 260, PERKS[id].n, 'good');
+  startWave(N.wave + 1);
+  N.last = performance.now();
+}
+function startNight(guardian) {
+  cancelAnimationFrame(raf);
+  closeSheet();
+  G.phase = guardian ? 'guard' : 'night';
+  save();
+  const d = guardian ? CFG.lifeDays : G.day;
+  const doorMax = DOORS[G.door].hp;
+  N = {
+    d, guardian, t: 0, door: doorMax, doorMax, ghosts: [], spawns: [], ally: null, helpUsed: false, names: [], kills: 0, coins: 0,
+    pk: {}, offer: [], picking: false, rainCount: 0, burnT: 0,
+    over: false, wave: -1, lastHit: '', hintT: 0, bows: [[40, 410], [320, 410], [92, 410], [268, 410]].slice(0, G.traps.crossbow).map(([x, y], i) => ({ x, y, cd: 1 + i * 0.35 })),
+    kid: guardian ? (G.kids[0] ? G.kids[0].look : randomLook()) : null,
+    fam: familyHelpers(),
+  };
+  N.lights = nightLights();
+  document.body.dataset.phase = G.phase;
+  renderHud();
+  $('scene').innerHTML = `<div class="doorbar"><span>门 · ${DOORS[G.door].name}</span><div class="bar" id="nd-bar"><i></i></div><b id="nd-num"></b></div>
+    <div class="wave" id="nwave"></div>
+    <svg viewBox="0 0 360 500" class="stage tall" id="nsvg" role="application" aria-label="守夜：点鬼打它，按 1 2 3 换手里的东西，空格打离门最近的鬼">${nightSvg()}</svg>`;
+  renderNightPanel();
+  drawPlayer();
+  const svg = $('nsvg');
+  svg.addEventListener('pointerdown', (e) => { if (N.over) return; e.preventDefault(); const p = toSvg(svg, e); hitAt(p.x, p.y); });
+  $('nfam').innerHTML = N.fam.map((f) => person(f.look, 'angry', f.age, f.x, 498, f.age === 'child' ? 0.2 : 0.19)).join('');
+  updateDoor();
+  startWave(0);
+  if (guardian) toast('你是护家神：子孙在守门，你在旁边显灵。');
+  N.last = performance.now();
+  raf = requestAnimationFrame(nightLoop);
+}
+// 雨夜小巷：越远越暗，只有灯照到的地方看得清。鬼自己发一点冷光；鬼头上的图标和血条永远最亮
+const LAMP = { x: 122, y: 466, r: 330 };
+function nightLights() {
+  const L = [{ x: 180, y: 368, r: 140, g: 'tRed' }, { x: 180, y: 108, r: 44, g: 'tRed' }];
+  if (G.door >= 2) L.push({ x: 124, y: 420, r: 72, g: 'tRed' }, { x: 236, y: 420, r: 72, g: 'tRed' });
+  if (G.traps.lamp) for (const x of [30, 80, 280, 330]) L.push({ x, y: 426, r: 46, g: 'tWarm' });
+  if (N.guardian) L.push({ x: 300, y: 430, r: 150, g: 'tBlue' });
+  return L;
+}
+function bigLantern(x, y, r) {
+  return `<g transform="translate(${x} ${y})"><line y1="${-r * 1.9}" y2="${-r * 1.1}" stroke="#1E1416" stroke-width="2"/><rect x="${-r * 0.55}" y="${-r * 1.18}" width="${r * 1.1}" height="${r * 0.22}" fill="#2A1A14"/>
+    <ellipse rx="${r * 1.15}" ry="${r}" fill="#C8301F"/><ellipse rx="${r * 0.8}" ry="${r * 0.92}" fill="none" stroke="#7E1A10" stroke-width="1" opacity="0.6"/><ellipse rx="${r * 0.4}" ry="${r * 0.95}" fill="none" stroke="#7E1A10" stroke-width="1" opacity="0.6"/>
+    <ellipse rx="${r * 0.42}" ry="${r * 0.62}" fill="#FFB45E" opacity="0.75"/><rect x="${-r * 0.5}" y="${r * 0.92}" width="${r}" height="${r * 0.2}" fill="#2A1A14"/>
+    <path d="M${-r * 0.25} ${r * 1.1} V${r * 2.1} M0 ${r * 1.1} V${r * 2.3} M${r * 0.25} ${r * 1.1} V${r * 2.1}" stroke="#D9A441" stroke-width="1.5" opacity="0.85"/></g>`;
+}
+function nightSvg() {
+  const L = N.lights;
+  // 透视：远处巷口 x 140–220、y 88–152；近处到院墙 y 414
+  const edge = (y, side) => { const t = (y - 152) / (414 - 152); return side < 0 ? 140 - 114 * t : 220 + 114 * t; };
+  let floor = '';
+  for (let i = 1; i < 10; i++) { const y = 152 + (414 - 152) * Math.pow(i / 9, 1.7); floor += `M${edge(y, -1).toFixed(1)} ${y.toFixed(1)} H${edge(y, 1).toFixed(1)} `; }
+  for (const fx of [156, 172, 188, 204]) floor += `M${fx} 152 L${(26 + ((fx - 140) / 80) * 308).toFixed(1)} 414 `;
+  let bricks = '';
+  for (let j = 1; j < 12; j++) { const y0 = j * 36; bricks += `M0 ${y0} L140 ${(88 + (y0 / 414) * 64).toFixed(1)} M360 ${y0} L220 ${(88 + (y0 / 414) * 64).toFixed(1)} `; }
+  let tiles = '';
+  for (let x = -9; x < 370; x += 18) tiles += `M${x} 24 a9 9 0 0 0 18 0 `;
+  let s = `<defs>
+      <radialGradient id="holeG"><stop offset="0" stop-color="#000"/><stop offset="0.25" stop-color="#111"/><stop offset="0.62" stop-color="#7A7A7A"/><stop offset="1" stop-color="#fff"/></radialGradient>
+      <radialGradient id="tRed"><stop offset="0" stop-color="#FF5A3C" stop-opacity="0.42"/><stop offset="1" stop-color="#FF5A3C" stop-opacity="0"/></radialGradient>
+      <radialGradient id="tWarm"><stop offset="0" stop-color="#FFB45E" stop-opacity="0.34"/><stop offset="1" stop-color="#FFB45E" stop-opacity="0"/></radialGradient>
+      <radialGradient id="tBlue"><stop offset="0" stop-color="#9BB0E8" stop-opacity="0.3"/><stop offset="1" stop-color="#9BB0E8" stop-opacity="0"/></radialGradient>
+      <radialGradient id="gglow"><stop offset="0" stop-color="#BFD3FF" stop-opacity="0.32"/><stop offset="1" stop-color="#BFD3FF" stop-opacity="0"/></radialGradient>
+      <linearGradient id="reflG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FF5A3C" stop-opacity="0.5"/><stop offset="1" stop-color="#FF5A3C" stop-opacity="0"/></linearGradient>
+      <pattern id="rainA" patternUnits="userSpaceOnUse" width="60" height="90"><path d="M10 0 l-4 22 M40 30 l-4 22 M25 60 l-4 22 M54 74 l-3 15" stroke="#C9D6EA" stroke-width="1" stroke-opacity="0.32" stroke-linecap="round"/></pattern>
+      <pattern id="rainB" patternUnits="userSpaceOnUse" width="90" height="140"><path d="M20 0 l-5 30 M70 52 l-5 30 M44 100 l-4 26" stroke="#DCE6F5" stroke-width="1.4" stroke-opacity="0.22" stroke-linecap="round"/></pattern>
+      <mask id="darkmask" maskUnits="userSpaceOnUse" x="0" y="0" width="360" height="500"><rect width="360" height="500" fill="#fff"/>${L.map((l) => `<circle cx="${l.x}" cy="${l.y}" r="${l.r}" fill="url(#holeG)"/>`).join('')}<circle id="lampHole" cx="${LAMP.x}" cy="${LAMP.y}" r="0" fill="url(#holeG)"/></mask>
+    </defs>
+    <rect width="360" height="500" fill="#151A25"/>
+    <rect x="140" y="88" width="80" height="64" fill="#1C2333"/>
+    <path d="M140 152 H220 L334 414 H26 Z" fill="#262D3A"/><path d="${floor}" stroke="#323A4A" stroke-width="1.2" fill="none"/>
+    <path d="M150 220 L120 330 M210 220 L245 340 M178 170 L182 300" stroke="#5A6378" stroke-width="5" stroke-linecap="round" opacity="0.12"/>
+    <path d="M0 0 L140 88 V152 L26 414 H0 Z" fill="#1A1F2A"/><path d="M360 0 L220 88 V152 L334 414 H360 Z" fill="#1A1F2A"/>
+    <path d="${bricks}" stroke="#262C38" stroke-width="1.2" fill="none"/>
+    <path d="M0 0 H360 L220 88 H140 Z" fill="#0E121B"/><path d="${tiles}" fill="#0A0D14"/><rect width="360" height="24" fill="#0A0D14"/>
+    <rect x="0" y="414" width="360" height="62" fill="#3A4250"/><rect x="0" y="408" width="360" height="8" fill="#20262F"/>
+    <rect x="124" y="350" width="9" height="126" fill="#2A1A14"/><rect x="227" y="350" width="9" height="126" fill="#2A1A14"/><path d="M110 352 Q180 336 250 352 V360 H110 Z" fill="#1E1416"/>
+    <g id="ndoor">${doorSvg(G.door, 180, 476, 82, 82)}</g>`;
+  if (G.door >= 3) s += lionSvg(110, 476) + lionSvg(250, 476, true);
+  for (const b of N.bows) s += crossbowSvg(b.x, b.y, 1.2);
+  if (G.traps.lamp) s += `<path d="M0 414 Q70 426 130 416 M230 416 Q290 426 360 414" stroke="#1E1416" fill="none"/>`;
+  for (let i = 0; i < G.traps.talisman; i++) s += talismanSvg(164 + i * 32, 444);
+  s += `<rect x="0" y="476" width="360" height="24" fill="#1A2030"/>
+    <rect width="360" height="500" fill="#03050B" opacity="0.84" mask="url(#darkmask)"/>
+    ${L.map((l) => `<circle cx="${l.x}" cy="${l.y}" r="${l.r}" fill="url(#${l.g})"/>`).join('')}<circle id="lampTint" cx="${LAMP.x}" cy="${LAMP.y}" r="0" fill="url(#tWarm)"/>
+    <ellipse cx="180" cy="396" rx="11" ry="20" fill="url(#reflG)"/><ellipse cx="180" cy="160" rx="4" ry="10" fill="url(#reflG)"/>
+    ${bigLantern(180, 108, 4)}${bigLantern(180, 382, 15)}`;
+  if (G.door >= 2) s += lanternSvg(124, 420, 8) + lanternSvg(236, 420, 8);
+  if (G.traps.lamp) for (const x of [30, 80, 280, 330]) s += lanternSvg(x, 426, 6);
+  s += `<g id="nbows"></g><g id="glayer"></g><g id="nplayer"></g><g id="nfam"></g><g id="nally"></g>`;
+  if (N.guardian) s += `<g id="nguardian" class="float">${ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22)}</g>`;
+  s += `<g pointer-events="none"><g class="rain1"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainA)"/></g><g class="rain2"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainB)"/></g></g><g id="fx"></g>
+    <g pointer-events="none"><path id="gleaders" fill="none" stroke="#DCE8F7" stroke-opacity=".65" stroke-linecap="round"/><g id="glabels"></g></g>`;
+  return s;
+}
+// 远小近大：鬼从巷子深处走到院门口
+const depthK = (y) => 0.55 + 0.45 * clamp((y - 90) / (424 - 90), 0, 1);
+function ghostCenter(g) { return { x: g.x + g.ox, y: g.y - 44 * (g.k || 1) }; }
+function litAt(x, y) { return (G.item === 'lamp' && Math.hypot(x - LAMP.x, y - LAMP.y) < LAMP.r) || N.lights.some((l) => Math.hypot(x - l.x, y - l.y) < l.r * 0.8); }
+function drawPlayer() {
+  const it = G.item;
+  const base = N.guardian ? N.kid : ME;
+  const look = { ...base, weapon: it === 'sword' ? 'sword' : it === 'bow' ? 'bow' : 'none', weaponPos: 'hand' };
+  const age = N.guardian ? 'child' : ageOf(G.day);
+  const expr = N.guardian ? 'angry' : playerExpression(G.hp <= 1 ? 'sad' : 'angry');
+  $('nplayer').innerHTML = person(look, expr, age, 108, 498, 0.2) + (it === 'lamp' ? lanternSvg(128, 470, 7) : '');
+  $('lampHole').setAttribute('r', it === 'lamp' ? LAMP.r : 0);
+  $('lampTint').setAttribute('r', it === 'lamp' ? LAMP.r * 0.85 : 0);
+}
+function renderNightPanel() {
+  const helper = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt).sort((a, b) => G.friends[b.id] - G.friends[a.id])[0];
+  $('panel').innerHTML = `<div class="items" role="group" aria-label="手里拿什么">${ITEMS.map(([k, g, hint, c], i) => `<button type="button" class="item" data-item="${k}" aria-pressed="${G.item === k}"><span class="g" style="--c:${c}">${g}</span>${g === '灯' ? '灯笼' : g}<small>${i + 1} · ${hint}</small></button>`).join('')}</div>
+    <div class="help">${helper ? `<button type="button" class="big" id="callhelp"${N.helpUsed ? ' disabled' : ''}>${N.helpUsed ? `${helper.who}来帮过了` : `求救：喊${helper.who}来帮忙`}<small>交情 ${G.friends[helper.id]} · 每晚一次</small></button>` : `<p class="note">交情到 ${CFG.helpAt} 的邻居，夜里可以喊来帮忙（驰援）。</p>`}</div>
+    <p class="note" id="perkline">${Object.keys(N.pk).length ? '今晚的本事：' + Object.entries(N.pk).map(([k, n]) => PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、') : '还没有本事：每守住一波，挑一个。'}</p>
+    <p class="note">点鬼打它。鬼头上写着它的特点：飞、隐、甲。怎么对付随你：换手里的东西、靠机关、挑本事都行。</p>`;
+  $('panel').querySelectorAll('[data-item]').forEach((b) => { b.onclick = () => setItem(b.dataset.item); });
+  if (helper && !N.helpUsed) $('callhelp').onclick = () => callHelp(helper);
+}
+function setItem(k) {
+  if (!N || N.over || G.item === k) return;
+  G.item = k;
+  drawPlayer();
+  $('panel').querySelectorAll('[data-item]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.item === k)));
+  for (const g of N.ghosts) refreshGhost(g);
+}
+function callHelp(n) {
+  if (N.helpUsed || N.over) return;
+  N.helpUsed = true;
+  N.ally = { n, t: 18, cd: 0.4 };
+  addFriend(n.id, 2);
+  $('nally').innerHTML = person(lookOf(INSPIRE[n.look][1]), 'angry', 'adult', 60, 498, 0.2);
+  floatText(60, 400, `${n.who}来了！`, 'good');
+  renderNightPanel();
+}
+function toSvg(svg, e) { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+function revealed(g) {
+  return g.type !== 'shade' || (G.item === 'lamp' && g.y > 150) || ((G.traps.lamp || N.pk.lampstr) && g.y > 330) || (N.pk.eye && g.y > 240) || g.flash > 0;
+}
+function spawnGhost(sp) {
+  const T = GHOSTS[sp.type], hpMul = (1 + NIGHT.hpPerDay * (N.d - 1)) * (1 + NIGHT.hpPerWave * sp.wave);
+  const g = { id: ++gidN, type: sp.type, hp: T.hp * hpMul, max: T.hp * hpMul, lane: rnd(-0.85, 0.85), x: 180, y: rnd(96, 122), ox: 0, k: 0.55, tx: 180 + rnd(-48, 48), ty: 424 + rnd(-6, 4), speed: T.speed * rnd(0.85, 1.15), state: 'walk', bashT: rnd(0.2, 0.8), name: ghostName(), ph: rnd(0, 6.28), hit: T.hit, flash: 0, lit: null };
+  if (sp.type === 'fly') g.ty -= 34;
+  N.names.push(g.name);
+  const el = document.createElementNS(NS, 'g');
+  el.setAttribute('class', 'ghost ' + sp.type);
+  const tag = T.tag ? `<g transform="translate(0 -15)"><circle r="10" fill="${T.tag[1]}" stroke="#0B0F1E" stroke-width="1.5"/><text y="4.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1E2A2C">${T.tag[0]}</text></g>` : '';
+  el.innerHTML = `<g class="gb"><ellipse cx="0" cy="-44" rx="32" ry="48" fill="url(#gglow)"/>${ghostSvg(randomLook(), pick(['angry', 'rage', 'gloomy']), Math.random() < 0.5 ? 'elder' : 'adult', 0, 0, 0.2)}</g>`;
+  const label = document.createElementNS(NS, 'g');
+  label.innerHTML = `<g class="hpw"><rect x="-17" y="-3" width="34" height="6" rx="3" fill="#0B0F1E" opacity="0.85"/><rect class="hpb" x="-17" y="-3" width="34" height="6" rx="3" fill="#FF6B6B"/></g>
+      ${tag}
+      <text class="nametag" y="-32" text-anchor="middle" font-size="10" fill="#DCE8F7" paint-order="stroke" stroke="#0B0F1E" stroke-width="3">${g.name}</text>`;
+  $('glayer').appendChild(el);
+  $('glabels').appendChild(label);
+  g.el = el; g.gb = el.querySelector('.gb'); g.label = label; g.hpb = label.querySelector('.hpb'); g.hpw = label.querySelector('.hpw');
+  N.ghosts.push(g);
+  refreshGhost(g);
+}
+function refreshGhost(g) {
+  const vis = revealed(g), c = ghostCenter(g);
+  g.lit = litAt(c.x, c.y);
+  // 暗处的鬼只剩一层冷光；灯照到才看得清
+  g.gb.setAttribute('opacity', g.type === 'shade' ? (vis ? '0.9' : '0.07') : g.lit ? '1' : '0.62');
+  g.hpw.setAttribute('opacity', vis ? '1' : '0');
+  g.hpb.setAttribute('width', (34 * clamp(g.hp / g.max, 0, 1)).toFixed(1));
+}
+// 门口的标记按鬼的位置从左到右排，细线指回各自头顶。坐标只用于绘制。
+function layoutGateLabels(ghosts) {
+  const lines = [];
+  if (ghosts.length) {
+    ghosts.sort((a, b) => a.tx - b.tx || a.id - b.id);
+    const baseY = Math.min(...ghosts.map(g => g.y - 96 * g.k));
+    const perRow = 7, gap = 46;
+    for (let i = 0; i < ghosts.length; i += perRow) {
+      const row = ghosts.slice(i, i + perRow);
+      const left = row[0].tx, right = row[row.length - 1].tx;
+      const span = Math.max(right - left, (row.length - 1) * gap);
+      const start = clamp((left + right - span) / 2, 20, 340 - span);
+      const y = baseY - (i / perRow) * 46;
+      row.forEach((g, j) => {
+        const x = start + j * span / Math.max(1, row.length - 1);
+        g.label.setAttribute('transform', `translate(${x} ${y})`);
+        const headX = g.x + g.ox, headY = g.y - 84 * g.k;
+        lines.push(`M${x} ${y + 5} L${headX} ${headY}`);
+      });
+    }
+  }
+  $('gleaders').setAttribute('d', lines.join(' '));
+}
+function floatText(x, y, text, cls = '') {
+  const t = document.createElementNS(NS, 'text');
+  t.setAttribute('x', x.toFixed(1)); t.setAttribute('y', y.toFixed(1)); t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('class', 'dmg ' + cls); t.textContent = text;
+  const fx = $('fx'); if (!fx) return;
+  fx.appendChild(t); setTimeout(() => t.remove(), 750);
+}
+function line(x1, y1, x2, y2, color, w = 2) {
+  const l = document.createElementNS(NS, 'line');
+  for (const [k, v] of Object.entries({ x1, y1, x2, y2 })) l.setAttribute(k, v.toFixed(1));
+  l.setAttribute('stroke', color); l.setAttribute('stroke-width', w); l.setAttribute('stroke-linecap', 'round');
+  $('fx').appendChild(l); setTimeout(() => l.remove(), 130);
+}
+function ghostAt(x, y) {
+  let best = null, bd = 1e9;
+  for (const g of N.ghosts) { const c = ghostCenter(g), d = Math.hypot(x - c.x, y - c.y); if (d < 36 * Math.max(g.k, 0.8) && d < bd) { best = g; bd = d; } }
+  return best;
+}
+// 点一下的伤害：手里的东西 × 特点，再算上本事
+function tapMult(g) {
+  let m = MULT[G.item][g.type];
+  if (g.type === 'armor' && N.pk.heavy) m = MULT[G.item].evil;
+  if (g.type === 'fly' && G.item === 'sword' && N.pk.qi) m = 1.3;
+  if (G.item === 'bow') m *= 1 + 0.6 * (N.pk.pierce || 0);
+  return m * (1 + 0.4 * (N.pk.heavy || 0));
+}
+function hitAt(x, y) {
+  const g = ghostAt(x, y);
+  // 提示字别刷屏：同一句话至少隔 0.7 秒
+  const say = (msg) => { if (N.t > (N.missT || 0)) { N.missT = N.t + 0.7; floatText(x, y, msg, 'miss'); } };
+  if (!g) return say('没打中');
+  const hidden = !revealed(g);
+  if (hidden && !N.pk.ear) return say('看不见！');
+  const m = tapMult(g) * (hidden ? 0.5 : 1);
+  const hurt = N.guardian ? 1 : G.hp >= CFG.hpMax ? 1 : G.hp <= 1 ? 0.6 : 0.85;
+  const age = N.guardian ? AGE_FX.child : AGE_FX[ageOf(G.day)];
+  const crit = Math.random() < Math.min(0.75, 0.25 * (N.pk.crit || 0));
+  const dmg = Math.max(1, Math.round(NIGHT.tap * m * age.dmg * hurt * (N.guardian ? 1.25 : G.power || 1) * (crit ? 3 : 1)));
+  if (m < 0.7 && !crit && N.t > N.hintT) { N.hintT = N.t + 1.5; floatText(g.x + g.ox, g.y - 124 * g.k, '打不动', 'weak'); }
+  const c = ghostCenter(g);
+  hurtGhost(g, dmg, crit || m >= 1.5 ? 'crit' : m < 0.7 ? 'weak' : '', true);
+  if (N.pk.sweep) for (const o of N.ghosts.slice()) { if (o === g || !revealed(o)) continue; const oc = ghostCenter(o); if (Math.hypot(oc.x - c.x, oc.y - c.y) < 70) hurtGhost(o, Math.max(1, Math.round(dmg / 2)), 'weak', true); }
+}
+// 空格：打离门最近、看得见的鬼
+function autoHit() { const g = N.ghosts.filter(revealed).sort((a, b) => b.y - a.y)[0]; if (g) { const c = ghostCenter(g); hitAt(c.x, c.y); } }
+function hurtGhost(g, dmg, cls, byPlayer, quiet) {
+  if (g.hp <= 0) return;
+  g.hp -= dmg; g.flash = 0.25;
+  if (!quiet) floatText(g.x + g.ox + rnd(-8, 8), g.y - 70 * g.k, '-' + dmg, cls);
+  if (g.hp <= 0) {
+    g.el.remove();
+    g.label.remove();
+    N.ghosts = N.ghosts.filter((x) => x !== g);
+    N.kills++;
+    N.coins += (byPlayer ? 2 : 0) + 3 * (N.pk.coins || 0);
+    floatText(g.x + g.ox, g.y - 40, '散了', 'good');
+    if (N.pk.soul) { N.door = Math.min(N.doorMax, N.door + 3 * N.pk.soul); updateDoor(); }
+    if (N.pk.rain && ++N.rainCount >= 5) { N.rainCount = 0; swordRain(); }
+  } else refreshGhost(g);
+}
+function swordRain() {
+  floatText(180, 230, '剑雨！', 'crit');
+  for (const o of N.ghosts.slice()) { const c = ghostCenter(o); line(c.x - 20, c.y - 120, c.x, c.y, '#DCE8F7', 2); hurtGhost(o, 15 * N.pk.rain, '', false); }
+}
+function updateDoor() {
+  const p = clamp(N.door / N.doorMax, 0, 1);
+  $('nd-bar').querySelector('i').style.width = (p * 100).toFixed(1) + '%';
+  $('nd-bar').classList.toggle('low', p < 0.3);
+  $('nd-num').textContent = `${Math.max(0, Math.ceil(N.door))} / ${N.doorMax}`;
+}
+function shake(el, cls = 'shake') { if (!el) return; el.classList.remove(cls); void el.getBoundingClientRect(); el.classList.add(cls); }
+function nightLoop(now) {
+  if (!N || N.over) return;
+  const dt = Math.min(0.05, (now - N.last) / 1000) * SPEED;
+  N.last = now;
+  nightStep(dt);
+  if (!N.over) raf = requestAnimationFrame(nightLoop);
+}
+function nightStep(dt) {
+  if (N.picking) return;
+  N.t += dt;
+  while (N.spawns.length && N.spawns[0].at <= N.t) spawnGhost(N.spawns.shift());
+  const slowNear = Math.pow(0.72, G.traps.talisman) * Math.pow(0.7, N.pk.slow || 0) * (N.guardian ? 0.65 : 1);
+  let bashed = false;
+  const atGate = [];
+  for (const g of N.ghosts) {
+    const wasVis = revealed(g);
+    g.flash = Math.max(0, g.flash - dt);
+    if (g.state === 'walk') {
+      // 在巷子里散开走（lane = 占巷子宽度的哪一条），快到门口才往门上挤，免得图标叠成一串
+      const slow = g.y > 300 ? slowNear : 1;
+      g.y = Math.min(g.ty, g.y + g.speed * slow * dt);
+      const t = clamp((g.y - 90) / (g.ty - 90), 0, 1), hw = 40 + 114 * clamp((g.y - 152) / 262, 0, 1);
+      const merge = clamp((t - 0.72) / 0.28, 0, 1);
+      g.x = 180 + g.lane * hw * (1 - merge) + (g.tx - 180) * merge;
+      if (g.y >= g.ty) g.state = 'bash';
+      g.ox = g.type === 'fly' ? Math.sin(N.t * 2.2 + g.ph) * 22 * clamp((g.ty - g.y) / 80, 0, 1) : 0;
+    } else {
+      g.bashT -= dt;
+      if (g.bashT <= 0) {
+        g.bashT = 1;
+        const hit = g.hit * (1 + NIGHT.hitPerDay * (N.d - 1)) * Math.pow(0.7, N.pk.bolt || 0);
+        N.door -= hit; N.lastHit = g.name; bashed = true;
+        floatText(180 + rnd(-30, 30), 430, '-' + Math.round(hit), 'door');
+      }
+    }
+    const bob = Math.sin(N.t * 3 + g.ph) * 3;
+    g.k = depthK(g.y);
+    g.el.setAttribute('transform', `translate(${(g.x + g.ox).toFixed(1)} ${(g.y + bob).toFixed(1)})`);
+    g.gb.setAttribute('transform', `scale(${g.k.toFixed(3)})`);
+    if (g.ty - g.y < 20) atGate.push(g);
+    else g.label.setAttribute('transform', `translate(${g.x + g.ox} ${g.y + bob - 96 * g.k})`);
+    const c = ghostCenter(g);
+    if (revealed(g) !== wasVis || g.type === 'shade' || litAt(c.x, c.y) !== g.lit) refreshGhost(g);
+  }
+  if (bashed) { updateDoor(); shake($('nsvg')); }
+  // 弩机
+  for (const b of N.bows) {
+    b.cd -= dt;
+    if (b.cd > 0) continue;
+    // 弩机不怕铁甲；连弩一次射好几个
+    const tgs = N.ghosts.filter((g) => revealed(g) && g.y > 150).sort((a, c) => Math.hypot(a.x - b.x, a.y - b.y) - Math.hypot(c.x - b.x, c.y - b.y)).slice(0, 1 + (N.pk.bowplus || 0));
+    if (!tgs.length) { b.cd = 0.2; continue; }
+    b.cd = Math.max(0.35, NIGHT.bowCd * Math.pow(0.5, N.pk.bowfast || 0));
+    for (const tg of tgs) { const tc = ghostCenter(tg); line(b.x, b.y - 14, tc.x, tc.y, '#FFE7A3'); hurtGhost(tg, NIGHT.bowDmg, '', false); }
+  }
+  // 灯光烧鬼：提着灯时，灯光里的鬼一直掉血（隐身的也烧）
+  if (N.pk.burn && G.item === 'lamp') {
+    N.burnT += dt;
+    if (N.burnT >= 0.5) {
+      N.burnT = 0;
+      for (const g of N.ghosts.slice()) { const c = ghostCenter(g); if (c.y > 150 && Math.hypot(c.x - LAMP.x, c.y - LAMP.y) < LAMP.r) hurtGhost(g, 2.5 * N.pk.burn, '', false, true); }
+    }
+  }
+  // 自家人帮着守门
+  for (const f of N.fam) {
+    f.cd -= dt;
+    if (f.cd > 0) continue;
+    const tg = N.ghosts.filter(revealed).sort((a, c) => c.y - a.y)[0];
+    if (!tg) { f.cd = 0.2; continue; }
+    f.cd = f.rate;
+    const tc = ghostCenter(tg);
+    line(f.x, 450, tc.x, tc.y, '#F2C14E', 2);
+    hurtGhost(tg, f.dmg, '', false);
+  }
+  // 驰援的邻居
+  if (N.ally) {
+    N.ally.t -= dt; N.ally.cd -= dt;
+    if (N.ally.cd <= 0) {
+      const tg = N.ghosts.filter(revealed).sort((a, c) => c.y - a.y)[0];
+      if (tg) { N.ally.cd = 0.45; const tc = ghostCenter(tg); line(60, 440, tc.x, tc.y, '#7FD6C2', 3); hurtGhost(tg, NIGHT.allyDmg, '', false); } else N.ally.cd = 0.15;
+    }
+    if (N.ally.t <= 0) { N.ally = null; $('nally').innerHTML = ''; }
+  }
+  layoutGateLabels(atGate.filter(g => g.hp > 0));
+  if (N.door <= 0) return endNight(false);
+  if (!N.spawns.length && !N.ghosts.length) return N.wave >= NIGHT.waves - 1 ? endNight(true) : offerPerks();
+}
+function endNight(won) {
+  N.over = true;
+  cancelAnimationFrame(raf);
+  if (!won) { N.door = 0; updateDoor(); }
+  const names = [...new Set(N.names)].slice(0, 6).join('、');
+  let title, body;
+  if (won) {
+    G.money += N.coins; G.kills += N.kills;
+    if (!N.guardian) G.held++;
+    title = '守住了！';
+    body = `<p>打散了 ${N.kills} 个鬼${N.coins ? `，捡到纸钱换了 ${N.coins} 文` : ''}。门还剩 ${Math.ceil(N.door)} / ${N.doorMax}。</p>`;
+  } else {
+    if (!N.guardian) G.broken++;
+    const lost = Math.floor(G.money * 0.3);
+    G.money -= lost;
+    const parts = [`抢走了 ${lost} 文`];
+    if (G.treasures.length) { const t = G.treasures.splice(Math.floor(Math.random() * G.treasures.length), 1)[0]; parts.push(`宝物架上的<b>${t.n}</b>`); }
+    title = '门破了！';
+    body = `<p><b>${N.lastHit}</b>砸破了你家的${DOORS[G.door].name}，鬼冲进院子，${parts.join('，还有')}。</p>`;
+  }
+  const pks = Object.entries(N.pk).map(([k, n]) => PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、');
+  if (pks) body += `<p>今晚挑的本事：${pks}</p>`;
+  body += `<p class="note">今晚来砸门的：${names}……真游戏里，大部分是电脑鬼，偶尔会有死去的真人玩家变成的厉鬼。</p>`;
+  let next, label;
+  if (N.guardian) { G.afterlife = { kind: 'guard', won }; next = goReborn; label = '天亮了，去投胎'; body = `<p>${won ? '你显灵帮子孙守住了家门。' : '你没能护住子孙的家门。'}</p>` + body; }
+  else if (G.day >= CFG.lifeDays) { next = () => die('old', `${G.day} 天过去了，你老了。`); label = '天亮了……'; }
+  else { next = nextMorning; label = '天亮了'; }
+  save();
+  setTimeout(() => sheet({ title, body, buttons: [[label, next, 'main']] }), won ? 300 : 700);
+}
+function nextMorning() {
+  G.day++; G.time = CFG.dayStart; G.hp = Math.min(CFG.hpMax, G.hp + 1); G.phase = 'home';
+  if (G.spouse) G.love = Math.min(100, G.love + 8);
+  const born = maybeBirth();
+  save(); render();
+  toast(`第 ${G.day} 天，${AGE_NAME[ageOf(G.day)]}。` + (ageOf(G.day) !== ageOf(G.day - 1) ? '你长大了一些。' : ''));
+  if (born) sheet({ title: '孩子出生了！', body: `<p>${born.name}出生了，品级<b>${born.grade}</b>（爹娘红线：${threadName(G.love)}）。</p><p class="note">真游戏里，这个孩子是一个新玩家投胎来的。品级主要是面子，强弱最多差三成。</p>`, buttons: [['好', null, 'main']] });
+  else if (ageOf(G.day) === 'adult' && !G.spouse && !G.offered) { G.offered = true; save(); offerMatch(); }
+}
+
+// ================= 死后 =================
+function die(kind, msg) { cancelAnimationFrame(raf); G.phase = 'death'; G.deathKind = kind; G.deathMsg = msg; save(); render(); }
+function renderDeath() {
+  $('scene').innerHTML = `<svg viewBox="0 0 360 300" class="stage" role="img" aria-label="你变成了鬼"><rect width="360" height="300" fill="url(#hsky)"/><circle cx="60" cy="60" r="18" fill="#F4F1E3" opacity="0.8"/>
+    <path d="M0 250 Q90 230 180 246 Q270 262 360 240 V300 H0 Z" fill="#20142E"/><g class="float">${ghostSvg(ME, G.deathKind === 'early' ? 'sad' : 'calm', 'elder', 180, 262, 0.5)}</g></svg>`;
+  $('panel').innerHTML = `<div class="where"><b>${G.deathKind === 'early' ? '英年早逝' : '寿终正寝'}</b><span>${G.fam} · 第 ${G.lifeNo} 世</span></div>
+    <p>${G.deathMsg}这一辈子活了 ${G.day} 天，守住 ${G.held} 夜，门被砸破 ${G.broken} 次，赚了 ${G.earned} 文。</p>
+    <p class="note">鬼的样子就是你捏的那张脸。投胎之前，可以先当一晚鬼：</p>
+    <div class="acts">
+      <button type="button" class="big main" data-a="guard">当护家神<small>回自家守一夜：你在旁边显灵，门口的鬼变慢、打得更疼</small></button>
+      <button type="button" class="big" data-a="haunt">当厉鬼<small>去砸别人家的门：抢到的东西带进下一世；被捉住要扣因果分</small></button>
+      <button type="button" class="big ghosty" data-a="skip">直接投胎<small>什么都不做</small></button>
+    </div>`;
+  bindActs({ guard: () => startNight(true), haunt: startHaunt, skip: () => { G.afterlife = null; goReborn(); } });
+}
+
+// ---------------- 当厉鬼：去砸别人家的门 ----------------
+// 弩机：等 wait 秒 → 亮红光 charge 秒 → 射。躲一次 dodge 秒，躲的时候砸不了门
+const HAUNT = { time: 25, door: 220, doorPerTier: 80, bash: 8, dodge: 0.75, charge: 0.65, wait: [1.6, 2.8] };
+let H = null;
+function startHaunt() {
+  cancelAnimationFrame(raf);
+  closeSheet();
+  G.phase = 'haunt'; save();
+  const tier = ri([1, 3]);
+  const max = HAUNT.door + tier * HAUNT.doorPerTier;
+  H = { fam: pick(SURNAMES) + '家', tier, door: max, max, souls: 3, t: HAUNT.time, dodge: 0, over: false, bows: [{ x: 108, s: 'wait', c: rnd(1.4, 2) }, { x: 252, s: 'wait', c: rnd(2.6, 3.4) }] };
+  document.body.dataset.phase = 'haunt';
+  renderHud();
+  $('scene').innerHTML = `<div class="doorbar"><span>${H.fam}的门</span><div class="bar" id="hd-bar"><i></i></div><b id="hd-num"></b></div>
+    <div class="doorbar"><span>魂火</span><div class="bar soul" id="hs-bar"><i></i></div><b id="hs-num"></b></div>
+    <svg viewBox="0 0 360 500" class="stage tall" id="hsvg" role="application" aria-label="当厉鬼：点画面砸门，弩机发红光时按躲开">${hauntSvg()}</svg>`;
+  $('panel').innerHTML = `<button type="button" class="big main" id="dodge">躲开！<small>弩机亮红光就躲（键盘：K）</small></button>
+    <p class="note">点画面砸门（键盘：空格）。${HAUNT.time} 秒内砸开就能抢东西；三团魂火都被射灭，就会被收进葫芦。真游戏里，守门的是活着的真人玩家。</p>`;
+  $('dodge').addEventListener('pointerdown', (e) => { e.preventDefault(); dodge(); });
+  $('dodge').addEventListener('click', (e) => { if (e.detail === 0) dodge(); });
+  const svg = $('hsvg');
+  svg.addEventListener('pointerdown', (e) => { e.preventDefault(); bash(); });
+  updateHaunt();
+  H.last = performance.now();
+  raf = requestAnimationFrame(hauntLoop);
+}
+function hauntSvg() {
+  let s = `<rect width="360" height="500" fill="url(#hsky)"/><circle cx="64" cy="58" r="18" fill="#F4F1E3" opacity="0.85"/>
+    <path d="M0 150 Q60 120 120 142 Q200 110 260 140 Q320 120 360 132 V200 H0 Z" fill="#1C1230"/>
+    <rect x="0" y="250" width="360" height="160" fill="#4A3F5A"/><rect x="0" y="242" width="360" height="10" fill="#2A2238"/>
+    <g id="hdoor">${doorSvg(H.tier, 180, 410, 124, 132)}</g>
+    <rect x="140" y="252" width="80" height="18" rx="2" fill="#1E1416"/><text x="180" y="266" text-anchor="middle" font-size="12" fill="#E3B341">${H.fam}</text>`;
+  H.bows.forEach((b, i) => { s += `<g id="hb${i}" transform="translate(${b.x} 240)">${crossbowSvg(0, 0, 1.6)}<circle class="chg" r="18" fill="none" stroke="#FF4D4D" stroke-width="3" opacity="0"/><text class="bang" y="-30" text-anchor="middle" font-size="18" font-weight="700" fill="#FF6B6B" opacity="0">！</text></g>`; });
+  s += `<rect x="0" y="410" width="360" height="90" fill="#22182F"/><g id="hme" class="token" style="transform: translate(180px, 492px)"><g class="float">${ghostSvg(ME, 'rage', 'elder', 0, 0, 0.32)}</g></g><g id="fx"></g>`;
+  return s;
+}
+function updateHaunt() {
+  const p = clamp(H.door / H.max, 0, 1);
+  $('hd-bar').querySelector('i').style.width = (p * 100).toFixed(1) + '%';
+  $('hd-num').textContent = `${Math.max(0, Math.ceil(H.door))}`;
+  $('hs-bar').querySelector('i').style.width = ((H.souls / 3) * 100).toFixed(1) + '%';
+  $('hs-num').textContent = `${H.souls} 团 · ${Math.max(0, Math.ceil(H.t))} 秒`;
+}
+function dodge() { if (!H || H.over) return; H.dodge = HAUNT.dodge; $('hme').style.transform = 'translate(62px, 492px)'; }
+function bash() {
+  if (!H || H.over) return;
+  if (H.dodge > 0) { floatText(62, 380, '躲着呢', 'miss'); return; }
+  H.door -= HAUNT.bash;
+  floatText(180 + rnd(-40, 40), 320 + rnd(-20, 20), '-' + HAUNT.bash, 'door');
+  shake($('hdoor'));
+  updateHaunt();
+  if (H.door <= 0) endHaunt('win');
+}
+function hauntLoop(now) {
+  if (!H || H.over) return;
+  const dt = Math.min(0.05, (now - H.last) / 1000) * SPEED;
+  H.last = now;
+  hauntStep(dt);
+  if (!H.over) raf = requestAnimationFrame(hauntLoop);
+}
+function hauntStep(dt) {
+  H.t -= dt;
+  if (H.dodge > 0) { H.dodge -= dt; if (H.dodge <= 0) $('hme').style.transform = 'translate(180px, 492px)'; }
+  H.bows.forEach((b, i) => {
+    b.c -= dt;
+    const el = $('hb' + i);
+    if (b.s === 'wait' && b.c <= 0) { b.s = 'charge'; b.c = HAUNT.charge; el.querySelector('.chg').setAttribute('opacity', '1'); el.querySelector('.bang').setAttribute('opacity', '1'); }
+    else if (b.s === 'charge' && b.c <= 0) {
+      b.s = 'wait'; b.c = rnd(...HAUNT.wait);
+      el.querySelector('.chg').setAttribute('opacity', '0'); el.querySelector('.bang').setAttribute('opacity', '0');
+      const mx = H.dodge > 0 ? 62 : 180;
+      line(b.x, 240, mx, 440, '#FF6B6B', 3);
+      if (H.dodge <= 0) { H.souls--; floatText(mx, 400, '魂火 −1', 'door'); shake($('hsvg'), 'hurt'); }
+      else floatText(mx, 400, '躲开了', 'good');
+    }
+  });
+  updateHaunt();
+  if (H.souls <= 0) return endHaunt('caught');
+  if (H.t <= 0) return endHaunt('timeout');
+}
+function endHaunt(r) {
+  H.over = true;
+  cancelAnimationFrame(raf);
+  let title, body;
+  if (r === 'win') {
+    const [n, v] = pick(TREASURES);
+    G.afterlife = { kind: 'haunt', won: true, loot: { n, v, tre: true } };
+    title = '砸开了！';
+    body = `<p>你砸开了${H.fam}的门，抢走了<b>${n}</b>和 30 文。这些会带进下一世。</p><p class="note">第二批会加「仇家簿」：${H.fam}会记住你，你投胎以后，他们死了也能来找你报仇。</p>`;
+  } else if (r === 'caught') {
+    G.afterlife = { kind: 'haunt', caught: true };
+    title = '被收进了葫芦';
+    body = `<p>${H.fam}的弩机把你的魂火全射灭了。你被收进葫芦关了一阵，因果分 −10。</p>`;
+  } else {
+    G.afterlife = { kind: 'haunt' };
+    title = '天亮了';
+    body = `<p>没砸开${H.fam}的门，鬼见了光，只能散了。</p>`;
+  }
+  save();
+  setTimeout(() => sheet({ title, body, buttons: [['去奈何桥', goReborn, 'main']] }), 300);
+}
+
+// ================= 投胎 =================
+function karmaRows() {
+  const fr = NEIGHBORS.reduce((a, n) => a + G.friends[n.id], 0);
+  const rows = [
+    ['守住的夜', `${G.held} 夜`, G.held * 8],
+    ['门被砸破', `${G.broken} 次`, -G.broken * 4],
+    ['赚的钱', `${G.earned} 文`, Math.floor(G.earned / 20)],
+    ['交情', `合计 ${fr}`, Math.floor(fr / 10)],
+    ['养育', `${G.kids.length} 个孩子或徒弟`, Math.min(40, G.kids.length * 10)],
+    ['红线', G.spouse ? threadName(G.love) : '没有', G.spouse ? { 相识: 0, 知己: 5, 倾心: 15, 挚爱: 25 }[threadName(G.love)] : 0],
+  ];
+  const A = G.afterlife;
+  if (A && A.kind === 'guard') rows.push(['当护家神', A.won ? '守住了' : '没守住', A.won ? 20 : 5]);
+  if (A && A.kind === 'haunt') rows.push(['当厉鬼', A.won ? '得手了' : A.caught ? '被收进葫芦' : '没砸开', A.won ? 5 : A.caught ? -10 : 0]);
+  if (G.deathKind === 'early') rows.push(['英年早逝', '', -5]);
+  return rows;
+}
+function newFamily(tier) {
+  const R = [{ door: [0, 1], money: [10, 40], cb: [0, 0], lamp: 0, tal: 0, tre: [0, 0] }, { door: [1, 2], money: [50, 110], cb: [1, 1], lamp: 0, tal: 0, tre: [0, 1] }, { door: [2, 4], money: [120, 240], cb: [2, 3], lamp: 1, tal: 1, tre: [1, 2] }][tier];
+  return {
+    name: pick(SURNAMES) + '家', door: ri(R.door), money: ri(R.money), crossbow: ri(R.cb), lamp: R.lamp, talisman: R.tal, thread: pick(THREADS[tier]),
+    treasures: Array.from({ length: ri(R.tre) }, () => { const [n, v] = pick(TREASURES); return { n, v, tre: true }; }),
+  };
+}
+function goReborn() {
+  cancelAnimationFrame(raf);
+  const rows = karmaRows(), total = rows.reduce((a, r) => a + r[2], 0);
+  const tier = total < 30 ? 0 : total < 70 ? 1 : 2;
+  const heirs = G.kids.slice(0, 3);
+  const fams = heirs.length ? heirs.map(ownFamily) : [newFamily(tier)];
+  fams.push(newFamily(tier), newFamily(Math.max(0, tier - 1)));
+  G.reborn = { rows, total, tier, fams };
+  G.phase = 'reborn';
+  save(); render();
+}
+function renderReborn() {
+  const R = G.reborn;
+  // 旧存档在奈何桥只保存了第一个后人。保留已展示的家庭，只补齐另外的后人。
+  const ownCount = R.fams.filter(f => f.own).length;
+  const missing = G.kids.slice(ownCount, 3);
+  if (missing.length) {
+    R.fams.splice(ownCount, 0, ...missing.map(ownFamily));
+    save();
+  }
+  $('scene').innerHTML = `<svg viewBox="0 0 360 220" class="stage" role="img" aria-label="奈何桥"><rect width="360" height="220" fill="url(#hsky)"/><path d="M0 170 Q180 120 360 170 V220 H0 Z" fill="#1A1028"/>
+    <path d="M30 168 Q180 70 330 168" fill="none" stroke="#8A6A8C" stroke-width="10"/><path d="M30 168 Q180 70 330 168" fill="none" stroke="#B49AB8" stroke-width="2" transform="translate(0 -12)"/>
+    ${[70, 120, 180, 240, 290].map((x) => `<line x1="${x}" y1="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 - 12}" x2="${x}" y2="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 + 4}" stroke="#B49AB8" stroke-width="2"/>`).join('')}
+    <text x="180" y="40" text-anchor="middle" font-size="18" fill="#E3B341" font-family="var(--font-display)">奈何桥</text>
+    <g class="float">${ghostSvg(ME, 'calm', 'elder', 180, 112, 0.18)}</g></svg>`;
+  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? '院子、机关、宝物都还在；祠堂里挂着你的画像 · ' : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · ${f.money} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
+  const loot = G.afterlife && G.afterlife.won && G.afterlife.loot;
+  const keep = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt);
+  $('panel').innerHTML = `<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>
+    <table class="kt"><tbody>${R.rows.map(([a, b, c]) => `<tr><td>${a}</td><td>${b}</td><td>${c > 0 ? '+' : ''}${c}</td></tr>`).join('')}<tr class="total"><td>合计</td><td></td><td>${R.total}</td></tr></tbody></table>
+    <p class="note">${G.kids.length ? '回自己家可以挑一位后人，也可以去按因果分选出的另外两户人家。' : '你没有留下孩子或徒弟，这一世的院子会荒掉。按因果分，系统给你三户人家挑。'}${loot ? `前世抢来的${loot.n}和 30 文会跟着你。` : ''}${keep.length ? `${keep.map((n) => n.who).join('、')}和你交情深，下一世还记得你（交情留一半）。` : ''}</p>
+    <div class="fams">${R.fams.map(famCard).join('')}</div>`;
+  $('panel').querySelectorAll('[data-fam]').forEach((b) => { b.onclick = () => reborn(R.fams[+b.dataset.fam]); });
+}
+function reborn(f) {
+  const prev = G;
+  const fam = { ...f, treasures: [...f.treasures], friends: {} };
+  for (const n of NEIGHBORS) fam.friends[n.id] = prev.friends[n.id] >= CFG.helpAt ? Math.floor(prev.friends[n.id] / 2) : ri([0, 15]);
+  const A = prev.afterlife;
+  if (A && A.won && A.loot) { fam.treasures.push(A.loot); fam.money += 30; }
+  if (!fam.own) fam.ancestors = Array.from({ length: 2 }, (_, i) => ({ name: surnameOf(fam.name) + ['老太公', '太奶奶'][i], look: randomLook(), note: '祖上' }));
+  G = freshLife(fam, prev);
+  G.history.push({ life: prev.lifeNo, fam: prev.fam, days: prev.day, held: prev.held, karma: prev.reborn.total });
+  save(); render();
+  toast(`投胎到了${f.name}。第 ${G.lifeNo} 世开始了。`);
+}
+
+// ================= 设置 =================
+function applyLook(raw) {
+  const look = validatedLook(raw);
+  // 先写完整存档。写入失败时保留原形象和捏人台草稿，可重试或取消。
+  localStorage.setItem('wulin-loop', JSON.stringify({ ...G, look }));
+  G.look = ME = look;
+  try { localStorage.setItem('wulin-loop-look', JSON.stringify(look)); } catch (e) {}
+  refreshAppearance();
+}
+function refreshAppearance() {
+  render();
+  if ($('nplayer')) drawPlayer();
+  if ($('nguardian')) $('nguardian').innerHTML = ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22);
+  if ($('hme')) $('hme').firstElementChild.innerHTML = ghostSvg(ME, 'rage', 'elder', 0, 0, 0.32);
+}
+const avatarDialog = $('avatar-dialog');
+let cancelEditor;
+function openEditor(onCancel) {
+  closeSheet();
+  cancelEditor = onCancel;
+  cancelAnimationFrame(raf);
+  const frame = document.createElement('iframe');
+  frame.title = '武林捏人台';
+  frame.src = avatarDialog.dataset.editor;
+  avatarDialog.replaceChildren(frame);
+  avatarDialog.showModal();
+  frame.focus();
+}
+function closeEditor(finished) {
+  avatarDialog.close();
+  avatarDialog.replaceChildren();
+  if ((G.phase === 'night' || G.phase === 'guard') && !N.over) {
+    N.last = performance.now(); raf = requestAnimationFrame(nightLoop);
+  } else if (G.phase === 'haunt' && !H.over) {
+    H.last = performance.now(); raf = requestAnimationFrame(hauntLoop);
+  }
+  if (finished) { $('menu').focus({ preventScroll: true }); toast('样子已保存'); }
+  else cancelEditor();
+}
+avatarDialog.addEventListener('cancel', e => { e.preventDefault(); closeEditor(false); });
+window.addEventListener('message', event => {
+  const peer = avatarDialog.querySelector('iframe')?.contentWindow;
+  if (!avatarDialog.open || !isAvatarPeer(event, peer)) return;
+  if (event.data.type === 'ready') sendAvatar(peer, 'init', { look: ME });
+  if (event.data.type === 'cancel') closeEditor(false);
+  if (event.data.type === 'finish') {
+    try { applyLook(event.data.look); }
+    catch (e) {
+      sendAvatar(peer, 'error', { message: e instanceof DOMException ? '存档写入失败，请检查浏览器存储后重试。' : '形象数据无效，请检查后重试。' });
+      return;
+    }
+    closeEditor(true);
+  }
+});
+function openMenu() {
+  const playing = G.phase === 'home' || G.phase === 'map';
+  sheet({
+    title: '设置', dismiss: true,
+    body: `<button type="button" class="big main" id="edit-look">改样子</button>
+      <details id="share-look"><summary>分享 / 导入捏人码</summary>
+      <label for="code-out">我的捏人码</label><textarea id="code-out" readonly></textarea>
+      <label for="code-in">导入别人的人</label><textarea id="code-in" placeholder="WULIN1:..."></textarea><button type="button" class="big" id="use-code">用这个人</button><p class="note" id="code-msg" role="status"></p></details>
+      <div class="sub">试玩用</div>
+      <button type="button" class="big" id="ff"${playing && G.day < CFG.lifeDays ? '' : ' disabled'}>快进到最后一天<small>直接试老死、当鬼和投胎</small></button>
+      <button type="button" class="big" id="restart">从头再来<small>清掉这一局，回到第一世</small></button>
+      <p class="note">这是样机：邻居、来砸门的鬼、被你砸门的人家都用电脑代替；所有数字都是占位。</p>`,
+    buttons: [['关上', null]],
+    bind: (el) => {
+      el.querySelector('#edit-look').onclick = () => openEditor(openMenu);
+      el.querySelector('#code-out').value = encode(ME);
+      el.querySelector('#use-code').onclick = () => {
+        try { applyLook(decode(el.querySelector('#code-in').value)); el.querySelector('#code-out').value = encode(ME); el.querySelector('#code-msg').textContent = '换好了'; }
+        catch (e) { el.querySelector('#code-msg').textContent = e instanceof DOMException && e.name !== 'InvalidCharacterError' ? '存档写入失败，请检查浏览器存储。' : '这串码读不出来，请检查捏人码是否完整。'; }
+      };
+      el.querySelector('#ff').onclick = () => { closeSheet(); G.day = CFG.lifeDays; G.phase = 'home'; G.at = 'home'; G.bag = []; G.buddy = null; save(); render(); toast('快进到了最后一天'); };
+      el.querySelector('#restart').onclick = () => { closeSheet(); cancelAnimationFrame(raf); N = null; H = null; G = freshLife(FIRST_FAMILY, null); save(); render(); intro(); };
+    },
+  });
+}
+function intro() {
+  sheet({
+    title: '一日一夜（样机）',
+    body: `<p>白天<b>出门找东西</b>，走得越远东西越好，但<b>天黑前一定要回家</b>。</p><p>夜里鬼来<b>砸门</b>。门破了，钱和宝物真的会被抢走。</p><p>真游戏里一个现实日就是一天一夜：白天的时辰花完就天黑，什么时候玩你自己定。样机里一辈子 ${CFG.lifeDays} 天，长大以后可以结缘生孩子，也可以收徒弟。老死以后，可以当<b>护家神</b>守自己家，或者当<b>厉鬼</b>去砸别人家的门，然后投胎。</p>
+      <p class="note">一句话：砸你家门的鬼，是别人家的祖宗（大部分是电脑鬼，偶尔是死去的真人玩家）。样机里，别的玩家都用电脑代替。</p>`,
+    buttons: [['开始', save, 'main'], ['先捏个人', () => openEditor(intro)]],
+  });
+}
+
+// ================= 键盘 =================
+document.addEventListener('keydown', (e) => {
+  if (avatarDialog.open) return;
+  if (!$('sheet').hidden) {
+    if (e.key === 'Escape' && $('sheet').dataset.dismiss) closeSheet();
+    const n = ['1', '2', '3'].indexOf(e.key);
+    if (n >= 0 && $('sheet').dataset.num) { const b = $('sheet').querySelectorAll('.sh-btns button')[n]; if (b) b.click(); }
+    return;
+  }
+  if ((G.phase === 'night' || G.phase === 'guard') && N && !N.over) {
+    const i = ['1', '2', '3'].indexOf(e.key);
+    if (i >= 0) setItem(ITEMS[i][0]);
+    if (e.key === ' ' || e.key === 'j') { e.preventDefault(); autoHit(); }
+  }
+  if (G.phase === 'haunt' && H && !H.over) {
+    if (e.key === ' ' || e.key === 'j') { e.preventDefault(); bash(); }
+    if (e.key === 'k' || e.key === 'ArrowLeft') { e.preventDefault(); dodge(); }
+  }
+});
+
+// ================= 启动 =================
+G = loadGame();
+const firstTime = !G;
+if (!G) G = freshLife(FIRST_FAMILY, null);
+if (G.look) { try { ME = validatedLook(G.look); } catch (e) {} }
+G.look = ME;
+if (G.phase === 'night' || G.phase === 'guard') startNight(G.phase === 'guard');
+else if (G.phase === 'haunt') startHaunt();
+else { if (G.phase === 'map' && G.bag == null) G.bag = []; render(); }
+if (firstTime) intro();
+</script>
+</body></html>

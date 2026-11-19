@@ -37,12 +37,29 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   await p.evaluate(() => { N.over = true; cancelAnimationFrame(raf); die('old', '测试。'); });
   await p.click('[data-a="skip"]');
   ok('own family offered first', await p.evaluate(() => G.reborn.fams[0].own === true));
-  await p.screenshot({ path: path.join(OUT, 'loop', 'f4-reborn.png'), fullPage: true });
+  const heirs = await p.evaluate(() => G.kids.map(k => k.name));
+  const ownChoices = p.locator('[data-fam]').filter({ hasText: '回自己家投胎' });
+  ok('one choice per heir, plus two other households', heirs.length === 2 && await ownChoices.count() === 2 && await p.locator('[data-fam]').count() === 4);
+  ok('both choices name the corresponding heir', (await ownChoices.allTextContents()).every((text, i) => text.includes(`做${heirs[i]}的孩子`)));
+  // 模拟旧版已经停在奈何桥的存档：第二个后人需要补上，原来三户不能重抽。
+  const originalFamilies = await p.evaluate(() => {
+    G.reborn.fams.splice(1, 1); save();
+    return G.reborn.fams;
+  });
+  await p.reload();
+  ok('old save gains its second heir and keeps existing candidates', await ownChoices.count() === 2 && await p.evaluate(original => JSON.stringify(G.reborn.fams.filter((_, i) => i !== 1)) === JSON.stringify(original), originalFamilies));
+  const choices = await p.evaluate(() => G.reborn.fams);
+  await p.reload();
+  ok('heir choices persist on reload', await p.evaluate(saved => JSON.stringify(saved) === JSON.stringify(G.reborn.fams), choices));
+  await p.screenshot({ path: path.join(OUT, 'loop', 'f4-reborn.png'), fullPage: true, animations: 'disabled' });
   const prevName = await p.evaluate(() => G.name);
-  await p.locator('[data-fam="0"]').click();
-  ok('reborn into own family', await p.evaluate(() => G.own && G.lifeNo === 2 && G.door >= 0 && G.parents[0].rel.includes('上一世')), await p.evaluate(() => G.parents[0].rel));
+  await ownChoices.nth(1).click();
+  ok('second heir becomes the parent', await p.evaluate(name => G.own && G.lifeNo === 2 && G.parents[0].name === name && /上一世你的[儿女]/.test(G.parents[0].rel), heirs[1]));
   ok('ancestor portrait of past self', await p.evaluate((n) => G.ancestors.some((a) => a.name === n), prevName));
   await p.click('[data-a="family"]');
+  const parent = await p.locator('#sheet .list li').first().textContent();
+  ok('family panel names the selected heir as parent', parent.startsWith(heirs[1]) && /[爹娘]（上一世你的[儿女]/.test(parent), parent);
+  await p.screenshot({ path: path.join(OUT, 'loop', 'f4-parent.png'), animations: 'disabled' });
   await p.locator('#sheet .sh-btns button', { hasText: '去祠堂' }).click();
   ok('hall renders portraits', (await p.locator('.pt').count()) >= 1);
   await p.screenshot({ path: path.join(OUT, 'loop', 'f5-hall.png') });

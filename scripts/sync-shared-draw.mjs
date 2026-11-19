@@ -30,4 +30,13 @@ for (const file of TARGETS) {
   writeFileSync(file, out);
   console.log(`${file}: 已同步`);
 }
+// 可直接打开的交接版使用同一份页面，只调整相邻捏人台及公共资源的位置。
+for (const [source, target] of [[SOURCE, 'prototype/creator.html'], [TARGETS[0], 'prototype/loop.html']]) {
+  const page = readFileSync(source, 'utf8')
+    .replaceAll('../../../assets/', '../assets/')
+    .replace('data-editor="../../art/creator/index.html?', 'data-editor="./creator.html?');
+  if (readFileSync(target, 'utf8') === page) continue;
+  if (check) { console.error(`${target}: 离线页面需要同步`); stale++; }
+  else { writeFileSync(target, page); console.log(`${target}: 已同步`); }
+}
 if (stale) process.exit(1);

@@ -169,6 +169,7 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   await p.evaluate(() => { N.over = true; cancelAnimationFrame(raf); G.phase = 'home'; render(); });
   const code = await p.evaluate(() => encode({ ...DEFAULT, hairColor: '#C8402E', top: 'armor' }));
   await p.click('#menu');
+  await p.click('#share-look summary');
   await p.fill('#code-in', code);
   await p.click('#use-code');
   ok('share code import', (await p.evaluate(() => ME.hairColor)) === '#C8402E');

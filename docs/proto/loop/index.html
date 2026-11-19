@@ -1,8 +1,10 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>一日一夜</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=ZCOOL+XiaoWei&family=Noto+Sans+SC:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="../../../assets/fonts/prototype.css">
+<script src="../../../assets/avatar.js"></script>
 <style>
 /* 一日一夜（样机）：白天出门找东西、天黑前回家；夜里守门；老死后当一晚鬼；投胎。
    白天是暖米色的人间，夜里和阴间整页换成深蓝。朱砂只给主要动作，金色只给“手里拿的东西”和宝物。 */
@@ -16,7 +18,7 @@
   --seal: #B8402F;
   --on-seal: #FFF7F2;
   --gold: #B7862A;
-  --font-display: 'ZCOOL XiaoWei', 'Songti SC', 'STSong', serif;
+  --font-display: 'ZCOOL KuaiLe', 'Songti SC', 'STSong', serif;
   --font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
 }
 @media (prefers-color-scheme: dark) {
@@ -158,7 +160,18 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; border-radius:
   .shake, .hurt, .glow, .float, .bar.low i, .rain1, .rain2 { animation: none !important; }
   .token, .ghost .gb { transition: none !important; }
 }
+#avatar-dialog { inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: var(--bg); }
+#avatar-dialog iframe { display: block; width: 100%; height: 100%; border: 0; }
+#game-expressions { box-sizing: border-box; width: min(360px, calc(100% - 32px)); max-height: 72dvh; padding: 16px; border: 1px solid var(--line); border-radius: 16px; color: var(--ink); background: var(--panel); box-shadow: 0 8px 36px #0003; }
+#game-expressions h2 { font: 20px var(--font-display); margin: 0 0 12px; }
+#game-expressions .choices { display: flex; gap: 6px; flex-wrap: wrap; }
+#game-expressions [aria-pressed="true"] { background: var(--seal); color: var(--on-seal); }
+@media (max-width: 420px) { .hud-r { gap: 5px; flex-wrap: wrap; justify-content: flex-end; } }
+body:has(#avatar-dialog[open]) { overflow: hidden; }
+#share-look { margin: 14px 0; }
+#share-look summary { cursor: pointer; }
 </style>
+</head><body>
 
 <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
   <defs>
@@ -179,6 +192,8 @@ textarea { width: 100%; box-sizing: border-box; min-height: 64px; border-radius:
 </div>
 <div class="sheet" id="sheet" hidden></div>
 <div class="toast" id="toast" role="status" hidden></div>
+<dialog id="avatar-dialog" aria-label="武林捏人台" data-editor="../../art/creator/index.html?embed=1"></dialog>
+<section id="game-expressions" popover="auto" aria-label="表情栏"><h2>表情</h2><div class="choices"></div></section>
 
 <script>
 'use strict';
@@ -287,9 +302,12 @@ const EXPRESSIONS = [
   ['gloomy', '郁闷', { eye: 'half', mouth: 'frown', brow: 'knit', fx: ['gloom'] }],
 ];
 let myExpr = { eye: 'arc', mouth: 'tongue', brow: 'up', fx: ['blush'] };
-function exprOf(id) {
+function exprOf(id, draw) {
   if (id === 'mine') return myExpr;
-  if (/^h[1-4]$/.test(id)) return { eye: 'open', mouth: 'base', brow: 'normal', fx: [], hand: id };
+  if (HAND_SLOTS.includes(id)) {
+    const base = EXPRESSIONS.find(([key]) => key === draw?.baseExpr?.[id]) || EXPRESSIONS[0];
+    return { ...base[2], hand: id };
+  }
   const e = EXPRESSIONS.find((x) => x[0] === id); return e ? e[2] : EXPRESSIONS[0][2];
 }
 // 笔画转成 SVG
@@ -298,14 +316,32 @@ function strokesSvg(list) {
     const pts = st.p || [];
     if (!pts.length) return '';
     const d = pts.length === 1 ? `M${pts[0][0]} ${pts[0][1]} l0.0001 0` : 'M' + pts.map((q) => `${q[0]} ${q[1]}`).join(' L');
-    return `<path d="${d}" stroke="${st.c}" stroke-width="${st.w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    return `<path d="${d}${st.fill ? ' Z' : ''}" stroke="${st.w ? st.c : 'none'}" stroke-width="${st.w}" fill="${st.fill || 'none'}" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"/>`;
   }).join('');
 }
 
-// 手绘：每层是一串笔画 { c 颜色, w 粗细, p 点 [[x, y], ...] }。脸上的层以头的中心为原点、以头的半高为 1；花纹和图案以 0–1 的方块为准
-const DRAW_LAYERS = [['face', '脸上（一直显示）'], ['h1', '手绘表情 1'], ['h2', '手绘表情 2'], ['h3', '手绘表情 3'], ['h4', '手绘表情 4'], ['cloth', '衣服花纹'], ['emblem', '胸前图案']];
-function emptyDraw() { return { face: [], h1: [], h2: [], h3: [], h4: [], cloth: [], emblem: [], hide: { h1: true, h2: true, h3: true, h4: true } }; }
-function normDraw(d) { const e = emptyDraw(); if (!d || typeof d !== 'object') return e; for (const [k] of DRAW_LAYERS) e[k] = Array.isArray(d[k]) ? d[k] : []; e.hide = { ...e.hide, ...(d.hide || {}) }; return e; }
+// v2 笔画以部位画布为单位。绑定名随存档导出，袖子的第二份渲染在右臂上。
+const HAND_SLOTS = Array.from({ length: 8 }, (_, i) => 'h' + (i + 1));
+const DRAW_LAYERS = [
+  ['hairFront', '前发', 'head'], ['hairBack', '后发', 'head'], ['head', '头饰', 'head'],
+  ['face', '脸上（一直显示）', 'head'], ...HAND_SLOTS.map(key => [key, '手绘表情 ' + key.slice(1), 'head']),
+  ['top', '上衣', 'torso'], ['back', '背后', 'torso'], ['sleeve', '袖子', 'armLeft'],
+  ['bottom', '下装', 'legs'], ['shoes', '鞋', 'legs'], ['cloth', '衣服花纹', 'torso'], ['emblem', '胸前图案', 'torso'],
+];
+function emptyDraw() {
+  const draw = { v: 2, hide: {}, customOnly: {}, baseExpr: {}, omitExpr: {}, bindings: {} };
+  for (const [k,, bone] of DRAW_LAYERS) {
+    draw[k] = [];
+    draw.bindings[k] = bone;
+    draw.customOnly[k] = false;
+  }
+  for (const k of HAND_SLOTS) { draw.hide[k] = true; draw.omitExpr[k] = []; }
+  return draw;
+}
+function hasDrawExpression(draw, key) {
+  return HAND_SLOTS.includes(key) && Boolean(draw?.[key]?.length || draw?.baseExpr?.[key]);
+}
+function normDraw(draw) { return validatedDraw(draw); }
 function encode(s) { return 'WULIN1:' + btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
 function decode(t) { const m = /WULIN1:([A-Za-z0-9+/=]+)/.exec(t.trim()); if (!m) throw new Error('bad'); return JSON.parse(decodeURIComponent(escape(atob(m[1])))); }
 
@@ -314,23 +350,61 @@ function headGeom(s) { const h = 372 / (3 + s.heads); return { cx: 120, hcy: 20 
 const INK = '#2B2233';
 const lerp = (a, b, t) => a + (b - a) * t;
 
-function drawPerson(s0, expr, age, opt = {}) {
-  // opt.uid：同一页画好几个人时，给裁切和花纹的 id 加后缀，免得互相串
-  const U = opt.uid || '';
-  const s = { ...s0 };
-  const D = s.draw || emptyDraw();
-  if (age === 'elder') { s.hairColor = '#E6E4DE'; s.streak = 'none'; }
-  const browColor = age === 'elder' ? '#D8D4CC' : s.browFollow ? s.hairColor : s.browColor;
-  const cx = 120;
-  const heads = 3 + s.heads; // 3–4 头身
-  const H = 372, h = H / heads;
-  const hcy = 20 + h / 2, ry = h / 2, rx = ry * (0.9 + 0.2 * s.faceWidth);
-  const shoulderY = 20 + h + 2;
+function bodyGeom(s) {
+  const { cx, hcy, ry } = headGeom(s);
+  const rx = ry * (0.9 + 0.2 * s.faceWidth);
+  const shoulderY = hcy + ry + 2;
   const bodyLen = 392 - shoulderY;
   const torso = bodyLen * (0.5 - 0.1 * s.height);
   const waistY = shoulderY + torso * 0.72, hipY = shoulderY + torso;
   const sw = rx * 0.6 + s.build * 14, hw = sw * 0.92 + s.build * 4;
   const legW = 15 + s.build * 6, legGap = 5;
+  return { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw, legW, legGap };
+}
+
+function layerBox(s, key, geometry = bodyGeom(s)) {
+  const { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw } = geometry;
+  const centered = (halfWidth, y, bottom) => ({ x: cx - halfWidth, y, w: halfWidth * 2, h: bottom - y });
+  switch (key) {
+    case 'hairFront': return centered(rx * 1.38, 0, hcy + ry * 1.3);
+    case 'hairBack': return centered(rx * 1.65, 0, hcy + ry * 4);
+    case 'head': return centered(rx * 1.75, 0, hcy + ry * 1.4);
+    case 'top': return centered(Math.max(sw, hw) + 25, shoulderY - 8, 392);
+    case 'back': return centered(108, Math.max(0, shoulderY - 85), 392);
+    case 'sleeve': return { x: cx - sw - 36, y: shoulderY - 4, w: 52, h: hipY - shoulderY + 25 };
+    case 'bottom': return centered(hw + 28, waistY - 8, 392);
+    case 'shoes': return centered(hw + 12, 348, 398);
+    case 'emblem': {
+      const e = sw * 0.95;
+      return centered(e / 2, lerp(shoulderY, waistY, 0.22), lerp(shoulderY, waistY, 0.22) + e);
+    }
+    case 'cloth': {
+      const tile = 16 + 48 * s.tileSize;
+      return centered(tile / 2, shoulderY, shoulderY + tile);
+    }
+    default: return { x: cx - 1.45 * ry, y: hcy - 1.5 * ry, w: 2.9 * ry, h: 2.9 * ry };
+  }
+}
+
+function drawPerson(s0, expr, age, opt = {}) {
+  const U = opt.uid || '';
+  const s = { ...s0 };
+  const D = s.draw?.v === 2 && s.draw.bindings ? s.draw : normDraw(s.draw);
+  const only = D.customOnly || {};
+  if (only.head) { s.head = 'none'; s.ear = 'none'; s.neck = 'none'; }
+  if (only.back) { s.cape = 'none'; s.weapon = 'none'; }
+  if (only.face) { s.blush = 0; s.beard = 'none'; s.mark = 'none'; s.mole = false; s.nose = 'none'; s.glasses = 'none'; }
+  if (age === 'elder') { s.hairColor = '#E6E4DE'; s.streak = 'none'; }
+  const browColor = age === 'elder' ? '#D8D4CC' : s.browFollow ? s.hairColor : s.browColor;
+  const geometry = bodyGeom(s);
+  const { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw, legW, legGap } = geometry;
+  function inkLayer(key, mirrored = false) {
+    if (key === opt.skip || !D[key]?.length) return '';
+    const { x, y, w, h } = layerBox(s, key, geometry);
+    const flip = mirrored ? `translate(${2 * cx} 0) scale(-1 1) ` : '';
+    const bone = mirrored ? 'armRight' : D.bindings[key];
+    return `<g data-draw-layer="${key}" data-bone="${bone}" transform="${flip}translate(${x} ${y}) scale(${w} ${h})">${strokesSvg(D[key])}</g>`;
+  }
 
   // ---- 身体的各层 ----
   const behind = []; // 披风、背着的兵器
@@ -347,30 +421,39 @@ function drawPerson(s0, expr, age, opt = {}) {
   const W = s.weapon;
   const onBack = s.weaponPos === 'back' && ['sword', 'saber', 'umbrella', 'flute', 'bow'].includes(W);
   if (onBack) behind.push(weaponBack(W, cx, shoulderY, hipY, s.weaponColor, s.trimColor));
+  behind.push(inkLayer('back'));
 
   // 腿和鞋
   const legTop = hipY - 8, legBot = 382;
   const lx1 = cx - legGap / 2 - legW, lx2 = cx + legGap / 2;
-  const longRobe = ['changshan', 'daopao'].includes(s.top);
-  const skirt = ['skirt', 'pleat'].includes(s.bottom);
+  const longRobe = !only.top && ['changshan', 'daopao'].includes(s.top);
+  const skirt = !only.bottom && ['skirt', 'pleat'].includes(s.bottom);
   const shoe = (x) => {
     const c = s.shoeColor;
     if (s.shoes === 'boots') return `<path d="M${x - 1} ${legBot - 14} h${legW + 2} v10 q8 2 8 9 h-${legW + 10} Z" fill="${c}"/>`;
     if (s.shoes === 'straw') return `<ellipse cx="${x + legW / 2 + 2}" cy="${legBot + 5}" rx="${legW / 2 + 6}" ry="5" fill="#C9A86A"/><path d="M${x + 2} ${legBot + 1} L${x + legW} ${legBot - 6}" stroke="#8A6A3C" stroke-width="2"/>`;
     return `<ellipse cx="${x + legW / 2 + 2}" cy="${legBot + 4}" rx="${legW / 2 + 5}" ry="6" fill="${c}"/>`;
   };
+  if (only.top || only.bottom) {
+    body.push(`<path d="M${cx - sw} ${shoulderY + 9} Q${cx} ${shoulderY - 8} ${cx + sw} ${shoulderY + 9} Q${cx + hw * 0.7} ${waistY} ${cx + hw * 0.8} ${hipY - 7} Q${cx} ${hipY + 15} ${cx - hw * 0.8} ${hipY - 7} Q${cx - hw * 0.7} ${waistY} ${cx - sw} ${shoulderY + 9} Z" fill="${s.skin}"/>`);
+  }
   if (!skirt) {
-    body.push(`<rect x="${lx1}" y="${legTop}" width="${legW}" height="${legBot - legTop}" rx="7" fill="${s.bottomColor}"/><rect x="${lx2}" y="${legTop}" width="${legW}" height="${legBot - legTop}" rx="7" fill="${s.bottomColor}"/>`);
-    if (s.bottom === 'wrap') {
+    const legColor = only.bottom ? s.skin : s.bottomColor;
+    body.push(`<rect x="${lx1}" y="${legTop}" width="${legW}" height="${legBot - legTop + 4}" rx="7" fill="${legColor}"/><rect x="${lx2}" y="${legTop}" width="${legW}" height="${legBot - legTop + 4}" rx="7" fill="${legColor}"/>`);
+    if (!only.bottom && s.bottom === 'wrap') {
       for (const x of [lx1, lx2]) for (let y = legBot - 40; y < legBot - 6; y += 7) body.push(`<path d="M${x} ${y + 5} L${x + legW} ${y}" stroke="#F4ECDD" stroke-width="2.4" opacity="0.8"/>`);
     }
   }
-  body.push(shoe(lx1 - 3) + shoe(lx2 - 1));
+  if (only.shoes) {
+    for (const x of [lx1, lx2]) body.push(`<ellipse cx="${x + legW / 2 + 1}" cy="385" rx="${legW / 2 + 2}" ry="6" fill="${s.skin}"/>`);
+  } else body.push(shoe(lx1 - 3) + shoe(lx2 - 1));
+  body.push(inkLayer('shoes'));
   if (skirt) {
     const top = waistY - 2;
     body.push(`<path d="M${cx - hw} ${top} L${cx + hw} ${top} L${cx + hw + 22} ${legBot} Q${cx} ${legBot + 6} ${cx - hw - 22} ${legBot} Z" fill="${s.bottomColor}"/>`);
     if (s.bottom === 'pleat') for (let i = -3; i <= 3; i++) body.push(`<path d="M${cx + i * hw * 0.28} ${top + 8} L${cx + i * (hw + 22) * 0.28} ${legBot - 2}" stroke="#000" stroke-opacity="0.15" stroke-width="1.5"/>`);
   }
+  body.push(inkLayer('bottom'));
 
   // 上衣
   let topBottom = hipY + 6;
@@ -382,37 +465,51 @@ function drawPerson(s0, expr, age, opt = {}) {
   const torsoPath = `M${cx - sw} ${shoulderY + 8} Q${cx} ${shoulderY - 6} ${cx + sw} ${shoulderY + 8} L${cx + hw + flare} ${topBottom} Q${cx} ${topBottom + (longRobe ? 6 : 2)} ${cx - hw - flare} ${topBottom} Z`;
 
   // 袖子（先画，衣身压在上面）
-  const wide = s.sleeve === 'wide' || s.top === 'daopao';
-  const sleeveColor = s.top === 'vest' ? lighten(s.topColor, 0.55) : s.topColor;
+  const wide = s.sleeve === 'wide' || (!only.top && s.top === 'daopao');
+  const sleeveColor = !only.top && s.top === 'vest' ? lighten(s.topColor, 0.55) : s.topColor;
   const sleeve = (side) => {
     const sx = cx + side * (sw - 3), sy = shoulderY + 10, hx = side < 0 ? hand.lx : hand.rx;
     if (wide) return `<path d="M${sx} ${sy - 4} Q${sx + side * 24} ${lerp(sy, hand.y, 0.5)} ${hx + side * 10} ${hand.y + 6} L${hx - side * 16} ${hand.y + 8} Q${sx - side * 2} ${lerp(sy, hand.y, 0.55)} ${sx - side * 10} ${sy + 8} Z" fill="${sleeveColor}"/><path d="M${hx + side * 10} ${hand.y + 6} L${hx - side * 16} ${hand.y + 8}" stroke="${s.trimColor}" stroke-width="4" stroke-linecap="round"/>`;
     return `<path d="M${sx} ${sy - 4} Q${sx + side * 14} ${lerp(sy, hand.y, 0.5)} ${hx + side * 6} ${hand.y - 4} L${hx - side * 8} ${hand.y - 2} Q${sx - side * 2} ${lerp(sy, hand.y, 0.5)} ${sx - side * 9} ${sy + 8} Z" fill="${sleeveColor}"/>`
       + (s.top === 'jin' || s.top === 'armor' ? `<rect x="${Math.min(hx + side * 6, hx - side * 8) - 1}" y="${hand.y - 14}" width="16" height="10" rx="3" fill="#2A2A33"/>` : '');
   };
-  body.push(sleeve(-1), sleeve(1));
+  if (only.sleeve) {
+    for (const side of [-1, 1]) {
+      const wrist = side < 0 ? hand.lx : hand.rx;
+      body.push(`<path d="M${cx + side * (sw - 4)} ${shoulderY + 13} Q${wrist} ${waistY} ${wrist} ${hand.y + 4}" fill="none" stroke="${s.skin}" stroke-width="14" stroke-linecap="round"/>`);
+    }
+  } else body.push(sleeve(-1), sleeve(1));
+  body.push(inkLayer('sleeve'), inkLayer('sleeve', true));
   body.push(`<circle cx="${hand.lx}" cy="${hand.y + 6}" r="8" fill="${s.skin}"/><circle cx="${hand.rx}" cy="${hand.y + 6}" r="8" fill="${s.skin}"/>`);
   body.push(`<rect x="${cx - 9}" y="${hcy + ry * 0.7}" width="18" height="${shoulderY - hcy - ry * 0.7 + 6}" fill="${s.skin}"/>`);
-  body.push(`<path d="${torsoPath}" fill="${s.topColor}"/>`);
+  if (!only.top) body.push(`<path d="${torsoPath}" fill="${s.topColor}"/>`);
   // 花纹（剪在衣身里）
-  if (s.pattern === 'custom') {
+  const customPattern = (s.pattern === 'custom' || only.cloth) && opt.skip !== 'cloth' && D.cloth.length;
+  if (customPattern) {
     const T = 16 + 48 * s.tileSize;
-    body.push(`<pattern id="cp${U}" patternUnits="userSpaceOnUse" x="${cx - T / 2}" y="${shoulderY}" width="${T}" height="${T}"><g transform="scale(${T})">${strokesSvg(D.cloth)}</g></pattern><clipPath id="tc2${U}"><path d="${torsoPath}"/></clipPath><rect clip-path="url(#tc2${U})" x="${cx - hw - 40}" y="${shoulderY - 10}" width="${(hw + 40) * 2}" height="${topBottom - shoulderY + 20}" fill="url(#cp${U})"/>`);
-  } else if (s.pattern !== 'none') body.push(`<clipPath id="tc${U}"><path d="${torsoPath}"/></clipPath><g clip-path="url(#tc${U})" opacity="0.55">${pattern(s.pattern, s.patternColor, cx - hw - 30, shoulderY - 10, (hw + 30) * 2, topBottom - shoulderY + 20)}</g>`);
+    body.push(`<defs><pattern id="cp${U}" patternUnits="userSpaceOnUse" x="${cx - T / 2}" y="${shoulderY}" width="${T}" height="${T}"><g data-draw-layer="cloth" data-bone="torso" transform="scale(${T})">${strokesSvg(D.cloth)}</g></pattern></defs>`);
+    if (!only.top) body.push(`<clipPath id="tc2${U}"><path d="${torsoPath}"/></clipPath><rect clip-path="url(#tc2${U})" x="${cx - hw - 40}" y="${shoulderY - 10}" width="${(hw + 40) * 2}" height="${topBottom - shoulderY + 20}" fill="url(#cp${U})"/>`);
+  } else if (!only.top && !only.cloth && s.pattern !== 'custom' && s.pattern !== 'none') body.push(`<clipPath id="tc${U}"><path d="${torsoPath}"/></clipPath><g clip-path="url(#tc${U})" opacity="0.55">${pattern(s.pattern, s.patternColor, cx - hw - 30, shoulderY - 10, (hw + 30) * 2, topBottom - shoulderY + 20)}</g>`);
   // 领口
-  if (s.top === 'yuanling') body.push(`<path d="M${cx - 16} ${shoulderY + 2} Q${cx} ${shoulderY + 18} ${cx + 16} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
-  else if (s.top === 'duangua') body.push(`<path d="M${cx} ${shoulderY + 4} V${topBottom}" stroke="${s.trimColor}" stroke-width="3"/>${[0.35, 0.55, 0.75].map((t) => `<rect x="${cx - 7}" y="${lerp(shoulderY, topBottom, t)}" width="14" height="4" rx="2" fill="${s.trimColor}"/>`).join('')}`);
-  else if (s.top === 'vest') body.push(`<path d="M${cx - 10} ${shoulderY + 2} L${cx} ${hipY - 6} L${cx + 10} ${shoulderY + 2}" fill="${lighten(s.topColor, 0.55)}"/><path d="M${cx - 10} ${shoulderY + 2} L${cx} ${hipY - 6} L${cx + 10} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="3" fill="none"/>`);
-  else body.push(`<path d="M${cx - 12} ${shoulderY + 2} L${cx + 10} ${lerp(shoulderY, waistY, 0.95)}" stroke="#F4ECDD" stroke-width="6" stroke-linecap="round"/><path d="M${cx + 12} ${shoulderY + 2} L${cx - 1} ${lerp(shoulderY, waistY, 0.55)}" stroke="#F4ECDD" stroke-width="6" stroke-linecap="round"/><path d="M${cx - 12} ${shoulderY + 2} L${cx + 10} ${lerp(shoulderY, waistY, 0.95)}" stroke="${s.trimColor}" stroke-width="2" stroke-linecap="round"/>`);
-  if (s.top === 'daopao') body.push(`<path d="M${cx - hw - flare} ${topBottom} Q${cx} ${topBottom + 6} ${cx + hw + flare} ${topBottom}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
-  if (s.top === 'armor') {
-    for (let i = 0; i < 3; i++) body.push(`<path d="M${cx - sw + 6} ${shoulderY + 22 + i * 14} Q${cx} ${shoulderY + 30 + i * 14} ${cx + sw - 6} ${shoulderY + 22 + i * 14}" stroke="${s.trimColor}" stroke-width="7" fill="none"/>`);
-    body.push(`<ellipse cx="${cx - sw}" cy="${shoulderY + 10}" rx="14" ry="9" fill="${s.trimColor}"/><ellipse cx="${cx + sw}" cy="${shoulderY + 10}" rx="14" ry="9" fill="${s.trimColor}"/>`);
+  if (!only.top) {
+    if (s.top === 'yuanling') body.push(`<path d="M${cx - 16} ${shoulderY + 2} Q${cx} ${shoulderY + 18} ${cx + 16} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
+    else if (s.top === 'duangua') body.push(`<path d="M${cx} ${shoulderY + 4} V${topBottom}" stroke="${s.trimColor}" stroke-width="3"/>${[0.35, 0.55, 0.75].map((t) => `<rect x="${cx - 7}" y="${lerp(shoulderY, topBottom, t)}" width="14" height="4" rx="2" fill="${s.trimColor}"/>`).join('')}`);
+    else if (s.top === 'vest') body.push(`<path d="M${cx - 10} ${shoulderY + 2} L${cx} ${hipY - 6} L${cx + 10} ${shoulderY + 2}" fill="${lighten(s.topColor, 0.55)}"/><path d="M${cx - 10} ${shoulderY + 2} L${cx} ${hipY - 6} L${cx + 10} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="3" fill="none"/>`);
+    else body.push(`<path d="M${cx - 12} ${shoulderY + 2} L${cx + 10} ${lerp(shoulderY, waistY, 0.95)}" stroke="#F4ECDD" stroke-width="6" stroke-linecap="round"/><path d="M${cx + 12} ${shoulderY + 2} L${cx - 1} ${lerp(shoulderY, waistY, 0.55)}" stroke="#F4ECDD" stroke-width="6" stroke-linecap="round"/><path d="M${cx - 12} ${shoulderY + 2} L${cx + 10} ${lerp(shoulderY, waistY, 0.95)}" stroke="${s.trimColor}" stroke-width="2" stroke-linecap="round"/>`);
+    if (s.top === 'daopao') body.push(`<path d="M${cx - hw - flare} ${topBottom} Q${cx} ${topBottom + 6} ${cx + hw + flare} ${topBottom}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
+    if (s.top === 'armor') {
+      for (let i = 0; i < 3; i++) body.push(`<path d="M${cx - sw + 6} ${shoulderY + 22 + i * 14} Q${cx} ${shoulderY + 30 + i * 14} ${cx + sw - 6} ${shoulderY + 22 + i * 14}" stroke="${s.trimColor}" stroke-width="7" fill="none"/>`);
+      body.push(`<ellipse cx="${cx - sw}" cy="${shoulderY + 10}" rx="14" ry="9" fill="${s.trimColor}"/><ellipse cx="${cx + sw}" cy="${shoulderY + 10}" rx="14" ry="9" fill="${s.trimColor}"/>`);
+    }
+    // 腰带
+    if (s.top !== 'duangua' && s.top !== 'vest') body.push(`<rect x="${cx - hw - (longRobe ? 4 : 2)}" y="${waistY - 5}" width="${(hw + (longRobe ? 4 : 2)) * 2}" height="10" rx="4" fill="${s.beltColor}"/>`);
   }
-  // 腰带
-  if (s.top !== 'duangua' && s.top !== 'vest') body.push(`<rect x="${cx - hw - (longRobe ? 4 : 2)}" y="${waistY - 5}" width="${(hw + (longRobe ? 4 : 2)) * 2}" height="10" rx="4" fill="${s.beltColor}"/>`);
-  // 胸前图案（手绘）
-  if (D.emblem.length && opt.skip !== 'emblem') { const E = sw * 0.95; body.push(`<g transform="translate(${cx - E / 2} ${lerp(shoulderY, waistY, 0.22)}) scale(${E})">${strokesSvg(D.emblem)}</g>`); }
+  const customTop = inkLayer('top');
+  if (customTop && customPattern) {
+    // 由手绘上衣的不透明区域裁出花纹，镂空、衣摆和轮廓均保留。
+    body.push(`<g id="drawnTop${U}">${customTop}</g><mask id="drawnTopMask${U}" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="400"><use href="#drawnTop${U}"/></mask><rect width="240" height="400" fill="url(#cp${U})" mask="url(#drawnTopMask${U})"/>`);
+  } else body.push(customTop);
+  body.push(inkLayer('emblem'));
   // 颈饰
   if (s.neck === 'scarf') body.push(`<path d="M${cx - 18} ${shoulderY} Q${cx} ${shoulderY + 14} ${cx + 18} ${shoulderY} L${cx + 16} ${shoulderY + 12} Q${cx} ${shoulderY + 22} ${cx - 16} ${shoulderY + 12} Z" fill="${s.neckColor}"/><path d="M${cx + 8} ${shoulderY + 14} q6 22 -2 40 l10 -2 q6 -20 2 -38 Z" fill="${s.neckColor}"/>`);
   if (s.neck === 'pendant') body.push(`<path d="M${cx - 12} ${shoulderY} Q${cx} ${shoulderY + 30} ${cx + 12} ${shoulderY}" stroke="#2A2A33" stroke-width="1.5" fill="none"/><circle cx="${cx}" cy="${shoulderY + 24}" r="7" fill="${s.neckColor}"/><circle cx="${cx}" cy="${shoulderY + 24}" r="2.5" fill="${s.topColor}"/>`);
@@ -428,8 +525,8 @@ function drawPerson(s0, expr, age, opt = {}) {
   const hc = s.hairColor;
   const len = s.hairLen;
   // 头发底（盖住头顶，画在脸后面）
-  backHair.push(`<ellipse cx="${cx}" cy="${hcy - ry * 0.08}" rx="${rx * 1.07}" ry="${ry * 1.04}" fill="${hc}"/>`);
-  switch (s.hairBack) {
+  if (!only.hairBack) backHair.push(`<ellipse cx="${cx}" cy="${hcy - ry * 0.08}" rx="${rx * 1.07}" ry="${ry * 1.04}" fill="${hc}"/>`);
+  if (!only.hairBack) switch (s.hairBack) {
     case 'highpony': backHair.unshift(`<path d="M${cx + rx * 0.35} ${hcy - ry * 0.85} Q${cx + rx * 1.5} ${hcy - ry * 0.9} ${cx + rx * 1.25} ${hcy + ry * 0.2} Q${cx + rx * 1.05} ${hcy + ry * (0.8 + 1.8 * len)} ${cx + rx * 1.35} ${hcy + ry * (1 + 2.2 * len)} Q${cx + rx * 0.6} ${hcy + ry * (0.8 + 1.8 * len)} ${cx + rx * 0.7} ${hcy + ry * 0.2} Q${cx + rx * 0.6} ${hcy - ry * 0.4} ${cx + rx * 0.2} ${hcy - ry * 0.55} Z" fill="${hc}"/>`); headParts.push(`<circle cx="${cx + rx * 0.45}" cy="${hcy - ry * 0.88}" r="${ry * 0.14}" fill="${s.trimColor}"/>`); break;
     case 'lowpony': backHair.unshift(`<path d="M${cx - rx * 0.3} ${hcy + ry * 0.5} Q${cx} ${hcy + ry * (1.2 + 2.6 * len)} ${cx + rx * 0.3} ${hcy + ry * 0.5} Z" fill="${hc}"/>`); break;
     case 'long': backHair.unshift(`<path d="M${cx - rx * 1.05} ${hcy} Q${cx - rx * 1.2} ${hcy + ry * (1 + 2.4 * len)} ${cx - rx * 0.7} ${hcy + ry * (1.3 + 2.6 * len)} L${cx + rx * 0.7} ${hcy + ry * (1.3 + 2.6 * len)} Q${cx + rx * 1.2} ${hcy + ry * (1 + 2.4 * len)} ${cx + rx * 1.05} ${hcy} Z" fill="${hc}"/>`); break;
@@ -440,11 +537,13 @@ function drawPerson(s0, expr, age, opt = {}) {
     case 'halfup': backHair.unshift(`<path d="M${cx - rx * 1.05} ${hcy} Q${cx - rx * 1.15} ${hcy + ry * (1 + 2 * len)} ${cx - rx * 0.6} ${hcy + ry * (1.2 + 2.2 * len)} L${cx + rx * 0.6} ${hcy + ry * (1.2 + 2.2 * len)} Q${cx + rx * 1.15} ${hcy + ry * (1 + 2 * len)} ${cx + rx * 1.05} ${hcy} Z" fill="${hc}"/>`); backHair.push(`<circle cx="${cx}" cy="${hcy - ry * 1.02}" r="${ry * 0.26}" fill="${hc}"/>`); break;
   }
   // 发梢挑染：用头发自己的形状做剪切，只给末端上色
-  if (s.streak === 'tips') {
+  if (!only.hairBack && s.streak === 'tips') {
     const longStyle = ['highpony', 'lowpony', 'long', 'twintails', 'halfup'].includes(s.hairBack);
     const tipY = longStyle ? hcy + ry * (0.75 + 1.7 * len) : hcy + ry * 0.55;
     backHair.push(`<clipPath id="bh${U}">${backHair.join('').replace(/ fill="[^"]*"/g, '')}</clipPath><rect clip-path="url(#bh${U})" x="-100" y="${tipY}" width="440" height="400" fill="${s.streakColor}"/>`);
   }
+
+  backHair.push(inkLayer('hairBack'));
 
   // 脸
   const facePath = (() => {
@@ -459,7 +558,7 @@ function drawPerson(s0, expr, age, opt = {}) {
   headParts.unshift(`<path d="${facePath}" fill="${s.skin}"/>`);
 
   // 表情
-  const X = typeof expr === 'string' ? exprOf(expr) : expr;
+  const X = typeof expr === 'string' ? exprOf(expr, D) : expr;
   let eyeStyle = s.eyes, mouthStyle = X.mouth === 'base' ? s.mouth : X.mouth, tilt = s.browTilt, browLift = 0, eyeScale = 1, eyeState = X.eye;
   if (X.brow === 'up') { browLift = 5; tilt = Math.min(1, tilt + 0.2); }
   if (X.brow === 'knit') { tilt = 1; browLift = -2; }
@@ -467,8 +566,10 @@ function drawPerson(s0, expr, age, opt = {}) {
   if (eyeState === 'wide') eyeScale = 1.22;
   if (eyeState === 'arc') eyeStyle = 'smile';
   if (eyeState === 'star') eyeStyle = 'sparkle';
-  const fx = new Set(X.fx || []);
-  const hideFace = X.hand && D.hide[X.hand] && (D[X.hand].length > 0 || opt.forceHide);
+  const omit = D.omitExpr?.[X.hand] || [];
+  const hideSlot = X.hand && (D.hide[X.hand] || only[X.hand]) && (hasDrawExpression(D, X.hand) || opt.forceHide);
+  const hideFace = only.face || hideSlot;
+  const fx = new Set(hideSlot || omit.includes('fx') ? [] : X.fx);
   const es = (0.72 + 0.6 * s.eyeSize) * (ry / 52) * eyeScale;
   const egap = rx * (0.28 + 0.2 * s.eyeGap);
   const ey = hcy + ry * (0.06 + 0.24 * (s.eyeY - 0.5));
@@ -483,7 +584,7 @@ function drawPerson(s0, expr, age, opt = {}) {
   if (s.mark === 'paint') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 2)} ${ey + 14 * es} l${sd * 14} -4 M${cx + sd * (egap + 2)} ${ey + 20 * es} l${sd * 14} -4" stroke="${mc}" stroke-width="3" stroke-linecap="round"/>`);
   // 眼睛
   const eyeRotDeg = (s.eyeRot || 0) * 25, esq = 0.7 + 0.6 * (s.eyeSquash ?? 0.5);
-  if (!hideFace) for (const sd of [-1, 1]) headParts.push(`<g transform="translate(${cx + sd * egap} ${ey}) rotate(${-sd * eyeRotDeg}) scale(${sd * es} ${es * esq})">${eyeWithState(eyeState, eyeStyle, s.eyeColor, s.skin)}</g>`);
+  if (!hideFace && !omit.includes('eyes')) for (const sd of [-1, 1]) headParts.push(`<g transform="translate(${cx + sd * egap} ${ey}) rotate(${-sd * eyeRotDeg}) scale(${sd * es} ${es * esq})">${eyeWithState(eyeState, eyeStyle, s.eyeColor, s.skin)}</g>`);
   if (age === 'elder') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 12 * es)} ${ey - 2} l${sd * 6} -3 M${cx + sd * (egap + 12 * es)} ${ey + 3} l${sd * 6} 2" stroke="#C9A58F" stroke-width="1.2"/>`);
   // 表情特效
   if (fx.has('blush')) for (const sd of [-1, 1]) headParts.push(`<ellipse cx="${cx + sd * (egap + 2)}" cy="${ey + 16 * es + 4}" rx="${12 * es + 2}" ry="${6 * es + 1}" fill="#FF6B81" opacity="0.55"/><path d="M${cx + sd * (egap - 4)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 2)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 8)} ${ey + 14 * es + 4} l${sd * 3} 5" stroke="#E2475F" stroke-width="1.6" opacity="0.7"/>`);
@@ -498,7 +599,7 @@ function drawPerson(s0, expr, age, opt = {}) {
   const ny = hcy + ry * (0.3 + 0.22 * ((s.noseY ?? 0.5) - 0.5)), nk = (ry / 52) * (0.7 + 0.6 * (s.noseSize ?? 0.5));
   if (s.nose && s.nose !== 'none') headParts.push(`<g transform="translate(${cx} ${ny}) scale(${nk})">${nose(s.nose, shade(s.skin, -22))}</g>`);
   const mw = 0.7 + 0.6 * (s.mouthSize ?? 0.5), mh = mw * (0.7 + 0.6 * (s.mouthSquash ?? 0.5));
-  if (!hideFace) headParts.push(`<g transform="translate(${cx} ${my}) scale(${(ry / 52) * mw} ${(ry / 52) * mh})">${mouth(mouthStyle)}</g>`);
+  if (!hideFace && !omit.includes('mouth')) headParts.push(`<g transform="translate(${cx} ${my}) scale(${(ry / 52) * mw} ${(ry / 52) * mh})">${mouth(mouthStyle)}</g>`);
   // 痣：脸上任意位置
   if (s.mole) headParts.push(`<circle cx="${cx + (s.moleX ?? 0.45) * rx * 0.85}" cy="${hcy + (s.moleY ?? 0.35) * ry * 0.85}" r="${(1.3 + 3 * (s.moleSize ?? 0.4)) * (ry / 52)}" fill="${INK}"/>`);
   // 胡子
@@ -507,16 +608,17 @@ function drawPerson(s0, expr, age, opt = {}) {
   if (s.beard === 'goatee') headParts.push(`<path d="M${cx - 6} ${my + 6} Q${cx} ${my + 26} ${cx + 6} ${my + 6} Z" fill="${bc}"/><path d="M${cx} ${my - 6} q-8 -4 -14 2 q7 0 14 -1 q7 1 14 1 q-6 -6 -14 -2 Z" fill="${bc}"/>`);
   if (s.beard === 'full') headParts.push(`<path d="M${cx - rx * 0.92} ${hcy + ry * 0.1} Q${cx - rx * 0.8} ${hcy + ry * 1.05} ${cx} ${hcy + ry * 1.12} Q${cx + rx * 0.8} ${hcy + ry * 1.05} ${cx + rx * 0.92} ${hcy + ry * 0.1} Q${cx + rx * 0.6} ${hcy + ry * 0.75} ${cx} ${my + 4} Q${cx - rx * 0.6} ${hcy + ry * 0.75} ${cx - rx * 0.92} ${hcy + ry * 0.1} Z" fill="${bc}"/>`);
   // 前发
-  headParts.push(frontHair(s.hairFront, cx, hcy, rx, ry, hc));
-  if (!hideFace) headParts.push(browsSvg);
+  if (!only.hairFront) headParts.push(frontHair(s.hairFront, cx, hcy, rx, ry, hc));
+  if (!hideFace && !omit.includes('brows')) headParts.push(browsSvg);
   if (s.glasses && s.glasses !== 'none') headParts.push(glasses(s.glasses, s.glassesColor, cx, egap, ey + ((s.glassesY ?? 0.5) - 0.5) * ry * 0.25, (11 + 8 * (s.glassesSize ?? 0.5)) * (ry / 52)));
   // 手绘：脸上一直显示的层 + 当前手绘表情的层，画在头发上面，画什么就是什么
-  const handLayers = ['face', X.hand].filter((k) => k && k !== opt.skip);
-  for (const k of handLayers) headParts.push(`<g transform="translate(${cx} ${hcy}) scale(${ry})">${strokesSvg(D[k])}</g>`);
-  if (s.streak === 'left' || s.streak === 'right') {
+  headParts.push(inkLayer('face'));
+  if (X.hand) headParts.push(inkLayer(X.hand));
+  if (!only.hairFront && (s.streak === 'left' || s.streak === 'right')) {
     const sd = s.streak === 'left' ? -1 : 1;
     headParts.push(`<path d="M${cx + sd * rx * 0.25} ${hcy - ry * 1.02} Q${cx + sd * rx * 0.75} ${hcy - ry * 0.7} ${cx + sd * rx * 0.62} ${hcy - ry * 0.22} L${cx + sd * rx * 0.46} ${hcy - ry * 0.3} Q${cx + sd * rx * 0.5} ${hcy - ry * 0.75} ${cx + sd * rx * 0.1} ${hcy - ry * 1.0} Z" fill="${s.streakColor}"/>`);
   }
+  headParts.push(inkLayer('hairFront'));
   // 头饰、耳饰
   const hd = s.headColor;
   if (s.head === 'band') headParts.push(`<path d="M${cx - rx * 1.02} ${hcy - ry * 0.42} Q${cx} ${hcy - ry * 0.72} ${cx + rx * 1.02} ${hcy - ry * 0.42}" stroke="${hd}" stroke-width="${ry * 0.14}" fill="none"/><path d="M${cx + rx * 1.0} ${hcy - ry * 0.44} q${rx * 0.5} ${ry * 0.2} ${rx * 0.4} ${ry * 0.8} M${cx + rx * 1.0} ${hcy - ry * 0.44} q${rx * 0.3} ${ry * 0.4} ${rx * 0.1} ${ry * 0.95}" stroke="${hd}" stroke-width="${ry * 0.08}" fill="none" stroke-linecap="round"/>`);
@@ -529,6 +631,7 @@ function drawPerson(s0, expr, age, opt = {}) {
     const ex = cx + sd * rx * 0.98, eyy = hcy + ry * 0.28;
     headParts.push(s.ear === 'stud' ? `<circle cx="${ex}" cy="${eyy}" r="3" fill="${s.earColor}"/>` : `<path d="M${ex} ${eyy} v12" stroke="${s.earColor}" stroke-width="1.5"/><circle cx="${ex}" cy="${eyy + 15}" r="4" fill="${s.earColor}"/>`);
   }
+  headParts.push(inkLayer('head'));
   const defs = '';
   if (fx.has('sweat')) headParts.push(`<path d="M${cx + rx * 0.82} ${hcy - ry * 0.55} q-6 10 0 14 q6 -4 0 -14 Z" fill="#9CD8FF" stroke="#5AA9D6" stroke-width="1"/>`);
   if (fx.has('anger')) headParts.push(`<g transform="translate(${cx + rx * 0.62} ${hcy - ry * 0.62})" stroke="#E23B3B" stroke-width="3" stroke-linecap="round"><path d="M-7 -2 q5 0 5 -5 M7 -2 q-5 0 -5 -5 M-7 2 q5 0 5 5 M7 2 q-5 0 -5 5" fill="none"/></g>`);
@@ -704,7 +807,6 @@ const pct = (v) => Math.round(v * 100) + '%';
 let SPEED = 1; // 测试时调快
 
 const CFG = { lifeDays: 5, dayStart: 360, dusk: 1080, hpMax: 3, bag: 6, bagBuddy: 3, buddyAt: 20, helpAt: 40 };
-const CREATOR_URL = 'https://claude.ai/artifact/SoYUnmeWd5fubAt1UYw3zX';
 
 // ---------------- 野外 ----------------
 const RINGS = [
@@ -800,7 +902,7 @@ const TIER_NAME = ['寻常人家', '殷实人家', '名门望族'];
 function ageOf(day) { const f = (day - 1) / Math.max(1, CFG.lifeDays - 1); return f < 0.2 ? 'child' : f < 0.7 ? 'adult' : 'elder'; }
 
 function lookOf(o) { return { ...DEFAULT, ...(o || {}), draw: normDraw(o && o.draw) }; }
-function loadLook() { try { const r = localStorage.getItem('wulin-loop-look'); if (r) return lookOf(JSON.parse(r)); } catch (e) {} return lookOf(INSPIRE[0][1]); }
+function loadLook() { try { const r = localStorage.getItem('wulin-loop-look'); if (r) return validatedLook(JSON.parse(r)); } catch (e) {} return lookOf(INSPIRE[0][1]); }
 let ME = loadLook();
 function randomLook() {
   const o = { ...DEFAULT };
@@ -818,14 +920,25 @@ function mixHex(a, b, t) {
 function ghostOf(s) {
   const g = { ...s, weapon: 'none', blush: 0 };
   for (const k of Object.keys(g)) if ((k === 'skin' || /Color$/.test(k)) && /^#[0-9a-f]{6}$/i.test(g[k])) g[k] = mixHex(g[k], '#DCE8F7', 0.62);
+  if (s.draw) {
+    g.draw = { ...s.draw };
+    for (const [layer] of DRAW_LAYERS) {
+      if (!s.draw[layer]?.length) continue;
+      g.draw[layer] = s.draw[layer].map(stroke => ({
+        ...stroke, c: mixHex(stroke.c, '#DCE8F7', 0.62),
+        ...(stroke.fill ? { fill: mixHex(stroke.fill, '#DCE8F7', 0.62) } : {}),
+      }));
+    }
+  }
   return g;
 }
 let uidN = 0;
 const uid = () => 'p' + ++uidN;
 function placed(x, y, k, inner, attrs = '') { return `<g transform="translate(${(x - 120 * k).toFixed(1)} ${(y - 392 * k).toFixed(1)}) scale(${k})"${attrs}>${inner}</g>`; }
 function personSvg(s, expr, age) { return `<g style="--skin:${s.skin}">${drawPerson(s, expr, age, { uid: uid() })}</g>`; }
-function person(s, expr, age, x, y, k) { return placed(x, y, k, personSvg(s, expr, age)); }
+function person(s, expr, age, x, y, k) { return placed(x, y, k, personSvg(s, s === ME ? playerExpression(expr) : expr, age)); }
 function ghostSvg(s, expr, age, x, y, k) {
+  if (s === ME) expr = playerExpression(expr);
   return placed(x, y, k, `<g mask="url(#gmask)" opacity="0.9">${personSvg(ghostOf(s), expr, age)}</g><path d="M84 236 C70 300 96 352 118 394 C122 362 128 372 138 398 C150 358 170 330 158 236 Z" fill="#DCE8F7" opacity="0.3"/>`);
 }
 
@@ -841,7 +954,7 @@ function freshLife(fam, prev) {
     money: fam.money, door: fam.door, traps: { crossbow: fam.crossbow || 0, lamp: fam.lamp || 0, talisman: fam.talisman || 0 },
     treasures: [...(fam.treasures || [])], store: {}, bag: [], at: 'home', buddy: null, target: null, item: 'sword',
     friends: { ...fam.friends }, held: 0, broken: 0, earned: 0, kills: 0, deathKind: null, deathMsg: '', afterlife: null, reborn: null,
-    history: prev ? [...prev.history] : [],
+    history: prev ? [...prev.history] : [], look: ME,
   };
 }
 function save() { try { localStorage.setItem('wulin-loop', JSON.stringify(G)); } catch (e) {} }
@@ -898,11 +1011,36 @@ const talismanSvg = (x, y) => `<g transform="translate(${x} ${y})"><rect x="-4" 
 const lionSvg = (x, y, flip) => `<g transform="translate(${x} ${y}) scale(${flip ? -1 : 1} 1)"><rect x="-10" y="-6" width="20" height="8" rx="2" fill="#8C8F96"/><path d="M-8 -6 Q-9 -22 0 -24 Q9 -22 8 -12 L8 -6 Z" fill="#A7AAB1"/><circle cx="2" cy="-18" r="5" fill="#8C8F96"/></g>`;
 
 // ---------------- 顶栏 ----------------
+function playerExpression(fallback) {
+  const id = G?.expression;
+  if (EXPRESSIONS.some(([key]) => key === id) || (HAND_SLOTS.includes(id) && hasDrawExpression(ME.draw, id))) return id;
+  return fallback;
+}
+function openExpressions() {
+  const pane = $('game-expressions');
+  const options = [['', '随情境'], ...EXPRESSIONS,
+    ...HAND_SLOTS.filter(k => hasDrawExpression(ME.draw, k)).map(k => [k, '手绘表情 ' + k.slice(1)])];
+  const selected = playerExpression('');
+  pane.querySelector('.choices').innerHTML = options.map(([k, label]) => `<button type="button" class="icon" data-expression="${k}" aria-pressed="${selected === k}">${label}</button>`).join('');
+  pane.showPopover();
+  pane.querySelector('[aria-pressed="true"]').focus({ preventScroll: true });
+}
+$('game-expressions').addEventListener('click', event => {
+  const button = event.target.closest('[data-expression]');
+  if (!button) return;
+  G.expression = button.dataset.expression;
+  save(); $('game-expressions').hidePopover(); refreshAppearance();
+  $('show-expressions').focus({ preventScroll: true });
+});
 function renderHud() {
   const ghostly = ['death', 'haunt', 'reborn', 'guard'].includes(G.phase);
   const age = ageOf(G.day);
   $('hud').innerHTML = `<div class="hud-l"><b>${G.phase === 'guard' ? '护家神' : G.phase === 'haunt' ? '厉鬼' : ghostly ? '阴间' : `第 ${G.day} 天`}</b><span>${ghostly ? `第 ${G.lifeNo} 世走完了` : `${G.name} · ${AGE_NAME[age]} · 第 ${G.lifeNo} 世`}</span></div>
     <div class="hud-r">${ghostly ? '' : `<span class="hp" role="img" aria-label="体力 ${G.hp} / ${CFG.hpMax}">${'<i class="on"></i>'.repeat(Math.max(0, G.hp))}${'<i></i>'.repeat(Math.max(0, CFG.hpMax - G.hp))}</span><span>${G.money} 文</span><span>宝物 ${G.treasures.length}</span>`}<button type="button" class="icon" id="menu">设置</button></div>`;
+  const expressions = document.createElement('button');
+  expressions.type = 'button'; expressions.className = 'icon'; expressions.id = 'show-expressions';
+  expressions.textContent = '表情'; expressions.setAttribute('aria-controls', 'game-expressions');
+  expressions.onclick = openExpressions; $('menu').before(expressions);
   $('menu').onclick = openMenu;
 }
 function clockHtml() {
@@ -1270,7 +1408,7 @@ function openFamily() {
 }
 // 祠堂：一代代的祖宗画像。回自家投胎的话，前几世的你也挂在这里
 function portrait(a) {
-  return `<figure class="pt"><svg viewBox="30 -6 180 190" role="img" aria-label="${a.name}的画像"><rect x="30" y="-6" width="180" height="190" fill="#E8DCC2"/>${personSvg(a.look, 'calm', 'elder')}</svg><figcaption><b>${a.name}</b><span>${a.note}</span></figcaption></figure>`;
+  return `<figure class="pt"><svg viewBox="30 -6 180 190" role="img" aria-label="${a.name}的画像"><rect x="30" y="-6" width="180" height="190" fill="#E8DCC2"/>${personSvg(a.look, a.expression || 'calm', 'elder')}</svg><figcaption><b>${a.name}</b><span>${a.note}</span></figcaption></figure>`;
 }
 function openHall() {
   const list = G.ancestors;
@@ -1294,7 +1432,7 @@ function ownFamily(heir) {
     own: true, name: G.fam, door: G.door, money: Math.floor(G.money * 0.6), crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
     treasures: G.treasures.slice(), thread: t,
     parents: [{ name: heir.name, look: heir.look, rel: heir.kind === '女' ? '娘（上一世你的女儿）' : heir.kind === '徒' ? '师父（上一世你的徒弟）' : '爹（上一世你的儿子）' }, { name: pick(SURNAMES) + '氏', look: randomLook(), rel: heir.kind === '女' ? '爹' : '娘' }],
-    ancestors: [...G.ancestors, { name: G.name, look: { ...ME }, note: `第 ${G.lifeNo} 世的你` }],
+    ancestors: [...G.ancestors, { name: G.name, look: { ...ME }, expression: playerExpression('calm'), note: `第 ${G.lifeNo} 世的你` }],
   };
 }
 
@@ -1429,8 +1567,9 @@ function nightSvg() {
   if (G.door >= 2) s += lanternSvg(124, 420, 8) + lanternSvg(236, 420, 8);
   if (G.traps.lamp) for (const x of [30, 80, 280, 330]) s += lanternSvg(x, 426, 6);
   s += `<g id="nbows"></g><g id="glayer"></g><g id="nplayer"></g><g id="nfam"></g><g id="nally"></g>`;
-  if (N.guardian) s += `<g class="float">${ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22)}</g>`;
-  s += `<g pointer-events="none"><g class="rain1"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainA)"/></g><g class="rain2"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainB)"/></g></g><g id="fx"></g>`;
+  if (N.guardian) s += `<g id="nguardian" class="float">${ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22)}</g>`;
+  s += `<g pointer-events="none"><g class="rain1"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainA)"/></g><g class="rain2"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainB)"/></g></g><g id="fx"></g>
+    <g pointer-events="none"><path id="gleaders" fill="none" stroke="#DCE8F7" stroke-opacity=".65" stroke-linecap="round"/><g id="glabels"></g></g>`;
   return s;
 }
 // 远小近大：鬼从巷子深处走到院门口
@@ -1442,7 +1581,8 @@ function drawPlayer() {
   const base = N.guardian ? N.kid : ME;
   const look = { ...base, weapon: it === 'sword' ? 'sword' : it === 'bow' ? 'bow' : 'none', weaponPos: 'hand' };
   const age = N.guardian ? 'child' : ageOf(G.day);
-  $('nplayer').innerHTML = person(look, G.hp <= 1 && !N.guardian ? 'sad' : 'angry', age, 108, 498, 0.2) + (it === 'lamp' ? lanternSvg(128, 470, 7) : '');
+  const expr = N.guardian ? 'angry' : playerExpression(G.hp <= 1 ? 'sad' : 'angry');
+  $('nplayer').innerHTML = person(look, expr, age, 108, 498, 0.2) + (it === 'lamp' ? lanternSvg(128, 470, 7) : '');
   $('lampHole').setAttribute('r', it === 'lamp' ? LAMP.r : 0);
   $('lampTint').setAttribute('r', it === 'lamp' ? LAMP.r * 0.85 : 0);
 }
@@ -1483,12 +1623,14 @@ function spawnGhost(sp) {
   const el = document.createElementNS(NS, 'g');
   el.setAttribute('class', 'ghost ' + sp.type);
   const tag = T.tag ? `<g transform="translate(0 -15)"><circle r="10" fill="${T.tag[1]}" stroke="#0B0F1E" stroke-width="1.5"/><text y="4.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1E2A2C">${T.tag[0]}</text></g>` : '';
-  el.innerHTML = `<g class="gb"><ellipse cx="0" cy="-44" rx="32" ry="48" fill="url(#gglow)"/>${ghostSvg(randomLook(), pick(['angry', 'rage', 'gloomy']), Math.random() < 0.5 ? 'elder' : 'adult', 0, 0, 0.2)}</g>
-    <g class="tg"><g class="hpw"><rect x="-17" y="-3" width="34" height="6" rx="3" fill="#0B0F1E" opacity="0.85"/><rect class="hpb" x="-17" y="-3" width="34" height="6" rx="3" fill="#FF6B6B"/></g>
+  el.innerHTML = `<g class="gb"><ellipse cx="0" cy="-44" rx="32" ry="48" fill="url(#gglow)"/>${ghostSvg(randomLook(), pick(['angry', 'rage', 'gloomy']), Math.random() < 0.5 ? 'elder' : 'adult', 0, 0, 0.2)}</g>`;
+  const label = document.createElementNS(NS, 'g');
+  label.innerHTML = `<g class="hpw"><rect x="-17" y="-3" width="34" height="6" rx="3" fill="#0B0F1E" opacity="0.85"/><rect class="hpb" x="-17" y="-3" width="34" height="6" rx="3" fill="#FF6B6B"/></g>
       ${tag}
-      <text class="nametag" y="-32" text-anchor="middle" font-size="10" fill="#DCE8F7" paint-order="stroke" stroke="#0B0F1E" stroke-width="3">${g.name}</text></g>`;
+      <text class="nametag" y="-32" text-anchor="middle" font-size="10" fill="#DCE8F7" paint-order="stroke" stroke="#0B0F1E" stroke-width="3">${g.name}</text>`;
   $('glayer').appendChild(el);
-  g.el = el; g.gb = el.querySelector('.gb'); g.tg = el.querySelector('.tg'); g.hpb = el.querySelector('.hpb'); g.hpw = el.querySelector('.hpw');
+  $('glabels').appendChild(label);
+  g.el = el; g.gb = el.querySelector('.gb'); g.label = label; g.hpb = label.querySelector('.hpb'); g.hpw = label.querySelector('.hpw');
   N.ghosts.push(g);
   refreshGhost(g);
 }
@@ -1499,6 +1641,29 @@ function refreshGhost(g) {
   g.gb.setAttribute('opacity', g.type === 'shade' ? (vis ? '0.9' : '0.07') : g.lit ? '1' : '0.62');
   g.hpw.setAttribute('opacity', vis ? '1' : '0');
   g.hpb.setAttribute('width', (34 * clamp(g.hp / g.max, 0, 1)).toFixed(1));
+}
+// 门口的标记按鬼的位置从左到右排，细线指回各自头顶。坐标只用于绘制。
+function layoutGateLabels(ghosts) {
+  const lines = [];
+  if (ghosts.length) {
+    ghosts.sort((a, b) => a.tx - b.tx || a.id - b.id);
+    const baseY = Math.min(...ghosts.map(g => g.y - 96 * g.k));
+    const perRow = 7, gap = 46;
+    for (let i = 0; i < ghosts.length; i += perRow) {
+      const row = ghosts.slice(i, i + perRow);
+      const left = row[0].tx, right = row[row.length - 1].tx;
+      const span = Math.max(right - left, (row.length - 1) * gap);
+      const start = clamp((left + right - span) / 2, 20, 340 - span);
+      const y = baseY - (i / perRow) * 46;
+      row.forEach((g, j) => {
+        const x = start + j * span / Math.max(1, row.length - 1);
+        g.label.setAttribute('transform', `translate(${x} ${y})`);
+        const headX = g.x + g.ox, headY = g.y - 84 * g.k;
+        lines.push(`M${x} ${y + 5} L${headX} ${headY}`);
+      });
+    }
+  }
+  $('gleaders').setAttribute('d', lines.join(' '));
 }
 function floatText(x, y, text, cls = '') {
   const t = document.createElementNS(NS, 'text');
@@ -1551,6 +1716,7 @@ function hurtGhost(g, dmg, cls, byPlayer, quiet) {
   if (!quiet) floatText(g.x + g.ox + rnd(-8, 8), g.y - 70 * g.k, '-' + dmg, cls);
   if (g.hp <= 0) {
     g.el.remove();
+    g.label.remove();
     N.ghosts = N.ghosts.filter((x) => x !== g);
     N.kills++;
     N.coins += (byPlayer ? 2 : 0) + 3 * (N.pk.coins || 0);
@@ -1583,6 +1749,7 @@ function nightStep(dt) {
   while (N.spawns.length && N.spawns[0].at <= N.t) spawnGhost(N.spawns.shift());
   const slowNear = Math.pow(0.72, G.traps.talisman) * Math.pow(0.7, N.pk.slow || 0) * (N.guardian ? 0.65 : 1);
   let bashed = false;
+  const atGate = [];
   for (const g of N.ghosts) {
     const wasVis = revealed(g);
     g.flash = Math.max(0, g.flash - dt);
@@ -1608,7 +1775,8 @@ function nightStep(dt) {
     g.k = depthK(g.y);
     g.el.setAttribute('transform', `translate(${(g.x + g.ox).toFixed(1)} ${(g.y + bob).toFixed(1)})`);
     g.gb.setAttribute('transform', `scale(${g.k.toFixed(3)})`);
-    g.tg.setAttribute('transform', `translate(0 ${(-96 * g.k).toFixed(1)})`);
+    if (g.ty - g.y < 20) atGate.push(g);
+    else g.label.setAttribute('transform', `translate(${g.x + g.ox} ${g.y + bob - 96 * g.k})`);
     const c = ghostCenter(g);
     if (revealed(g) !== wasVis || g.type === 'shade' || litAt(c.x, c.y) !== g.lit) refreshGhost(g);
   }
@@ -1651,6 +1819,7 @@ function nightStep(dt) {
     }
     if (N.ally.t <= 0) { N.ally = null; $('nally').innerHTML = ''; }
   }
+  layoutGateLabels(atGate.filter(g => g.hp > 0));
   if (N.door <= 0) return endNight(false);
   if (!N.spawns.length && !N.ghosts.length) return N.wave >= NIGHT.waves - 1 ? endNight(true) : offerPerks();
 }
@@ -1840,15 +2009,22 @@ function goReborn() {
   cancelAnimationFrame(raf);
   const rows = karmaRows(), total = rows.reduce((a, r) => a + r[2], 0);
   const tier = total < 30 ? 0 : total < 70 ? 1 : 2;
-  const fams = [newFamily(tier), newFamily(tier), newFamily(Math.max(0, tier - 1))];
-  const heir = G.kids[0];
-  if (heir) fams[0] = ownFamily(heir);
+  const heirs = G.kids.slice(0, 3);
+  const fams = heirs.length ? heirs.map(ownFamily) : [newFamily(tier)];
+  fams.push(newFamily(tier), newFamily(Math.max(0, tier - 1)));
   G.reborn = { rows, total, tier, fams };
   G.phase = 'reborn';
   save(); render();
 }
 function renderReborn() {
   const R = G.reborn;
+  // 旧存档在奈何桥只保存了第一个后人。保留已展示的家庭，只补齐另外的后人。
+  const ownCount = R.fams.filter(f => f.own).length;
+  const missing = G.kids.slice(ownCount, 3);
+  if (missing.length) {
+    R.fams.splice(ownCount, 0, ...missing.map(ownFamily));
+    save();
+  }
   $('scene').innerHTML = `<svg viewBox="0 0 360 220" class="stage" role="img" aria-label="奈何桥"><rect width="360" height="220" fill="url(#hsky)"/><path d="M0 170 Q180 120 360 170 V220 H0 Z" fill="#1A1028"/>
     <path d="M30 168 Q180 70 330 168" fill="none" stroke="#8A6A8C" stroke-width="10"/><path d="M30 168 Q180 70 330 168" fill="none" stroke="#B49AB8" stroke-width="2" transform="translate(0 -12)"/>
     ${[70, 120, 180, 240, 290].map((x) => `<line x1="${x}" y1="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 - 12}" x2="${x}" y2="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 + 4}" stroke="#B49AB8" stroke-width="2"/>`).join('')}
@@ -1859,7 +2035,7 @@ function renderReborn() {
   const keep = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt);
   $('panel').innerHTML = `<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>
     <table class="kt"><tbody>${R.rows.map(([a, b, c]) => `<tr><td>${a}</td><td>${b}</td><td>${c > 0 ? '+' : ''}${c}</td></tr>`).join('')}<tr class="total"><td>合计</td><td></td><td>${R.total}</td></tr></tbody></table>
-    <p class="note">${G.kids.length ? '' : '你没有留下孩子或徒弟，这一世的院子会荒掉。'}按因果分，系统给你三户人家挑。${loot ? `前世抢来的${loot.n}和 30 文会跟着你。` : ''}${keep.length ? `${keep.map((n) => n.who).join('、')}和你交情深，下一世还记得你（交情留一半）。` : ''}</p>
+    <p class="note">${G.kids.length ? '回自己家可以挑一位后人，也可以去按因果分选出的另外两户人家。' : '你没有留下孩子或徒弟，这一世的院子会荒掉。按因果分，系统给你三户人家挑。'}${loot ? `前世抢来的${loot.n}和 30 文会跟着你。` : ''}${keep.length ? `${keep.map((n) => n.who).join('、')}和你交情深，下一世还记得你（交情留一半）。` : ''}</p>
     <div class="fams">${R.fams.map(famCard).join('')}</div>`;
   $('panel').querySelectorAll('[data-fam]').forEach((b) => { b.onclick = () => reborn(R.fams[+b.dataset.fam]); });
 }
@@ -1877,21 +2053,78 @@ function reborn(f) {
 }
 
 // ================= 设置 =================
+function applyLook(raw) {
+  const look = validatedLook(raw);
+  // 先写完整存档。写入失败时保留原形象和捏人台草稿，可重试或取消。
+  localStorage.setItem('wulin-loop', JSON.stringify({ ...G, look }));
+  G.look = ME = look;
+  try { localStorage.setItem('wulin-loop-look', JSON.stringify(look)); } catch (e) {}
+  refreshAppearance();
+}
+function refreshAppearance() {
+  render();
+  if ($('nplayer')) drawPlayer();
+  if ($('nguardian')) $('nguardian').innerHTML = ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22);
+  if ($('hme')) $('hme').firstElementChild.innerHTML = ghostSvg(ME, 'rage', 'elder', 0, 0, 0.32);
+}
+const avatarDialog = $('avatar-dialog');
+let cancelEditor;
+function openEditor(onCancel) {
+  closeSheet();
+  cancelEditor = onCancel;
+  cancelAnimationFrame(raf);
+  const frame = document.createElement('iframe');
+  frame.title = '武林捏人台';
+  frame.src = avatarDialog.dataset.editor;
+  avatarDialog.replaceChildren(frame);
+  avatarDialog.showModal();
+  frame.focus();
+}
+function closeEditor(finished) {
+  avatarDialog.close();
+  avatarDialog.replaceChildren();
+  if ((G.phase === 'night' || G.phase === 'guard') && !N.over) {
+    N.last = performance.now(); raf = requestAnimationFrame(nightLoop);
+  } else if (G.phase === 'haunt' && !H.over) {
+    H.last = performance.now(); raf = requestAnimationFrame(hauntLoop);
+  }
+  if (finished) { $('menu').focus({ preventScroll: true }); toast('样子已保存'); }
+  else cancelEditor();
+}
+avatarDialog.addEventListener('cancel', e => { e.preventDefault(); closeEditor(false); });
+window.addEventListener('message', event => {
+  const peer = avatarDialog.querySelector('iframe')?.contentWindow;
+  if (!avatarDialog.open || !isAvatarPeer(event, peer)) return;
+  if (event.data.type === 'ready') sendAvatar(peer, 'init', { look: ME });
+  if (event.data.type === 'cancel') closeEditor(false);
+  if (event.data.type === 'finish') {
+    try { applyLook(event.data.look); }
+    catch (e) {
+      sendAvatar(peer, 'error', { message: e instanceof DOMException ? '存档写入失败，请检查浏览器存储后重试。' : '形象数据无效，请检查后重试。' });
+      return;
+    }
+    closeEditor(true);
+  }
+});
 function openMenu() {
   const playing = G.phase === 'home' || G.phase === 'map';
   sheet({
     title: '设置', dismiss: true,
-    body: `<div class="sub">用你捏的人</div><p class="note">在<a href="${CREATOR_URL}" target="_blank" rel="noopener">武林捏人台</a>的「灵感」页复制捏人码，贴在这里。你的人和你死后的鬼都会变成你捏的样子。</p>
-      <textarea id="code-in" placeholder="WULIN1:..."></textarea><button type="button" class="big" id="use-code">用这个人</button><p class="note" id="code-msg" role="status"></p>
+    body: `<button type="button" class="big main" id="edit-look">改样子</button>
+      <details id="share-look"><summary>分享 / 导入捏人码</summary>
+      <label for="code-out">我的捏人码</label><textarea id="code-out" readonly></textarea>
+      <label for="code-in">导入别人的人</label><textarea id="code-in" placeholder="WULIN1:..."></textarea><button type="button" class="big" id="use-code">用这个人</button><p class="note" id="code-msg" role="status"></p></details>
       <div class="sub">试玩用</div>
       <button type="button" class="big" id="ff"${playing && G.day < CFG.lifeDays ? '' : ' disabled'}>快进到最后一天<small>直接试老死、当鬼和投胎</small></button>
       <button type="button" class="big" id="restart">从头再来<small>清掉这一局，回到第一世</small></button>
       <p class="note">这是样机：邻居、来砸门的鬼、被你砸门的人家都用电脑代替；所有数字都是占位。</p>`,
     buttons: [['关上', null]],
     bind: (el) => {
+      el.querySelector('#edit-look').onclick = () => openEditor(openMenu);
+      el.querySelector('#code-out').value = encode(ME);
       el.querySelector('#use-code').onclick = () => {
-        try { const o = decode(el.querySelector('#code-in').value); ME = lookOf(o); try { localStorage.setItem('wulin-loop-look', JSON.stringify(ME)); } catch (e) {} el.querySelector('#code-msg').textContent = '换好了'; render(); }
-        catch (e) { el.querySelector('#code-msg').textContent = '这串码读不出来：请确认整串都复制了，开头是 WULIN1:'; }
+        try { applyLook(decode(el.querySelector('#code-in').value)); el.querySelector('#code-out').value = encode(ME); el.querySelector('#code-msg').textContent = '换好了'; }
+        catch (e) { el.querySelector('#code-msg').textContent = e instanceof DOMException && e.name !== 'InvalidCharacterError' ? '存档写入失败，请检查浏览器存储。' : '这串码读不出来，请检查捏人码是否完整。'; }
       };
       el.querySelector('#ff').onclick = () => { closeSheet(); G.day = CFG.lifeDays; G.phase = 'home'; G.at = 'home'; G.bag = []; G.buddy = null; save(); render(); toast('快进到了最后一天'); };
       el.querySelector('#restart').onclick = () => { closeSheet(); cancelAnimationFrame(raf); N = null; H = null; G = freshLife(FIRST_FAMILY, null); save(); render(); intro(); };
@@ -1903,12 +2136,13 @@ function intro() {
     title: '一日一夜（样机）',
     body: `<p>白天<b>出门找东西</b>，走得越远东西越好，但<b>天黑前一定要回家</b>。</p><p>夜里鬼来<b>砸门</b>。门破了，钱和宝物真的会被抢走。</p><p>真游戏里一个现实日就是一天一夜：白天的时辰花完就天黑，什么时候玩你自己定。样机里一辈子 ${CFG.lifeDays} 天，长大以后可以结缘生孩子，也可以收徒弟。老死以后，可以当<b>护家神</b>守自己家，或者当<b>厉鬼</b>去砸别人家的门，然后投胎。</p>
       <p class="note">一句话：砸你家门的鬼，是别人家的祖宗（大部分是电脑鬼，偶尔是死去的真人玩家）。样机里，别的玩家都用电脑代替。</p>`,
-    buttons: [['开始', null, 'main'], ['先换成我捏的人', openMenu]],
+    buttons: [['开始', save, 'main'], ['先捏个人', () => openEditor(intro)]],
   });
 }
 
 // ================= 键盘 =================
 document.addEventListener('keydown', (e) => {
+  if (avatarDialog.open) return;
   if (!$('sheet').hidden) {
     if (e.key === 'Escape' && $('sheet').dataset.dismiss) closeSheet();
     const n = ['1', '2', '3'].indexOf(e.key);
@@ -1930,8 +2164,11 @@ document.addEventListener('keydown', (e) => {
 G = loadGame();
 const firstTime = !G;
 if (!G) G = freshLife(FIRST_FAMILY, null);
+if (G.look) { try { ME = validatedLook(G.look); } catch (e) {} }
+G.look = ME;
 if (G.phase === 'night' || G.phase === 'guard') startNight(G.phase === 'guard');
 else if (G.phase === 'haunt') startHaunt();
 else { if (G.phase === 'map' && G.bag == null) G.bag = []; render(); }
 if (firstTime) intro();
 </script>
+</body></html>
