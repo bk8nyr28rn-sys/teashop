@@ -37,6 +37,8 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   await p.click('[data-a="out"]');
   ok('buddy offered (王大哥 交情 26)', (await p.locator('#sheet button', { hasText: '王大哥' }).count()) === 1);
   await sheetBtn('王大哥');
+  await p.locator('[data-r-target="far"]').click();
+  await p.locator('#mapsvg').waitFor();
   ok('map phase', (await p.evaluate(() => G.phase)) === 'map' && (await p.evaluate(() => G.buddy)) === 'wang');
   await p.evaluate(() => { SPEED = 8; });
   await p.click('[data-spot="3"]');

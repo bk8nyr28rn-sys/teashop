@@ -60,6 +60,8 @@ const { OUT, wrap } = require('./lib.cjs');
 
     const capacityAndMinutes = () => page.evaluate(() => ({ slots: bagCap(), minutes: walkMin('home', 0) }));
     await page.getByRole('button', { name: '和王大哥一起去' }).click();
+  await page.locator('[data-r-target="far"]').click();
+  await page.locator('#mapsvg').waitFor();
     const party = await capacityAndMinutes();
     await page.click('[data-spot="0"]');
     assert.ok((await page.locator('.plan').innerText()).includes(await page.evaluate(() => dur(walkMin('home', 0)))));

@@ -17,6 +17,8 @@ const { wrap } = require('./lib.cjs');
     await page.evaluate(() => { G.unlimitedDays = true; save(); SPEED = 50; });
     await button('out').click();
     await page.locator('#sheet .sh-btns button', { hasText: /一个人|独行/ }).first().click();
+  await page.locator('[data-r-target="far"]').click();
+  await page.locator('#mapsvg').waitFor();
     const initial = await page.evaluate(() => G.field.clues);
     assert.equal(initial.length, 8);
     for (let i = 0; i < 8; i++) {

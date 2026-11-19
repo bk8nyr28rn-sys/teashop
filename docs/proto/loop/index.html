@@ -5,6 +5,8 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="../../../assets/fonts/prototype.css">
 <script src="../../../assets/avatar.js"></script>
+<link rel="stylesheet" href="../../../assets/riverside.css">
+<script src="../../../assets/riverside.js"></script>
 <style>
 /* 一日一夜（样机）：白天出门找东西、天黑前回家；夜里守门；老死后当一晚鬼；投胎。
    白天是暖米色的人间，夜里和阴间整页换成深蓝。朱砂只给主要动作，金色只给“手里拿的东西”和宝物。 */
@@ -1158,6 +1160,7 @@ function render() {
   renderHud();
   if (G.phase === 'home' || G.phase === 'intro') renderHome();
   else if (G.phase === 'dawn' || G.phase === 'birth') renderWaiting();
+  else if (G.phase === 'river') River.render();
   else if (G.phase === 'map') renderMap();
   else if (G.phase === 'death') renderDeath();
   else if (G.phase === 'reborn') renderReborn();
@@ -1222,6 +1225,7 @@ function homeSvg() {
   if (G.spouse) s += person(G.spouse.look, 'happy', ageOf(G.day) === 'elder' ? 'elder' : 'adult', 258, 238, 0.23);
   G.kids.slice(0, 3).forEach((k, i) => { s += person(k.look, 'happy', k.kind === '徒' ? 'adult' : 'child', 150 - i * 30, 240, k.kind === '徒' ? 0.21 : 0.23); });
   if (G.own && !G.kids.length) s += person(G.parents[0].look, 'calm', 'adult', 150, 238, 0.22);
+  s += River.yardStone(false);
   // 前墙和门
   s += `<rect x="0" y="252" width="360" height="48" fill="#CBBFA8"/><rect x="0" y="246" width="360" height="8" fill="#4A4F5C"/>${doorSvg(G.door, 180, 300, 62, 58)}`;
   if (G.door >= 2) s += lanternSvg(136, 252) + lanternSvg(224, 252);
@@ -1240,7 +1244,9 @@ function renderHome() {
   const canHeal = G.hp < CFG.hpMax && (G.store['草药'] || 0) > 0;
   $('panel').innerHTML = `${clockHtml()}
     <div class="acts">
-      ${left > 0 ? `<button type="button" class="big main" data-a="out">出门找东西<small>越远东西越好，也越危险。天黑前要回来</small></button>` : ''}
+      ${left > 0 ? `<button type="button" class="big main" data-a="out">${River.firstVisit() ? '出门 · 去河埠' : '出门找东西'}<small>${River.firstVisit() ? '推开家门，沿河走走' : '越远东西越好，也越危险。天黑前要回来'}</small></button>` : ''}
+      ${left > 0 && !River.firstVisit() ? '<button type="button" class="big" data-a="river">到河埠走走</button>' : ''}
+      ${G.river?.stone === 'yard' ? '<button type="button" class="big" data-a="place">摆放院石</button>' : ''}
       <button type="button" class="big" data-a="market">去集市卖货<small>仓库 ${storeCount()} 件，值 ${storeValue()} 文</small></button>
       <button type="button" class="big" data-a="build">修院子<small>${DOORS[G.door].name}（门血 ${DOORS[G.door].hp}）${trapSummary()}</small></button>
       <button type="button" class="big" data-a="family">家和祠堂<small>${familySummary()}</small></button>
@@ -1248,7 +1254,7 @@ function renderHome() {
       ${canHeal ? `<button type="button" class="big" data-a="heal">用草药疗伤<small>体力 +1（仓库还有 ${G.store['草药']} 份）</small></button>` : ''}
       <button type="button" class="big ${left > 0 ? 'ghosty' : 'main'}" data-a="night">${left > 0 ? '在家歇到天黑' : '天黑了，去守夜'}<small>${left > 0 ? `还有 ${dur(left)} 天黑，鬼会来砸门` : '鬼要来砸门了'}</small></button>
     </div>`;
-  bindActs({ out: askBuddy, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, heal, night: () => { G.time = Math.max(G.time, CFG.dusk); startNight(false); } });
+  bindActs({ out: () => askBuddy(River.firstVisit()), river: () => askBuddy(true), place: River.placeStone, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, heal, night: () => { G.time = Math.max(G.time, CFG.dusk); startNight(false); } });
 }
 function heal() { G.store['草药']--; G.hp = Math.min(CFG.hpMax, G.hp + 1); save(); render(); toast('敷了草药，体力 +1'); }
 
@@ -1260,7 +1266,7 @@ function openMarket() {
   const tre = G.treasures.map((t, i) => `<li>${t.n}<span>${t.v} 文</span><button type="button" class="mini" data-sell="${i}">卖掉</button></li>`).join('');
   sheet({
     title: '集市', dismiss: true,
-    body: `<ul class="list market-stock">${rows}</ul>${tre ? `<div class="sub">宝物架</div><p class="note">宝物摆在家里更有面子，但夜里门被砸破，可能被鬼抢走。</p><ul class="list">${tre}</ul>` : ''}`,
+    body: `${River.marketGreeting()}<ul class="list market-stock">${rows}</ul>${tre ? `<div class="sub">宝物架</div><p class="note">宝物摆在家里更有面子，但夜里门被砸破，可能被鬼抢走。</p><ul class="list">${tre}</ul>` : ''}`,
     buttons: [[`货全卖了（+${storeValue()} 文）`, sellAll, 'main', !goods.length], ['回去', null]],
     bind: (el) => {
       el.querySelectorAll('[data-quantity]').forEach((button) => {
@@ -1325,7 +1331,7 @@ function openFriends() {
 }
 
 // ================= 野外（白天） =================
-function askBuddy() {
+function askBuddy(riverside = false) {
   const ok = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.buddyAt);
   sheet({
     title: '找人结伴？', dismiss: true,
@@ -1333,10 +1339,10 @@ function askBuddy() {
       <section><h3>一个人</h3><ul><li>路上少花两成时间</li><li>收获全归自己</li><li>有些地方能独自潜入</li></ul></section>
       <section><h3>找人结伴</h3><ul><li>少遇险，打赢和脱身都更容易</li><li>多背 ${CFG.bagBuddy} 件，倒下有人扛回家</li><li>回来交情 +5</li><li>与同一伙伴累计每找满 3 件，他分 1 件，宝物也算</li></ul></section>
       </div>${ok.length ? '' : `<p class="note">还没有能结伴的人。交情到 ${CFG.buddyAt} 才能约人，可以在「邻居和交情」里送点东西。</p>`}`,
-    buttons: [...ok.map((n) => [`和${n.who}一起去`, () => goOut(n.id), 'main']), ['一个人去', () => goOut(null), ok.length ? '' : 'main']],
+    buttons: [...ok.map((n) => [`和${n.who}一起去`, () => goOut(n.id, riverside), 'main']), ['一个人去', () => goOut(null, riverside), ok.length ? '' : 'main']],
   });
 }
-function goOut(b) { G.buddy = b; G.phase = 'map'; G.at = 'home'; G.target = null; save(); render(); }
+function goOut(b, riverside = false) { G.buddy = b; if (riverside) return River.enter(); G.phase = 'map'; G.at = 'home'; G.target = null; save(); render(); }
 // 只在第一次看当日地图时抽线索。同一游戏日往返、刷新都沿用已经看到的线索。
 function fieldToday() {
   if (G.field?.day !== G.day) {
@@ -1573,6 +1579,7 @@ function duskChoices(lead) {
 }
 function goHome() {
   if (busy) return;
+  River.leavingMap();
   if (G.at === 'home') { G.phase = 'home'; G.buddy = null; save(); render(); return; }
   const m = walkMin(G.at, 'home');
   moveToken(HOME, () => {
@@ -1586,6 +1593,7 @@ function goHome() {
 }
 // 进院门：东西放进仓库和宝物架，结伴的交情 +5
 function arriveHome() {
+  if (G.river) G.river.fromWharf = false;
   const goods = G.bag.filter((x) => !x.tre), tre = G.bag.filter((x) => x.tre);
   for (const g of goods) G.store[g.n] = (G.store[g.n] || 0) + 1;
   G.treasures.push(...tre);
@@ -1813,6 +1821,7 @@ function nightSvg() {
     ${bigLantern(180, 108, 4)}${bigLantern(180, 382, 15)}`;
   if (G.door >= 2) s += lanternSvg(124, 420, 8) + lanternSvg(236, 420, 8);
   if (G.traps.lamp) for (const x of [30, 80, 280, 330]) s += lanternSvg(x, 426, 6);
+  s += River.yardStone(true);
   s += `<g id="nbows"></g><g id="glayer"></g><g id="nplayer"></g><g id="nfam"></g><g id="nally"></g>`;
   if (N.guardian) s += `<g id="nguardian" class="float">${ghostSvg(ME, 'smug', 'elder', 300, 470, 0.22)}</g>`;
   s += `<g pointer-events="none"><g class="rain1"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainA)"/></g><g class="rain2"><rect x="-40" y="-500" width="440" height="1000" fill="url(#rainB)"/></g></g><g id="fx"></g>
@@ -2296,6 +2305,7 @@ function reborn(f) {
   if (A && A.won && A.loot) { fam.treasures.push(A.loot); fam.money += 30; }
   if (!fam.own) fam.ancestors = Array.from({ length: 2 }, (_, i) => ({ name: surnameOf(fam.name) + ['老太公', '太奶奶'][i], look: randomLook(), note: '祖上' }));
   G = freshLife(fam, prev);
+  River.inherit(prev, fam.own);
   G.history.push({ life: prev.lifeNo, fam: prev.fam, days: prev.day, held: prev.held, karma: prev.reborn.total });
   firstMorning();
   toast(`投胎到了${f.name}。`);
@@ -2365,12 +2375,14 @@ function openMenu() {
       <label for="code-out">我的捏人码</label><textarea id="code-out" readonly></textarea>
       <label for="code-in">导入别人的人</label><textarea id="code-in" placeholder="WULIN1:..."></textarea><button type="button" class="big" id="use-code">用这个人</button><p class="note" id="code-msg" role="status"></p></details>
       <div class="sub">试玩用</div>
+      <button type="button" class="big" id="copy-river-log">复制试玩记录</button><div id="river-copy-status" role="status"></div>
       <label class="bank-toggle"><input type="checkbox" id="unlimited-days"${G.unlimitedDays ? ' checked' : ''}>不限天数（试玩用）</label>
       <button type="button" class="big" id="ff"${playing && G.day < CFG.lifeDays ? '' : ' disabled'}>快进到最后一天<small>直接试老死、当鬼和投胎</small></button>
       <button type="button" class="big" id="restart">从头再来<small>清掉这一局，回到第一世</small></button>
       <p class="note">这是样机：邻居、来砸门的鬼、被你砸门的人家都用电脑代替；所有数字都是占位。</p>`,
     buttons: [['关上', null]],
     bind: (el) => {
+      el.querySelector('#copy-river-log').onclick = River.copyLog;
       el.querySelector('#unlimited-days').onchange = event => { G.unlimitedDays = event.target.checked; save(); render(); };
       el.querySelector('#edit-look').onclick = () => openEditor(openMenu);
       el.querySelector('#code-out').value = encode(ME);
