@@ -9,9 +9,14 @@ const PAGES = { creator: 'docs/art/creator/index.html', loop: 'docs/proto/loop/i
 function wrap(which) {
   return path.join(ROOT, PAGES[which]);
 }
+async function enableUnlimitedDays(page) {
+  await page.locator('#menu').click();
+  await page.locator('#unlimited-days').check();
+  await page.getByRole('button', { name: '关上', exact: true }).click();
+}
 // 打印里出现 FAIL 或页面报错，就让进程以 1 退出
 const log = console.log;
 let failed = false;
 console.log = (...a) => { const s = a.join(' '); if (/^FAIL /.test(s) || /^errors \S/.test(s)) failed = true; log(...a); };
 process.on('exit', (c) => { if (failed && c === 0) process.exitCode = 1; });
-module.exports = { ROOT, OUT, wrap };
+module.exports = { ROOT, OUT, wrap, enableUnlimitedDays };

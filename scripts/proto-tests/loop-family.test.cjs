@@ -1,7 +1,7 @@
 const { chromium, devices } = require('playwright');
 const fs = require('fs');
 const path = require('path');
-const { OUT, wrap } = require('./lib.cjs');
+const { OUT, wrap, enableUnlimitedDays } = require('./lib.cjs');
 const TMP = wrap('loop');
 const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' — ' + x : ''));
 (async () => {
@@ -12,6 +12,7 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   await p.goto('file://' + TMP);
   await p.evaluate(() => localStorage.clear()); await p.reload(); await p.waitForTimeout(200);
   await p.locator('#sheet .sh-btns button').first().click();
+  await enableUnlimitedDays(p);
   ok('has a name and grade', await p.evaluate(() => !!G.name && G.grade === '良才' && G.power === 1.05), await p.evaluate(() => `${G.name} ${G.grade}`));
   ok('clock shows 时辰', /个时辰/.test(await p.textContent('.clock')));
   await p.evaluate(() => nextMorning());

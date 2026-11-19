@@ -1,7 +1,12 @@
 // 依次跑所有样机浏览器测试；任何一个失败就以 1 退出。截图在 $PROTO_OUT（默认系统临时目录下的 teashop-proto）
 const { spawnSync } = require('child_process');
 const path = require('path');
-const tests = ['creator.test.cjs', 'creator-fold.test.cjs', 'creator-draw.test.cjs', 'creator-embed.test.cjs', 'creator-layers.test.cjs', 'loop-family.test.cjs', 'loop-gate.test.cjs', 'loop.test.cjs'];
+const tests = [
+  'creator.test.cjs', 'creator-fold.test.cjs', 'creator-draw.test.cjs',
+  'creator-embed.test.cjs', 'creator-layers.test.cjs',
+  'day-bank.test.cjs', 'day-field.test.cjs', 'day-market.test.cjs',
+  'loop-family.test.cjs', 'loop-gate.test.cjs', 'loop.test.cjs',
+];
 let bad = 0;
 for (const t of tests) {
   console.log(`\n=== ${t} ===`);

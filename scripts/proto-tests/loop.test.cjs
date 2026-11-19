@@ -1,7 +1,7 @@
 const { chromium, devices } = require('playwright');
 const fs = require('fs');
 const path = require('path');
-const { OUT, wrap } = require('./lib.cjs');
+const { OUT, wrap, enableUnlimitedDays } = require('./lib.cjs');
 const TMP = wrap('loop');
 const shots = path.join(OUT, 'loop');
 fs.mkdirSync(shots, { recursive: true });
@@ -29,6 +29,7 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   ok('intro shows', (await sheetTitle()).includes('一日一夜'));
   await p.screenshot({ path: path.join(shots, '0-intro.png') });
   await sheetBtn('开始');
+  await enableUnlimitedDays(p);
   await clean('home'); await overflow('home');
   await p.screenshot({ path: path.join(shots, '1-home.png') });
 

@@ -26,7 +26,7 @@
 }
 :root[data-theme="dark"] { --bg: #11181B; --panel: #19232A; --ink: #E3EBE7; --muted: #94A6A1; --line: #2C3B40; --accent: #55B99F; --seal: #E0654F; --on-seal: #1A1010; --gold: #E0B456; color-scheme: dark; }
 /* 夜里、阴间：不管系统是亮是暗，都用深色 */
-body[data-phase="night"], body[data-phase="guard"], body[data-phase="haunt"], body[data-phase="death"], body[data-phase="reborn"] {
+body[data-phase="night"], body[data-phase="guard"], body[data-phase="haunt"], body[data-phase="death"], body[data-phase="reborn"], body[data-phase="dawn"], body[data-phase="birth"] {
   --bg: #0E1424; --panel: #182035; --ink: #E6ECF5; --muted: #9AA8C0; --line: #2A3552; --seal: #E0654F; --on-seal: #1A1010; --gold: #E8BE5C; --accent: #7FD6C2; color-scheme: dark;
 }
 
@@ -43,6 +43,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .hud-l { min-width: 0; display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; }
 .hud-l b { font-family: var(--font-display); font-weight: 400; font-size: 22px; white-space: nowrap; }
 .hud-l span { font-size: 12px; color: var(--muted); }
+.hud-l .day-bank { flex-basis: 100%; white-space: nowrap; color: var(--accent); }
+.waiting-yard { filter: brightness(.67) saturate(.65); }
+.bank-toggle { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--bg); cursor: pointer; }
+.bank-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
 .hud-r { display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .hp { display: inline-flex; gap: 3px; }
 .hp i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--seal); }
@@ -79,6 +83,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .bag .lab { font-size: 12px; color: var(--muted); margin-right: 2px; }
 .bag .tre { border-color: var(--gold); color: var(--gold); }
 .plan { padding: 10px 12px; border-radius: 14px; border: 1px dashed var(--line); font-size: 13px; }
+.field-clue { margin: 0; color: var(--accent); font-weight: 600; }
+.field-scene { margin: 0; }
+#mapsvg.on-site { max-height: min(29svh, 260px); }
+.field-acts { display: grid; gap: 5px; }
+.field-acts .big { min-height: 44px; padding: 5px 12px; }
 
 .doorbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
 .doorbar b { font-variant-numeric: tabular-nums; }
@@ -108,6 +117,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
 .list li > span { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
+.market-stock li > div { flex: 1; }
+.market-stock small { display: block; color: var(--muted); }
+.market-stock button { min-height: 40px; white-space: nowrap; }
+.buddy-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.buddy-compare section { padding: 10px 12px; border-radius: 12px; background: var(--bg); }
+.buddy-compare h3 { margin: 0; color: var(--accent); font-size: 16px; }
+.buddy-compare ul { padding: 0 0 0 1.15em; margin: 6px 0 0; }
+.buddy-compare li + li { margin-top: 4px; }
 .mini { min-height: 32px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); background: var(--panel); font-size: 12.5px; }
 .sub { font-family: var(--font-display); font-size: 17px; }
 .fr { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 12px; background: var(--bg); }
@@ -810,14 +827,42 @@ const CFG = { lifeDays: 5, dayStart: 360, dusk: 1080, hpMax: 3, bag: 6, bagBuddy
 
 // ---------------- 野外 ----------------
 const RINGS = [
-  { name: '近郊', hint: '安全，东西普通', r: 64, band: 90, gather: 40, danger: 0.06, fight: 0.85, escape: 0.75, death: 0, loot: [['柴', 0.55], ['草药', 0.45]], foes: ['野狗', '毒蛇'], fill: '#CFE3C0' },
-  { name: '山林', hint: '有野兽，东西好', r: 112, band: 136, gather: 50, danger: 0.24, fight: 0.6, escape: 0.45, death: 0, loot: [['草药', 0.3], ['兽皮', 0.35], ['铁矿', 0.35]], foes: ['山狼', '黑熊', '山贼'], fill: '#9FBF8E' },
-  { name: '禁地', hint: '很危险，有宝物', r: 158, band: 180, gather: 60, danger: 0.4, fight: 0.45, escape: 0.2, death: 0.5, loot: [['古物', 0.6], ['宝物', 0.4]], foes: ['凶尸', '古墓机关', '毒瘴'], fill: '#7E6F96' },
+  { name: '近郊', hint: '风险低，东西普通', r: 64, band: 90, fight: 0.85, escape: 0.75, death: 0, foes: ['野狗', '毒蛇'], fill: '#CFE3C0' },
+  { name: '山林', hint: '有野兽，东西好', r: 112, band: 136, fight: 0.6, escape: 0.45, death: 0, foes: ['山狼', '黑熊', '山贼'], fill: '#9FBF8E' },
+  { name: '禁地', hint: '很危险，有宝物', r: 158, band: 180, fight: 0.45, escape: 0.2, death: 0.5, foes: ['凶尸', '古墓机关', '毒瘴'], fill: '#7E6F96' },
 ];
-const SPOTS = [['河边', 0, -50], ['竹林', 0, 70], ['菜地', 0, 190], ['松林', 1, -10], ['猎场', 1, 110], ['矿洞', 1, 230], ['古墓', 2, 40], ['乱葬岗', 2, 200]]
-  .map(([name, ring, a], id) => ({ id, name, ring, x: 180 + RINGS[ring].r * Math.cos((a * Math.PI) / 180), y: 180 + RINGS[ring].r * Math.sin((a * Math.PI) / 180) }));
+function fieldClue(text, action, focus, extraRisk = 0) { return { text, action, focus, extraRisk }; }
+const SPOTS = [
+  { name: '河边', ring: 0, angle: -50, loot: { 草药: 75, 柴: 25 }, scene: '岸边挂着一串水草，石滩再往前就要蹚水了。', safe: '在浅滩摘草药', minutes: [20, 45], risk: [.02, .13], clues: [
+    fieldClue('昨夜涨了水，石缝里卡着带根的药草。', '沿着水线捞草药', '草药', .05),
+    fieldClue('桥桩压着一排漂木，树皮还没泡软。', '绕到桥下拖漂木', '柴')] },
+  { name: '竹林', ring: 0, angle: 70, loot: { 柴: 85, 草药: 15 }, scene: '竹梢挨着竹梢，地上有条砍柴人踩出来的小路。', safe: '沿小路拾枯竹', minutes: [20, 40], risk: [.02, .11], clues: [
+    fieldClue('风刮断了几根老竹，折口还泛白。', '钻进倒竹堆拆柴', '柴'),
+    fieldClue('背阴处冒出一排青叶，根下的土很松。', '扒开竹叶挖药根', '草药', .04)] },
+  { name: '菜地', ring: 0, angle: 190, loot: { 时蔬: 85, 草药: 15 }, scene: '田埂上摆着两只空筐，摘满一把就能沿原路回来。', safe: '在田边摘两把菜', safeCount: 2, minutes: [25, 45], risk: [.01, .06], clues: [
+    fieldClue('畦里的菜都卷了心，隔着篱笆就看得见。', '穿过篱门收菜心', '时蔬'),
+    fieldClue('沟边翻过土，几株平时难找的药苗露出了头。', '顺着水沟辨药苗', '草药', .02)] },
+  { name: '松林', ring: 1, angle: -10, loot: { 兽皮: 60, 柴: 40 }, scene: '老松下散着松针，树干粗糙处挂着一绺兽毛。', safe: '查看林缘的旧猎套', minutes: [30, 55], risk: [.05, .22], clues: [
+    fieldClue('狐狸换毛，松根旁留了一路毛团。', '循着毛团找兽径', '兽皮', .06),
+    fieldClue('雷劈开了老松，树心干得正好。', '进林劈开雷击木', '柴')] },
+  { name: '猎场', ring: 1, angle: 110, loot: { 兽皮: 85, 草药: 15 }, scene: '废猎棚外有两串脚印，一串进了芦苇，就没再出来。', safe: '查猎棚边的浅套', minutes: [30, 60], risk: [.09, .36], solo: '屏住气钻进兽径', clues: [
+    fieldClue('饮水坑边都是蹄印，野兽刚散开。', '沿蹄印收深处的猎套', '兽皮', .08),
+    fieldClue('守棚人晾的药根被雨打落，散进了围场。', '进围场找散落的药根', '草药')] },
+  { name: '矿洞', ring: 1, angle: 230, loot: { 铁矿: 85, 柴: 15 }, scene: '洞口堆着碎石，一条窄轨通往看不清的深处。', safe: '在洞口捡碎矿', minutes: [25, 55], risk: [.04, .23], clues: [
+    fieldClue('铁轨尽头泛着红光，岩壁上露出了新矿脉。', '沿窄轨凿富矿', '铁矿'),
+    fieldClue('洞口有新鲜爪印，石壁上还蹭着兽毛。', '循着爪印查旧矿车', '兽皮', .12)] },
+  { name: '古墓', ring: 2, angle: 40, loot: { 古物: 80, 宝物: 20 }, scene: '石门只开了一道缝，门槛上散着碎陶，里头有侧室。', safe: '在门槛边拾旧物', minutes: [35, 65], risk: [.08, .32], solo: '侧身悄悄摸进耳室', clues: [
+    fieldClue('门口掉了半张地图，角上圈着一间耳室。', '按残图寻找暗格', '宝物', .10),
+    fieldClue('塌土露出一段砖台，台沿排着陶片。', '扒开砖台寻古物', '古物')] },
+  { name: '乱葬岗', ring: 2, angle: 200, loot: { 宝物: 55, 古物: 45 }, scene: '几块残碑歪在坡上，过了枯树便听不见身后的脚步。', safe: '翻找坡脚的旧供台', minutes: [35, 70], risk: [.11, .46], clues: [
+    fieldClue('枯树根下透出一点金光，远处的铃却自己响了。', '掘开枯树根找金光', '宝物', .12),
+    fieldClue('坡上的土被冲开了，露出一列旧香炉。', '顺着断碑寻旧供器', '古物', .04)] },
+].map((sp, id) => {
+  const angle = sp.angle * Math.PI / 180;
+  return { ...sp, id, x: 180 + RINGS[sp.ring].r * Math.cos(angle), y: 180 + RINGS[sp.ring].r * Math.sin(angle) };
+});
 const HOME = { name: '家', x: 180, y: 180 };
-const GOODS = { 柴: 3, 草药: 6, 兽皮: 14, 铁矿: 18, 古物: 40 };
+const GOODS = { 柴: 3, 时蔬: 5, 草药: 6, 兽皮: 14, 铁矿: 18, 古物: 40 };
 const TREASURES = [['古玉', 90], ['夜明珠', 140], ['青铜剑', 110], ['金步摇', 120], ['玉玺残片', 160], ['夜行衣', 80]];
 const TREASURE_COLOR = { 古玉: '#7FC8A9', 夜明珠: '#DDEBFF', 青铜剑: '#6E9E8C', 金步摇: '#E3B341', 玉玺残片: '#C9E3D3', 夜行衣: '#3A3F55' };
 
@@ -944,10 +989,54 @@ function ghostSvg(s, expr, age, x, y, k) {
 
 // ---------------- 存档 ----------------
 let G = null;
+const BANK_CAP = 3;
+function localDateKey(now = new Date()) {
+  return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
+}
+function storedGame() {
+  try { return JSON.parse(localStorage.getItem('wulin-loop')); } catch { return null; }
+}
+function bankFields(game) {
+  return { bankedDays: game.bankedDays, lastGrantDate: game.lastGrantDate, unlimitedDays: game.unlimitedDays };
+}
+let observedBank = '';
+// 旧标签页的普通存档也要带上别处刚领到或用掉的天。
+function pullBank(stored) {
+  if (stored?.v !== 3 || !Number.isInteger(stored.bankedDays) || !stored.lastGrantDate) return;
+  const bank = bankFields(stored), snapshot = JSON.stringify(bank);
+  if (snapshot !== observedBank) { Object.assign(G, bank); observedBank = snapshot; }
+}
+function accrueDays(now = new Date()) {
+  const today = localDateKey(now);
+  // 先取本地年月日，再按日历日相减；夏令时的 23 / 25 小时同样算一天。
+  const days = (Date.parse(today + 'T00:00:00Z') - Date.parse(G.lastGrantDate + 'T00:00:00Z')) / 86400000;
+  if (days <= 0 || !Number.isFinite(days)) return false;
+  G.bankedDays = Math.min(BANK_CAP, G.bankedDays + days);
+  G.lastGrantDate = today;
+  return true;
+}
+function spendDawn() {
+  pullBank(storedGame()); accrueDays();
+  if (G.unlimitedDays) return true;
+  if (G.bankedDays === 0) return false;
+  G.bankedDays--;
+  return true;
+}
+function dawnAlreadyStarted(first) {
+  const stored = storedGame();
+  if (stored?.v !== 3) return false;
+  const later = stored.lifeNo > G.lifeNo || (stored.lifeNo === G.lifeNo && stored.day > G.day);
+  const sameFirstDay = first && stored.lifeNo === G.lifeNo && stored.day === G.day && !['intro', 'birth'].includes(stored.phase);
+  if (!later && !sameFirstDay) return false;
+  // 另一标签页已经替这一世开了天，直接回到已存下的进度。
+  location.reload();
+  return true;
+}
 const FIRST_FAMILY = { name: '林家', money: 20, door: 0, treasures: [], friends: { wang: 26, li: 8, zhao: 0 }, thread: '知己' };
 function freshLife(fam, prev) {
   return {
-    v: 2, lifeNo: prev ? prev.lifeNo + 1 : 1, fam: fam.name, thread: fam.thread, phase: 'home', day: 1, time: CFG.dayStart, hp: CFG.hpMax,
+    v: 3, ...(prev ? bankFields(prev) : { bankedDays: BANK_CAP, lastGrantDate: localDateKey(), unlimitedDays: false }),
+    lifeNo: prev ? prev.lifeNo + 1 : 1, fam: fam.name, thread: fam.thread, phase: prev ? 'birth' : 'intro', day: 1, time: CFG.dayStart, hp: CFG.hpMax,
     name: surnameOf(fam.name) + pick(GIVEN_ME), grade: GRADES[fam.thread][0], power: GRADES[fam.thread][1],
     parents: fam.parents || [{ name: surnameOf(fam.name) + '大郎', look: randomLook(), rel: '爹' }, { name: '娘', look: randomLook(), rel: '娘' }],
     spouse: null, love: 0, kids: [], ancestors: fam.ancestors || [], offered: false, own: !!fam.own,
@@ -957,8 +1046,21 @@ function freshLife(fam, prev) {
     history: prev ? [...prev.history] : [], look: ME,
   };
 }
-function save() { try { localStorage.setItem('wulin-loop', JSON.stringify(G)); } catch (e) {} }
-function loadGame() { try { const r = localStorage.getItem('wulin-loop'); if (r) { const o = JSON.parse(r); if (o && o.v === 2) return o; } } catch (e) {} return null; }
+function writeGame(game) {
+  localStorage.setItem('wulin-loop', JSON.stringify(game));
+  observedBank = JSON.stringify(bankFields(game));
+}
+function save() { try { pullBank(storedGame()); accrueDays(); writeGame(G); } catch (e) {} }
+function loadGame() {
+  const o = storedGame();
+  if (!o || ![2, 3].includes(o.v)) return null;
+  o.v = 3;
+  o.bankedDays = Number.isInteger(o.bankedDays) ? clamp(o.bankedDays, 0, BANK_CAP) : BANK_CAP;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(o.lastGrantDate) || !Number.isFinite(Date.parse(o.lastGrantDate))) o.lastGrantDate = localDateKey();
+  o.unlimitedDays = o.unlimitedDays === true;
+  observedBank = JSON.stringify(bankFields(o));
+  return o;
+}
 
 // ---------------- 小工具 ----------------
 const SHI = ['子', '丑', '寅', '卯', '辰', '巳', '午', '未', '申', '酉', '戌', '亥'];
@@ -970,7 +1072,11 @@ function bagCap() { return CFG.bag + (G.buddy ? CFG.bagBuddy : 0); }
 function storeCount() { return Object.values(G.store).reduce((a, n) => a + n, 0); }
 function storeValue() { return Object.entries(G.store).reduce((a, [k, n]) => a + GOODS[k] * n, 0); }
 function posOf(at) { return at === 'home' ? HOME : SPOTS[at]; }
-function walkMin(a, b) { const p = posOf(a), q = posOf(b); return Math.round(Math.hypot(p.x - q.x, p.y - q.y) * AGE_FX[ageOf(G.day)].walk); }
+function walkMin(a, b) {
+  const p = posOf(a), q = posOf(b);
+  const minutes = Math.hypot(p.x - q.x, p.y - q.y) * AGE_FX[ageOf(G.day)].walk;
+  return Math.round(minutes * (G.buddy ? 1 : 0.8));
+}
 function addFriend(id, n) { G.friends[id] = clamp((G.friends[id] || 0) + n, 0, 100); }
 let toastT = 0;
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { el.hidden = true; }, 2600); }
@@ -1035,7 +1141,7 @@ $('game-expressions').addEventListener('click', event => {
 function renderHud() {
   const ghostly = ['death', 'haunt', 'reborn', 'guard'].includes(G.phase);
   const age = ageOf(G.day);
-  $('hud').innerHTML = `<div class="hud-l"><b>${G.phase === 'guard' ? '护家神' : G.phase === 'haunt' ? '厉鬼' : ghostly ? '阴间' : `第 ${G.day} 天`}</b><span>${ghostly ? `第 ${G.lifeNo} 世走完了` : `${G.name} · ${AGE_NAME[age]} · 第 ${G.lifeNo} 世`}</span></div>
+  $('hud').innerHTML = `<div class="hud-l"><b>${G.phase === 'guard' ? '护家神' : G.phase === 'haunt' ? '厉鬼' : ghostly ? '阴间' : `第 ${G.day} 天`}</b><span>${ghostly ? `第 ${G.lifeNo} 世走完了` : `${G.name} · ${AGE_NAME[age]} · 第 ${G.lifeNo} 世`}</span><span class="day-bank">攒着的天：${G.bankedDays} / ${BANK_CAP}</span></div>
     <div class="hud-r">${ghostly ? '' : `<span class="hp" role="img" aria-label="体力 ${G.hp} / ${CFG.hpMax}">${'<i class="on"></i>'.repeat(Math.max(0, G.hp))}${'<i></i>'.repeat(Math.max(0, CFG.hpMax - G.hp))}</span><span>${G.money} 文</span><span>宝物 ${G.treasures.length}</span>`}<button type="button" class="icon" id="menu">设置</button></div>`;
   const expressions = document.createElement('button');
   expressions.type = 'button'; expressions.className = 'icon'; expressions.id = 'show-expressions';
@@ -1050,10 +1156,43 @@ function clockHtml() {
 function render() {
   document.body.dataset.phase = G.phase;
   renderHud();
-  if (G.phase === 'home') renderHome();
+  if (G.phase === 'home' || G.phase === 'intro') renderHome();
+  else if (G.phase === 'dawn' || G.phase === 'birth') renderWaiting();
   else if (G.phase === 'map') renderMap();
   else if (G.phase === 'death') renderDeath();
   else if (G.phase === 'reborn') renderReborn();
+}
+function renderWaiting(now = new Date()) {
+  const ready = G.bankedDays > 0 || G.unlimitedDays;
+  const midnight = new Date(now.getTime());
+  midnight.setHours(24, 0, 0, 0);
+  const mins = Math.ceil((midnight - now) / 60000);
+  const first = G.phase === 'birth';
+  if (!$('scene').querySelector('.waiting-yard')) $('scene').innerHTML = `<svg viewBox="0 0 360 300" class="stage waiting-yard" role="img" aria-label="等候天亮的院子">${homeSvg()}</svg>`;
+  $('panel').innerHTML = `<div class="where"><b>${ready ? '可以天亮了' : '今天的日子过完了'}</b></div>
+    <div class="plan">${ready ? `准备好了，就开始第 ${first ? 1 : G.day + 1} 天。` : `下一个现实日的 0 点再领 1 天，还有 ${Math.floor(mins / 60)} 小时 ${mins % 60} 分。`}<br>攒着的天：${G.bankedDays} / ${BANK_CAP}</div>
+    <button type="button" class="big main" data-a="dawn"${ready ? '' : ' disabled'}>${first ? '开始新一世的第一天' : '开始下一天'}</button>`;
+  bindActs({ dawn: first ? firstMorning : nextMorning });
+}
+function firstMorning() {
+  if (G.phase !== 'intro' && G.phase !== 'birth') return;
+  if (dawnAlreadyStarted(true)) return;
+  G.phase = spendDawn() ? 'home' : 'birth';
+  save(); render();
+}
+function updateCalendar() {
+  const before = JSON.stringify(bankFields(G));
+  const stored = storedGame();
+  pullBank(stored);
+  if (accrueDays() && stored) {
+    // 跨零点时只更新余额，保留另一标签页已写入的游戏进度。
+    try { writeGame({ ...stored, ...bankFields(G) }); } catch {}
+  }
+  if (before !== JSON.stringify(bankFields(G))) renderHud();
+  if (G.phase === 'dawn' || G.phase === 'birth') renderWaiting();
+}
+function scheduleCalendar() {
+  setTimeout(() => { updateCalendar(); scheduleCalendar(); }, 60000 - Date.now() % 60000);
 }
 
 // ================= 院子（白天） =================
@@ -1115,14 +1254,35 @@ function heal() { G.store['草药']--; G.hp = Math.min(CFG.hpMax, G.hp + 1); sav
 
 function openMarket() {
   const goods = Object.entries(G.store).filter(([, n]) => n > 0);
-  const rows = goods.map(([k, n]) => `<li>${k} ×${n}<span>${GOODS[k] * n} 文</span></li>`).join('') || '<li class="note">仓库是空的。出门找点东西回来吧。</li>';
+  const rows = goods.map(([k, n]) => `<li data-good-kind="${k}"><div><b>${k} ×${n}</b><small>每件 ${GOODS[k]} 文 · 共 ${GOODS[k] * n} 文</small></div>
+    <button type="button" class="mini" data-quantity="one" aria-label="卖 1 件${k}">卖 1 件</button>
+    <button type="button" class="mini" data-quantity="all" aria-label="全卖${k}">全卖</button></li>`).join('') || '<li class="note">仓库是空的。出门找点东西回来吧。</li>';
   const tre = G.treasures.map((t, i) => `<li>${t.n}<span>${t.v} 文</span><button type="button" class="mini" data-sell="${i}">卖掉</button></li>`).join('');
   sheet({
     title: '集市', dismiss: true,
-    body: `<ul class="list">${rows}</ul>${tre ? `<div class="sub">宝物架</div><p class="note">宝物摆在家里更有面子，但夜里门被砸破，可能被鬼抢走。</p><ul class="list">${tre}</ul>` : ''}`,
+    body: `<ul class="list market-stock">${rows}</ul>${tre ? `<div class="sub">宝物架</div><p class="note">宝物摆在家里更有面子，但夜里门被砸破，可能被鬼抢走。</p><ul class="list">${tre}</ul>` : ''}`,
     buttons: [[`货全卖了（+${storeValue()} 文）`, sellAll, 'main', !goods.length], ['回去', null]],
-    bind: (el) => el.querySelectorAll('[data-sell]').forEach((b) => { b.onclick = () => { const t = G.treasures.splice(+b.dataset.sell, 1)[0]; G.money += t.v; G.earned += t.v; save(); render(); toast(`卖了${t.n}，+${t.v} 文`); openMarket(); }; }),
+    bind: (el) => {
+      el.querySelectorAll('[data-quantity]').forEach((button) => {
+        button.onclick = () => sellGoods(button.closest('[data-good-kind]').dataset.goodKind, button.dataset.quantity);
+      });
+      el.querySelectorAll('[data-sell]').forEach((b) => { b.onclick = () => { const t = G.treasures.splice(+b.dataset.sell, 1)[0]; G.money += t.v; G.earned += t.v; save(); render(); toast(`卖了${t.n}，+${t.v} 文`); openMarket(); }; });
+    },
   });
+}
+function sellGoods(kind, quantity) {
+  const stock = G.store[kind];
+  if (!stock) return;
+  const count = quantity === 'all' ? stock : 1;
+  if (count === stock) delete G.store[kind];
+  else G.store[kind] -= count;
+  const value = GOODS[kind] * count;
+  G.money += value; G.earned += value;
+  save(); render(); openMarket();
+  const next = $('sheet').querySelector(`[data-good-kind="${kind}"] [data-quantity="one"]`)
+    || $('sheet').querySelector('.sh-btns button:last-child');
+  next.focus({ preventScroll: true });
+  toast(`卖了${kind} ×${count}，+${value} 文`);
 }
 function sellAll() { const v = storeValue(); G.money += v; G.earned += v; G.store = {}; save(); render(); toast(`卖了 ${v} 文`); }
 
@@ -1169,16 +1329,67 @@ function askBuddy() {
   const ok = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.buddyAt);
   sheet({
     title: '找人结伴？', dismiss: true,
-    body: ok.length ? '<p>结伴出门：遇到危险更容易打赢，背包多 3 格，倒下了有人扛你回家。平安回来，交情 +5。</p>' : `<p>还没有能结伴的人。交情到 ${CFG.buddyAt} 才能约人一起出门，可以先在「邻居和交情」里送点东西。</p>`,
+    body: `<div class="buddy-compare">
+      <section><h3>一个人</h3><ul><li>路上少花两成时间</li><li>收获全归自己</li><li>有些地方能独自潜入</li></ul></section>
+      <section><h3>找人结伴</h3><ul><li>少遇险，打赢和脱身都更容易</li><li>多背 ${CFG.bagBuddy} 件，倒下有人扛回家</li><li>回来交情 +5</li><li>与同一伙伴累计每找满 3 件，他分 1 件，宝物也算</li></ul></section>
+      </div>${ok.length ? '' : `<p class="note">还没有能结伴的人。交情到 ${CFG.buddyAt} 才能约人，可以在「邻居和交情」里送点东西。</p>`}`,
     buttons: [...ok.map((n) => [`和${n.who}一起去`, () => goOut(n.id), 'main']), ['一个人去', () => goOut(null), ok.length ? '' : 'main']],
   });
 }
 function goOut(b) { G.buddy = b; G.phase = 'map'; G.at = 'home'; G.target = null; save(); render(); }
-function rollLoot(ring) {
-  let r = Math.random(), name = ring.loot[ring.loot.length - 1][0];
-  for (const [n, p] of ring.loot) { if (r < p) { name = n; break; } r -= p; }
+// 只在第一次看当日地图时抽线索。同一游戏日往返、刷新都沿用已经看到的线索。
+function fieldToday() {
+  if (G.field?.day !== G.day) {
+    const notes = G.field?.day === G.day - 1 ? G.field.tomorrow : {};
+    G.field = { day: G.day, clues: SPOTS.map(sp => Math.floor(Math.random() * sp.clues.length)),
+      visits: {}, bonus: notes || {}, tomorrow: {}, encounter: null };
+    save();
+  }
+  return G.field;
+}
+function siteClue(sp) { return sp.clues[G.field.clues[sp.id]]; }
+function fieldWeights(sp) {
+  const weights = Object.fromEntries(Object.entries(sp.loot).map(([name, weight]) => [name, weight * .7]));
+  const focus = siteClue(sp).focus;
+  weights[focus] = (weights[focus] || 0) + 30;
+  return weights;
+}
+function rollLoot(sp) {
+  let r = Math.random() * 100;
+  let name;
+  for (const [n, weight] of Object.entries(fieldWeights(sp))) {
+    name = n;
+    if (r < weight) break;
+    r -= weight;
+  }
   if (name === '宝物') { const [n, v] = pick(TREASURES); return { n, v, tre: true }; }
   return { n: name };
+}
+function fieldAction(sp, rich) {
+  const clue = siteClue(sp), solo = rich && sp.solo && !G.buddy;
+  const risk = (sp.risk[+rich] + clue.extraRisk * (rich ? 1 : .25)) * (G.buddy ? .6 : 1);
+  const base = rich ? [2, 3] : [sp.safeCount || 1, sp.safeCount || 1];
+  const visits = G.field.visits[sp.id] || 0;
+  const factor = [1, .5, .25][visits] || 0;
+  const double = !!(G.buddy && G.field.bonus[sp.id]);
+  const multiplier = double ? 2 : 1;
+  // 先判定还找得到几件，再翻倍。这样单件的零头不会吞掉昨天的约定。
+  const lo = Math.floor(base[0] * factor) * multiplier, hi = Math.ceil(base[1] * factor) * multiplier;
+  return { name: rich ? (solo ? `${sp.solo}（${clue.focus}）` : clue.action) : sp.safe,
+    minutes: sp.minutes[+rich] - (solo ? 10 : 0), risk, base, factor, double, lo, hi };
+}
+function collectFieldLoot(sp, count) {
+  const kept = [], shared = [];
+  if (!G.shareRemainder) G.shareRemainder = {};
+  for (let i = 0; i < count; i++) {
+    const due = G.buddy && G.shareRemainder[G.buddy] === 2;
+    if (!due && G.bag.length >= bagCap()) break;
+    const item = rollLoot(sp);
+    if (due) shared.push(item);
+    else { G.bag.push(item); kept.push(item); }
+    if (G.buddy) G.shareRemainder[G.buddy] = due ? 0 : (G.shareRemainder[G.buddy] || 0) + 1;
+  }
+  return [kept.length && `收进背包：${kept.map(it => it.n).join('、')}`, shared.length && `${nb(G.buddy).who}分到：${shared.map(it => it.n).join('、')}`].filter(Boolean).join('；');
 }
 function mapSvg() {
   const f = dayFrac();
@@ -1189,7 +1400,7 @@ function mapSvg() {
   const here = G.at;
   for (const sp of SPOTS) {
     const sel = G.target === sp.id, cur = here === sp.id;
-    s += `<g class="spot" data-spot="${sp.id}" role="button" aria-label="${sp.name}（${RINGS[sp.ring].name}）"><circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="22" fill="transparent"/><circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="13" fill="${cur ? '#FFF7E0' : '#F4F1E8'}" stroke="${sel ? '#B8402F' : cur ? '#B7862A' : '#4A4F5C'}" stroke-width="${sel || cur ? 3.5 : 1.5}"/><text x="${sp.x.toFixed(1)}" y="${(sp.y + 26).toFixed(1)}" text-anchor="middle" font-size="11.5" font-weight="700" fill="${sp.ring === 2 ? '#FFFFFF' : '#1E2A2C'}" paint-order="stroke" stroke="${sp.ring === 2 ? '#3A2C46' : '#F4F1E8'}" stroke-width="3">${sp.name}</text></g>`;
+    s += `<g class="spot" data-spot="${sp.id}" role="button" tabindex="0" aria-pressed="${sel || cur}" aria-label="${sp.name}（${RINGS[sp.ring].name}）"><circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="22" fill="transparent"/><circle cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="13" fill="${cur ? '#FFF7E0' : '#F4F1E8'}" stroke="${sel ? '#B8402F' : cur ? '#B7862A' : '#4A4F5C'}" stroke-width="${sel || cur ? 3.5 : 1.5}"/><text x="${sp.x.toFixed(1)}" y="${(sp.y + 26).toFixed(1)}" text-anchor="middle" font-size="11.5" font-weight="700" fill="${sp.ring === 2 ? '#FFFFFF' : '#1E2A2C'}" paint-order="stroke" stroke="${sp.ring === 2 ? '#3A2C46' : '#F4F1E8'}" stroke-width="3">${sp.name}</text></g>`;
   }
   if (G.target != null && G.target !== G.at) { const p = posOf(G.at), q = SPOTS[G.target]; s += `<line x1="${p.x}" y1="${p.y}" x2="${q.x}" y2="${q.y}" stroke="#B8402F" stroke-width="2.5" stroke-dasharray="6 5"/>`; }
   const p = posOf(G.at);
@@ -1198,23 +1409,45 @@ function mapSvg() {
   return s;
 }
 function renderMap() {
-  $('scene').innerHTML = `<svg viewBox="0 0 360 360" class="stage" id="mapsvg" role="group" aria-label="野外地图：中间是家，越往外越危险">${mapSvg()}</svg>`;
-  $('mapsvg').onclick = (e) => { const g = e.target.closest('[data-spot]'); if (!g || busy) return; G.target = +g.dataset.spot === G.at ? null : +g.dataset.spot; renderMap(); };
+  const field = fieldToday();
   const atHome = G.at === 'home';
+  $('scene').innerHTML = `<svg viewBox="0 0 360 360" class="stage${atHome || G.target != null ? '' : ' on-site'}" id="mapsvg" role="group" aria-label="野外地图：中间是家，越往外越危险">${mapSvg()}</svg>`;
+  const selectSpot = (e) => {
+    const g = e.target.closest('[data-spot]');
+    if (!g || busy) return;
+    G.target = +g.dataset.spot === G.at ? null : +g.dataset.spot;
+    save(); renderMap();
+  };
+  $('mapsvg').onclick = selectSpot;
+  $('mapsvg').onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectSpot(e); } };
   const here = posOf(G.at);
   const chips = G.bag.map((it) => `<span class="tag${it.tre ? ' tre' : ''}">${it.n}</span>`).join('');
-  let plan = '<p class="note">点地图上的地方，看看要走多久。</p>';
+  let plan = atHome ? '<p class="note">点一个地方，打听今天的线索和路程。</p>' : '';
   const t = G.target != null && G.target !== G.at ? SPOTS[G.target] : null;
   if (t) {
     const go = walkMin(G.at, t.id), arrive = G.time + go, back = walkMin(t.id, 'home');
-    const late = arrive + RINGS[t.ring].gather + back > CFG.dusk;
-    plan = `<div class="plan">去<b>${t.name}</b>（${RINGS[t.ring].name}）：走 ${dur(go)}，到了是 ${hm(arrive)}。从那儿回家要 ${dur(back)}。${late ? '<br><span class="warn">采一次再回来，天就黑了。</span>' : ''}</div><button type="button" class="big main" data-a="go">走过去<small>${RINGS[t.ring].name}：${RINGS[t.ring].hint}</small></button>`;
+    const late = arrive + t.minutes[0] + back > CFG.dusk;
+    plan = `<div class="plan"><p class="field-clue">${t.name} · 今日线索</p>${siteClue(t).text}<br>走 ${dur(go)}，到了是 ${hm(arrive)}。从那儿回家要 ${dur(back)}。${field.bonus[t.id] ? '<br><b>昨天留了记号，今日结伴首采翻倍。</b>' : ''}${field.visits[t.id] ? '<br>今天来采过了，剩下的不多。' : ''}${late ? '<br><span class="warn">停下来采一次，再回来就天黑了。</span>' : ''}</div><button type="button" class="big main" data-a="go">走过去<small>${t.name} · 常见${Object.keys(t.loot)[0]}</small></button>`;
   }
   let acts = '';
   if (!atHome) {
-    const ring = RINGS[here.ring], back = walkMin(G.at, 'home'), full = G.bag.length >= bagCap();
-    acts = `<div class="acts"><button type="button" class="big${t ? '' : ' main'}" data-a="gather"${full ? ' disabled' : ''}>${full ? '背包满了' : '采集'}<small>${full ? '先回家放东西' : `${ring.gather} 分钟 · 可能遇到${ring.foes.join('、')}`}</small></button>
-      <button type="button" class="big" data-a="home">回家<small>走 ${dur(back)}，到家是 ${hm(G.time + back)}${G.time + back > CFG.dusk ? ' · <b class="warn">路上就天黑了</b>' : ''}</small></button></div>`;
+    const back = walkMin(G.at, 'home'), full = G.bag.length >= bagCap(), clue = siteClue(here);
+    const visits = field.visits[here.id] || 0;
+    if (!t) {
+      plan = `<p class="field-scene">${here.scene}</p><p class="field-clue">今日线索 · ${clue.text}</p>`;
+      if (visits || field.bonus[here.id] || full) plan += `<p class="note">${visits >= 3 ? '今天已找遍，明日再来。' : visits ? '采过的痕迹还在，再找收获会少些。' : ''}${field.bonus[here.id] ? (G.buddy ? ' 认出昨日的记号，这次结伴收获翻倍。' : ' 昨日的记号还在，今天结伴回来可翻倍一次。') : ''}${full ? ' 背包满了，先回家放东西。' : ''}</p>`;
+      const buttons = [false, true].map(rich => {
+        const a = fieldAction(here, rich);
+        const level = a.risk < .12 ? '低' : a.risk < .32 ? '中' : '高';
+        const quantity = a.lo === a.hi ? a.lo : `${a.lo}–${a.hi}`;
+        const hint = rich ? `今日易得${clue.focus}` : `当地特产${Object.keys(here.loot)[0]}`;
+        return `<button type="button" class="big${rich ? '' : ' main'}" data-a="${rich ? 'rich' : 'gather'}"${full || !a.factor ? ' disabled' : ''}>${a.name}<small>${a.minutes} 分钟 · ${hint}，${quantity} 件 · 危险${level} ${pct(a.risk)}</small></button>`;
+      }).join('');
+      const marked = field.tomorrow[here.id];
+      const note = G.day < CFG.lifeDays ? `<button type="button" class="big ghosty" data-a="mark"${marked ? ' disabled' : ''}>${marked ? '已给明天留了记号' : '记下位置，明天带人来'}<small>10 分钟 · 今天空手，明天在此结伴首采翻倍 · 无危险</small></button>` : '';
+      acts = `<div class="field-acts">${buttons}${note}</div>`;
+    }
+    acts += `<button type="button" class="big" data-a="home">回家<small>走 ${dur(back)}，到家是 ${hm(G.time + back)}${G.time + back > CFG.dusk ? ' · <b class="warn">路上就天黑了</b>' : ''}</small></button>`;
   } else {
     acts = `<div class="acts"><button type="button" class="big" data-a="home">不去了，回院子<small>不花时间</small></button></div>`;
   }
@@ -1222,7 +1455,9 @@ function renderMap() {
     ${clockHtml()}
     <div class="bag"><span class="lab">背包 ${G.bag.length}/${bagCap()}</span>${chips || '<span class="note">空的</span>'}</div>
     ${plan}${acts}`;
-  bindActs({ go: () => walkTo(t.id), gather, home: goHome });
+  bindActs({ go: () => walkTo(t.id), gather: () => gather(false), rich: () => gather(true), mark: markSpot, home: goHome });
+  if (field.encounter) danger(RINGS[here.ring], field.encounter);
+  else if (!atHome && G.time >= CFG.dusk) duskChoices(field.duskLead || '天黑了。');
 }
 let busy = false;
 function moveToken(p, cb) {
@@ -1241,24 +1476,33 @@ function walkTo(id) {
     G.time += m; save(); render();
   });
 }
-function gather() {
-  if (busy) return;
-  const ring = RINGS[SPOTS[G.at].ring];
-  G.time += ring.gather;
-  const got = [];
-  const n = Math.random() < 0.35 ? 2 : 1;
-  for (let i = 0; i < n && G.bag.length < bagCap(); i++) { const it = rollLoot(ring); G.bag.push(it); got.push(it); }
+function markSpot() {
+  if (busy || G.field.encounter || G.at === 'home' || G.day >= CFG.lifeDays || G.field.tomorrow[G.at]) return;
+  G.field.tomorrow[G.at] = true;
+  G.time += 10;
   save();
-  if (got.some((x) => x.tre)) toast(`找到宝物：${got.filter((x) => x.tre).map((x) => x.n).join('、')}！`);
-  else toast(`采到了：${got.map((x) => x.n).join('、')}`);
+  if (G.time >= CFG.dusk) return dusk('刚记好位置，天就黑了。');
+  render(); toast('记好了。明天结伴回来，可以多带一份。');
+}
+function gather(rich = false) {
+  if (busy || G.at === 'home' || G.field.encounter || G.bag.length >= bagCap()) return;
+  const sp = SPOTS[G.at], a = fieldAction(sp, rich);
+  if (!a.factor) return;
+  const expected = (a.base[0] === a.base[1] ? a.base[0] : ri(a.base)) * a.factor;
+  const remainder = expected % 1;
+  const count = Math.floor(expected) + (remainder && Math.random() < remainder ? 1 : 0);
+  const got = collectFieldLoot(sp, count * (a.double ? 2 : 1));
+  if (a.double) delete G.field.bonus[sp.id];
+  G.field.visits[sp.id] = (G.field.visits[sp.id] || 0) + 1;
+  G.time += a.minutes;
+  if (G.time < CFG.dusk && Math.random() < a.risk) G.field.encounter = pick(RINGS[sp.ring].foes);
+  save();
+  toast(got || '翻过刚才找过的地方，这回空手。');
   if (G.time >= CFG.dusk) return dusk('采着采着，天黑了。');
-  if (Math.random() < ring.danger * (G.buddy ? 0.6 : 1)) return danger(ring);
   render();
 }
-function danger(ring) {
-  const foe = pick(ring.foes);
+function danger(ring, foe) {
   const chance = clamp(ring.fight + (G.buddy ? 0.2 : 0) + AGE_FX[ageOf(G.day)].fight - (G.hp < CFG.hpMax ? 0.1 : 0), 0.05, 0.95);
-  render();
   sheet({
     title: `${foe}！`,
     body: `<p>在${SPOTS[G.at].name}遇到了${foe}。</p>${G.buddy ? `<p class="note">${nb(G.buddy).who}在旁边，打赢的机会更大。</p>` : ''}`,
@@ -1266,17 +1510,17 @@ function danger(ring) {
   });
 }
 function fight(chance, ring, foe) {
+  G.field.encounter = null;
   if (Math.random() < chance) {
-    const it = rollLoot(ring);
-    let msg = `打赢了${foe}。`;
-    if (!it.tre && G.bag.length < bagCap()) { G.bag.push(it); msg += `还捡到了${it.n}。`; }
-    return afterEvent('赢了', msg);
+    const got = collectFieldLoot(SPOTS[G.at], 1);
+    return afterEvent('赢了', `打赢了${foe}。${got}`);
   }
   G.hp -= 1;
   if (G.hp <= 0) return knocked(ring, `被${foe}打倒了。`);
   afterEvent('受伤了', `被${foe}伤到了，体力 −1。`);
 }
 function flee() {
+  G.field.encounter = null;
   G.time += 30;
   let msg = '跑掉了，耽误了 30 分钟。';
   if (G.bag.length && Math.random() < 0.5) { const it = G.bag.splice(Math.floor(Math.random() * G.bag.length), 1)[0]; msg += `慌乱中丢了${it.n}。`; }
@@ -1300,9 +1544,12 @@ function knocked(ring, why) {
   sheet({ title: '倒下了', body: `<p>${msg}</p>${got ? `<p>${got}</p>` : ''}<p class="note">在野外倒下不会直接死：东西掉在原地，人受重伤（夜里打得没那么疼）。只有一个人倒在禁地里，才可能丢命。</p>`, buttons: [['知道了', afterArrive, 'main']] });
 }
 function dusk(lead) {
+  G.field.duskLead = lead;
+  save(); render();
+}
+function duskChoices(lead) {
   const sp = SPOTS[G.at], ring = RINGS[sp.ring], who = ghostName();
   const chance = clamp(ring.escape + (G.buddy ? 0.25 : 0), 0.05, 0.95);
-  render();
   sheet({
     title: '天黑了！',
     body: `<p>${lead}你还在${sp.name}（${ring.name}）。天黑以后，野外是鬼的地盘：<b>${who}</b>盯上了你。</p><p class="note">真游戏里，这个鬼是死去的真人玩家。</p>`,
@@ -1849,11 +2096,13 @@ function endNight(won) {
   let next, label;
   if (N.guardian) { G.afterlife = { kind: 'guard', won }; next = goReborn; label = '天亮了，去投胎'; body = `<p>${won ? '你显灵帮子孙守住了家门。' : '你没能护住子孙的家门。'}</p>` + body; }
   else if (G.day >= CFG.lifeDays) { next = () => die('old', `${G.day} 天过去了，你老了。`); label = '天亮了……'; }
-  else { next = nextMorning; label = '天亮了'; }
+  else { G.phase = 'dawn'; next = nextMorning; label = '天亮了'; }
   save();
   setTimeout(() => sheet({ title, body, buttons: [[label, next, 'main']] }), won ? 300 : 700);
 }
 function nextMorning() {
+  if (dawnAlreadyStarted(false)) return;
+  if (!spendDawn()) { G.phase = 'dawn'; save(); render(); return; }
   G.day++; G.time = CFG.dayStart; G.hp = Math.min(CFG.hpMax, G.hp + 1); G.phase = 'home';
   if (G.spouse) G.love = Math.min(100, G.love + 8);
   const born = maybeBirth();
@@ -2048,15 +2297,16 @@ function reborn(f) {
   if (!fam.own) fam.ancestors = Array.from({ length: 2 }, (_, i) => ({ name: surnameOf(fam.name) + ['老太公', '太奶奶'][i], look: randomLook(), note: '祖上' }));
   G = freshLife(fam, prev);
   G.history.push({ life: prev.lifeNo, fam: prev.fam, days: prev.day, held: prev.held, karma: prev.reborn.total });
-  save(); render();
-  toast(`投胎到了${f.name}。第 ${G.lifeNo} 世开始了。`);
+  firstMorning();
+  toast(`投胎到了${f.name}。`);
 }
 
 // ================= 设置 =================
 function applyLook(raw) {
   const look = validatedLook(raw);
   // 先写完整存档。写入失败时保留原形象和捏人台草稿，可重试或取消。
-  localStorage.setItem('wulin-loop', JSON.stringify({ ...G, look }));
+  pullBank(storedGame()); accrueDays();
+  writeGame({ ...G, look });
   G.look = ME = look;
   try { localStorage.setItem('wulin-loop-look', JSON.stringify(look)); } catch (e) {}
   refreshAppearance();
@@ -2088,7 +2338,7 @@ function closeEditor(finished) {
   } else if (G.phase === 'haunt' && !H.over) {
     H.last = performance.now(); raf = requestAnimationFrame(hauntLoop);
   }
-  if (finished) { $('menu').focus({ preventScroll: true }); toast('样子已保存'); }
+  if (finished) { if (G.phase === 'intro') firstMorning(); $('menu').focus({ preventScroll: true }); toast('样子已保存'); }
   else cancelEditor();
 }
 avatarDialog.addEventListener('cancel', e => { e.preventDefault(); closeEditor(false); });
@@ -2115,11 +2365,13 @@ function openMenu() {
       <label for="code-out">我的捏人码</label><textarea id="code-out" readonly></textarea>
       <label for="code-in">导入别人的人</label><textarea id="code-in" placeholder="WULIN1:..."></textarea><button type="button" class="big" id="use-code">用这个人</button><p class="note" id="code-msg" role="status"></p></details>
       <div class="sub">试玩用</div>
+      <label class="bank-toggle"><input type="checkbox" id="unlimited-days"${G.unlimitedDays ? ' checked' : ''}>不限天数（试玩用）</label>
       <button type="button" class="big" id="ff"${playing && G.day < CFG.lifeDays ? '' : ' disabled'}>快进到最后一天<small>直接试老死、当鬼和投胎</small></button>
       <button type="button" class="big" id="restart">从头再来<small>清掉这一局，回到第一世</small></button>
       <p class="note">这是样机：邻居、来砸门的鬼、被你砸门的人家都用电脑代替；所有数字都是占位。</p>`,
     buttons: [['关上', null]],
     bind: (el) => {
+      el.querySelector('#unlimited-days').onchange = event => { G.unlimitedDays = event.target.checked; save(); render(); };
       el.querySelector('#edit-look').onclick = () => openEditor(openMenu);
       el.querySelector('#code-out').value = encode(ME);
       el.querySelector('#use-code').onclick = () => {
@@ -2134,9 +2386,9 @@ function openMenu() {
 function intro() {
   sheet({
     title: '一日一夜（样机）',
-    body: `<p>白天<b>出门找东西</b>，走得越远东西越好，但<b>天黑前一定要回家</b>。</p><p>夜里鬼来<b>砸门</b>。门破了，钱和宝物真的会被抢走。</p><p>真游戏里一个现实日就是一天一夜：白天的时辰花完就天黑，什么时候玩你自己定。样机里一辈子 ${CFG.lifeDays} 天，长大以后可以结缘生孩子，也可以收徒弟。老死以后，可以当<b>护家神</b>守自己家，或者当<b>厉鬼</b>去砸别人家的门，然后投胎。</p>
+    body: `<p>白天<b>出门找东西</b>，走得越远东西越好，但<b>天黑前一定要回家</b>。</p><p>夜里鬼来<b>砸门</b>。门破了，钱和宝物真的会被抢走。</p><p>你攒着 <b>${BANK_CAP} 天</b>。每次天亮花 1 天，守夜也算在里面。现实里每天 0 点再给 1 天，最多攒 ${BANK_CAP} 天。</p><p>样机里一辈子 ${CFG.lifeDays} 天，长大以后可以结缘生孩子，也可以收徒弟。老死以后，可以当<b>护家神</b>守自己家，或者当<b>厉鬼</b>去砸别人家的门，然后投胎。</p>
       <p class="note">一句话：砸你家门的鬼，是别人家的祖宗（大部分是电脑鬼，偶尔是死去的真人玩家）。样机里，别的玩家都用电脑代替。</p>`,
-    buttons: [['开始', save, 'main'], ['先捏个人', () => openEditor(intro)]],
+    buttons: [['开始', firstMorning, 'main'], ['先捏个人', () => openEditor(intro)]],
   });
 }
 
@@ -2162,13 +2414,17 @@ document.addEventListener('keydown', (e) => {
 
 // ================= 启动 =================
 G = loadGame();
-const firstTime = !G;
 if (!G) G = freshLife(FIRST_FAMILY, null);
+else { accrueDays(); save(); }
 if (G.look) { try { ME = validatedLook(G.look); } catch (e) {} }
 G.look = ME;
 if (G.phase === 'night' || G.phase === 'guard') startNight(G.phase === 'guard');
 else if (G.phase === 'haunt') startHaunt();
 else { if (G.phase === 'map' && G.bag == null) G.bag = []; render(); }
-if (firstTime) intro();
+if (G.phase === 'intro') intro();
+window.addEventListener('focus', updateCalendar);
+window.addEventListener('storage', event => { if (event.key === 'wulin-loop') updateCalendar(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) updateCalendar(); });
+scheduleCalendar();
 </script>
 </body></html>
