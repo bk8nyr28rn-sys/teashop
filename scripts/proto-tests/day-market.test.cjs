@@ -14,6 +14,7 @@ const { OUT, wrap } = require('./lib.cjs');
     await page.getByRole('button', { name: '开始', exact: true }).click();
     await page.click('#menu');
     await page.getByLabel('不限天数（试玩用）').check();
+    await page.getByLabel('全部开放（试玩用）').check();
     await page.getByRole('button', { name: '关上' }).click();
     await page.evaluate(() => {
       G.store = { 柴: 3, 草药: 3, 兽皮: 2 };

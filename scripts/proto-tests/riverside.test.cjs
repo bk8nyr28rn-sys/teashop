@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
-const { wrap, OUT } = require('./lib.cjs');
+const { wrap, OUT, enableAllFeatures } = require('./lib.cjs');
 
 (async () => {
   const browser = await chromium.launch();
@@ -31,9 +31,19 @@ const { wrap, OUT } = require('./lib.cjs');
     const at = async (id) => {
       await click('[data-r-target="' + id + '"] > rect:last-child');
       if (id === 'far') await page.locator('#mapsvg').waitFor();
-      else await page.waitForFunction((id) => G.river.focus === id, id);
+      else
+        await page.waitForFunction(
+          (id) => G.river.focus === id && !document.querySelector('#rb-map[aria-busy="true"]'),
+          id,
+        );
     };
     const act = (id) => click('[data-r-act="' + id + '"]');
+    const openHeld = () => click('[data-r-held]');
+    const emptyGround = async () => {
+      const map = page.locator('#rb-map');
+      await map.tap({ position: { x: 30, y: 40 } });
+      await page.waitForFunction(() => G.river.focus === null && !document.querySelector('#rb-actions'));
+    };
     const study = () => page.evaluate(() => JSON.parse(JSON.stringify(G.river)));
     const snap = async (file) => {
       await page.evaluate(() => document.fonts.ready);
@@ -41,6 +51,7 @@ const { wrap, OUT } = require('./lib.cjs');
       await page.screenshot({ path: path.join(OUT, 'river-' + file + '.png') });
     };
     await button('开始').click();
+    await enableAllFeatures(page);
     await click('[data-a="out"]');
     await button('一个人去').click();
     const initial = await page.evaluate(() => JSON.stringify(G));
@@ -57,11 +68,17 @@ const { wrap, OUT } = require('./lib.cjs');
     assert.equal(await page.locator('[data-r-target^="wood"]').count(), 3);
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await snap('01-wharf');
+    assert.match(await page.locator('#rb-hint').innerText(), /点石板路/);
+    await page.reload();
+    assert.equal(await page.locator('#rb-hint').count(), 0, '刷新不会再提示如何走路');
+    assert.equal(await page.locator('#rb-description,.rb-panel').count(), 0);
     for (const id of ['stone', 'herb', 'wood0', 'rope', 'porter']) {
       await at(id);
       await act('hail');
       assert.ok((await study()).record.events.at(-1).内容.startsWith('招呼'));
     }
+    assert.match(await page.locator('#rb-speech').innerText(), /我来搭手/);
+    await page.locator('#rb-speech').waitFor({ state: 'detached', timeout: 5500 });
     await act('carry');
     assert.match((await study()).msg, /扁担/);
     await act('tie');
@@ -69,15 +86,55 @@ const { wrap, OUT } = require('./lib.cjs');
     await at('rope');
     await act('carry');
     assert.equal((await study()).belt, true);
+    assert.match(await page.locator('#rb-hint').innerText(), /头顶/);
     await at('porter');
     await act('tie');
     assert.equal((await study()).helped, true);
+    assert.equal(await page.locator('#rb-speech .rb-speaker').count(), 1, '初次道谢带周伯的头像');
     await page.reload();
     await at('wood0');
     await act('tie');
     assert.equal((await study()).wood.filter((w) => w === 'raft').length, 2);
     assert.equal((await study()).belt, false);
     await snap('02-raft');
+    // 旧存档无文字开关时默认关闭。开关只影响河埠描述，刷新依然生效。
+    await click('#menu');
+    assert.equal(await page.locator('#river-text').isChecked(), false);
+    await page.locator('#river-text').check();
+    await button('关上').click();
+    await at('raft');
+    assert.match(await page.locator('#rb-description').innerText(), /绳结扣得很牢/);
+    await page.reload();
+    assert.match(await page.locator('#rb-description').innerText(), /绳结扣得很牢/);
+    await click('#menu');
+    await page.locator('#river-text').uncheck();
+    await button('关上').click();
+    await emptyGround();
+    assert.equal(await page.locator('#rb-actions').count(), 0);
+    await at('raft');
+    for (const width of [320, 390, 900]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const fits = await page.evaluate(() => {
+        const target = document
+          .querySelector('[data-r-target="raft"] > rect:last-child')
+          .getBoundingClientRect();
+        const board = document.querySelector('#rb-board').getBoundingClientRect(),
+          menu = document.querySelector('#rb-actions').getBoundingClientRect();
+        return (
+          menu.left >= board.left &&
+          menu.right <= board.right &&
+          menu.top >= board.top &&
+          menu.bottom <= board.bottom &&
+          (menu.bottom <= target.top ||
+            menu.top >= target.bottom ||
+            menu.right <= target.left ||
+            menu.left >= target.right)
+        );
+      });
+      assert.ok(fits, '木排按钮在边界内且不挡木排 ' + width);
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
     await act('untie');
     assert.equal((await study()).belt, true);
     await at('wood0');
@@ -135,6 +192,7 @@ const { wrap, OUT } = require('./lib.cjs');
     await reset();
     await at('wood0');
     await act('carry');
+    await openHeld();
     await act('drop');
     assert.equal((await study()).hand, null);
     await act('carry');
@@ -153,11 +211,13 @@ const { wrap, OUT } = require('./lib.cjs');
     await at('rope');
     await act('tie');
     assert.equal((await study()).belt, true);
+    await openHeld();
     await act('dropRope');
     await act('carry');
     await at('stone');
     await act('tie');
     assert.equal((await study()).hand, 'stone');
+    await openHeld();
     await act('drop');
     await at('far');
     assert.equal((await page.locator('[data-spot]').count()) >= 8, true);

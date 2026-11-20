@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
-const { wrap } = require('./lib.cjs');
+const { wrap, enableAllFeatures } = require('./lib.cjs');
 
 (async () => {
   const browser = await chromium.launch();
@@ -15,6 +15,7 @@ const { wrap } = require('./lib.cjs');
     await page.getByRole('button', { name: /开始/ }).first().click();
     assert.equal(await page.evaluate(() => G.field), undefined, '线索在第一次看地图时才抽取');
     await page.evaluate(() => { G.unlimitedDays = true; save(); SPEED = 50; });
+    await enableAllFeatures(page);
     await button('out').click();
     await page.locator('#sheet .sh-btns button', { hasText: /一个人|独行/ }).first().click();
   await page.locator('[data-r-target="far"]').click();

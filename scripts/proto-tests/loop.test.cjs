@@ -1,7 +1,7 @@
 const { chromium, devices } = require('playwright');
 const fs = require('fs');
 const path = require('path');
-const { OUT, wrap, enableUnlimitedDays } = require('./lib.cjs');
+const { OUT, wrap, enableUnlimitedDays, enableAllFeatures } = require('./lib.cjs');
 const TMP = wrap('loop');
 const shots = path.join(OUT, 'loop');
 fs.mkdirSync(shots, { recursive: true });
@@ -26,10 +26,11 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   // resolve any event sheets during the day by taking the first (main) option
   const drainSheets = async () => { for (let i = 0; i < 8 && (await sheetOpen()); i++) { await p.locator('#sheet .sh-btns button').first().click(); await p.waitForTimeout(120); } };
 
-  ok('intro shows', (await sheetTitle()).includes('一日一夜'));
+  ok('开场可以直接开始，祖宗在场景说话', !(await sheetOpen()) && await p.locator('#ancestor').isVisible());
   await p.screenshot({ path: path.join(shots, '0-intro.png') });
-  await sheetBtn('开始');
-  await enableUnlimitedDays(p);
+  await p.getByRole('button', {name:'开始', exact:true}).click();
+  await enableAllFeatures(p);
+    await enableUnlimitedDays(p);
   await clean('home'); await overflow('home');
   await p.screenshot({ path: path.join(shots, '1-home.png') });
 
@@ -183,7 +184,7 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   pd.on('pageerror', (e) => errs.push('desktop: ' + e.message));
   await pd.goto('file://' + TMP);
   await pd.evaluate(() => localStorage.clear()); await pd.reload(); await pd.waitForTimeout(200);
-  await pd.locator('#sheet .sh-btns button').first().click();
+  await pd.getByRole('button', {name:'开始', exact:true}).click();
   await pd.evaluate(() => { G.time = CFG.dusk; startNight(false); SPEED = 1; });
   await pd.waitForTimeout(9000);
   await pd.screenshot({ path: path.join(shots, '12-desktop-night.png') });

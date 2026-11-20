@@ -19,7 +19,7 @@ const { wrap } = require('./lib.cjs');
       await page.goto(pathToFileURL(wrap('loop')).href);
       await page.getByRole('button', { name: '开始', exact: true }).tap();
       await page.locator('[data-a="out"]').tap();
-      await page.getByRole('button', { name: '一个人去', exact: true }).tap();
+      await page.locator('#rb-map').waitFor();
       await page.evaluate(() => document.fonts.ready);
       await page.waitForTimeout(400);
       await page.evaluate(() => {

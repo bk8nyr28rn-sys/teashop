@@ -9,6 +9,11 @@ const PAGES = { creator: 'docs/art/creator/index.html', loop: 'docs/proto/loop/i
 function wrap(which) {
   return path.join(ROOT, PAGES[which]);
 }
+async function enableAllFeatures(page) {
+  await page.locator('#menu').click();
+  await page.getByLabel('全部开放（试玩用）').check();
+  await page.getByRole('button', { name: '关上', exact: true }).click();
+}
 async function enableUnlimitedDays(page) {
   await page.locator('#menu').click();
   await page.locator('#unlimited-days').check();
@@ -19,4 +24,4 @@ const log = console.log;
 let failed = false;
 console.log = (...a) => { const s = a.join(' '); if (/^FAIL /.test(s) || /^errors \S/.test(s)) failed = true; log(...a); };
 process.on('exit', (c) => { if (failed && c === 0) process.exitCode = 1; });
-module.exports = { ROOT, OUT, wrap, enableUnlimitedDays };
+module.exports = { ROOT, OUT, wrap, enableUnlimitedDays, enableAllFeatures };

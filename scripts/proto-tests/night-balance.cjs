@@ -34,6 +34,7 @@ function simulateBatch({ day, door, bows, rate, strategy, first, count, override
     for (trial = first; trial < first + count; trial++) {
       Math.random = stream(seed(-1, 0));
       G = freshLife({ ...FIRST_FAMILY, door, crossbow: bows }, null);
+      G.guideOff = true; G.allFeatures = strategy !== 'firstNight';
       G.day = day; G.time = CFG.dusk; G.item = 'sword';
       startNight(false); cancelAnimationFrame(raf);
       let tapT = 0, switches = 0, wasted = 0, pending = null, taps = 0, misses = 0;
@@ -46,10 +47,10 @@ function simulateBatch({ day, door, bows, rate, strategy, first, count, override
         tapT += 0.05;
         while (!N.over && tapT >= 1 / rate) {
           tapT -= 1 / rate;
-          const nearest = N.ghosts.filter(g => strategy !== 'sword' || revealed(g)).sort((a, b) => b.y - a.y)[0];
+          const nearest = N.ghosts.filter(g => !['sword', 'firstNight'].includes(strategy) || revealed(g)).sort((a, b) => b.y - a.y)[0];
           const target = strategy === 'commit' && pending?.hp > 0 ? pending : nearest;
           if (!target) break;
-          if (strategy !== 'sword' && G.item !== items[target.type]) {
+          if (!['sword', 'firstNight'].includes(strategy) && G.item !== items[target.type]) {
             if (pending) wasted++;
             pending = target; switches++;
             setItem(items[target.type]); tapT -= 0.3; continue;
@@ -85,7 +86,7 @@ function simulateBatch({ day, door, bows, rate, strategy, first, count, override
       const doorName = await page.evaluate(id => DOORS[id].name, door);
       const wins = results.filter(r => r.win).length;
       const sum = key => results.reduce((n, r) => n + r[key], 0);
-      const label = { smart: '会换', sword: '只用剑', commit: '换后先打原目标' }[strategy];
+      const label = { smart: '会换', sword: '只用剑', firstNight: '分天开放首夜只用剑', commit: '换后先打原目标' }[strategy];
       console.log(`day ${day} door ${doorName} 弩${bows} ${rate}/s ${label}: 守住 ${wins}/${runs}，胜时门剩 ${wins ? (100 * sum('hp') / wins).toFixed(1) + '%' : '—'}，每局换手 ${(sum('switches') / runs).toFixed(1)}，连换未打 ${sum('wasted')}/${sum('switches')}，未伤及目标 ${sum('misses')}/${sum('taps')}`);
       return results;
     }
@@ -109,5 +110,6 @@ function simulateBatch({ day, door, bows, rate, strategy, first, count, override
       }
     }
     await run(1, 0, 0, 4, 'sword');
+    for (const rate of [2, 4]) await run(1, 0, 0, rate, 'firstNight');
   } finally { await b.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

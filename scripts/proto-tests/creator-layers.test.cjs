@@ -3,7 +3,7 @@ const path = require('node:path');
 const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const { chromium } = require('playwright');
-const { OUT, ROOT } = require('./lib.cjs');
+const { OUT, ROOT, enableAllFeatures } = require('./lib.cjs');
 
 (async () => {
   const browser = await chromium.launch();
@@ -106,6 +106,7 @@ const { OUT, ROOT } = require('./lib.cjs');
     await editor.locator('#finish-look').click();
     await page.locator('#avatar-dialog').waitFor({state:'hidden'});
     await page.reload();
+    await enableAllFeatures(page);
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('wulin-loop')).look);
     assert.equal(saved.draw.baseExpr.h8,'happy');
     for (const k of ['hairFront','top','sleeve','bottom']) {
