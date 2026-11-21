@@ -13,10 +13,16 @@ describe('亲守五波的难度回归', () => {
     expect(manualRow(day, door, bows, 4, 'smart').wins).toBe(wins4);
   });
 
-  it('全开只用剑和带路首夜锁剑各用各自的本事池', () => {
+  it('全开首夜只用剑仍是原版难度', () => {
     expect(manualRow(1, 0, 0, 4, 'sword').wins).toBe(12);
-    expect(manualRow(1, 0, 0, 4, 'firstNight').wins).toBe(11);
   });
+
+  it.each([[1.5, 180], [2, 198], [3, 200], [4, 200]])(
+    '带路首夜每秒 %i 下，固定 200 局守住 %i 局', (rate, wins) => {
+      const r = manualRow(1, 0, 0, rate, 'firstNight', 200);
+      expect(r.wins).toBe(wins);
+      if (rate === 2) expect(100 * r.hpWhenWon!).toBeCloseTo(96.5, 1);
+    });
 });
 
 describe('零输入机关基线', () => {

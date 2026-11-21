@@ -71,7 +71,7 @@ export interface NightResult {
 }
 
 export interface NightState {
-  ruleVersion: typeof RULE_VERSION;
+  ruleVersion: 1 | typeof RULE_VERSION;
   seed: number;
   rngState: number;
   cosmeticSeedState: number;
@@ -195,7 +195,9 @@ export function startNight(house: House, person: Person, options: NightOptions):
 
 export function startWave(n: NightState, wave: number): void {
   if (n.over || wave !== n.wave + 1 || wave >= NIGHT.waves || (wave > 0 && !n.picking)) return;
-  const counts = waveCounts(n.d, wave);
+  // 旧版打到一半的快照继续使用原来的五波。
+  const swordOnly = n.ruleVersion >= 2 && !n.guardian && !n.advancedItems;
+  const counts = waveCounts(n.d, wave, swordOnly);
   const types = ghostTypes.flatMap(type => Array<GhostType>(counts[type]).fill(type));
   const draw = eventRng(n.seed, wave, 0);
   orderNightDeck(types, () => draw.next());

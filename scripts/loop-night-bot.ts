@@ -83,7 +83,8 @@ export function fight(n: NightState, trial: number, rate: number, strategy: Stra
 
 // 仅供离线实验。清完一波直接排下一波，不提交玩家操作、不抽取加成、不写入家产。
 export function trapsOnly(trial: Trial) {
-  const n = newTrial(trial, false);
+  // 机关基线使用完整敌阵，角色全程持剑、没有输入，也不领取波间本事。
+  const n = newTrial(trial);
   for (let tick = 0; !n.over && tick < STEP_LIMIT; tick++) {
     if (n.picking) startWave(n, n.wave + 1);
     else nightStep(n);

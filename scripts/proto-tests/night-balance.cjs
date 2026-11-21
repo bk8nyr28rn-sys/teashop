@@ -150,7 +150,7 @@ function simulateBatch({ day, door, bows, rate, strategy, first, count, override
       }
     }
     await run(1, 0, 0, 4, 'sword');
-    for (const rate of [2, 4]) await run(1, 0, 0, rate, 'firstNight');
+    for (const rate of [1.5, 2, 3, 4]) await run(1, 0, 0, rate, 'firstNight', 200);
     if (bot) console.log('逐局核对通过：胜负、门血、击杀、纸钱、换手和命中记录完全相同。');
   } finally { await b.close(); }
 })().catch(e => { console.error(e); process.exitCode = 1; });

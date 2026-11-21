@@ -53,6 +53,7 @@ export const NIGHT = {
   tap: 10, bowDmg: 12, bowCd: 1.4, allyDmg: 12,
   step: 0.05, waveDelay: 1.5, offerCount: 3, lossFraction: 0.3,
   counts: {
+    firstNightEvil: [3, 4, 6, 7, 9],
     evilBase: 3, evilPerDay: 0.4, extraEvery: 3,
     flyWave: 1, flyOffset: 1, shadeDay: 2, shadeWave: 3, shadeOffset: 3,
     armorLastWave: 4, armorDay: 3, armorWave: 2, armorOffset: 5,
@@ -90,8 +91,9 @@ export const NIGHT = {
 export const NIGHT_CONFIG = { DOORS, TRAPS, GHOSTS, MULT, PERKS, NIGHT } as const;
 
 // w 从零起算，最后一波的 w 是 4。不同鬼的增兵门槛与样机相同。
-export function waveCounts(d: number, w: number): Record<GhostType, number> {
+export function waveCounts(d: number, w: number, swordOnly = false): Record<GhostType, number> {
   const c = NIGHT.counts;
+  if (d === 1 && swordOnly) return { evil: c.firstNightEvil[w]!, fly: 0, shade: 0, armor: 0 };
   return {
     evil: c.evilBase + w + Math.floor(c.evilPerDay * (d - 1)),
     fly: w >= c.flyWave ? 1 + Math.floor((d + w - c.flyOffset) / c.extraEvery) : 0,

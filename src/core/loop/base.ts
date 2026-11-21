@@ -1,6 +1,6 @@
 import { Rng } from '../rng';
 
-export const RULE_VERSION = 1;
+export const RULE_VERSION = 2;
 export const CFG = {
   lifeDays: 5, dayStart: 360, dusk: 1080, hpMax: 3, bag: 6, bagBuddy: 3,
   buddyAt: 20, helpAt: 40,

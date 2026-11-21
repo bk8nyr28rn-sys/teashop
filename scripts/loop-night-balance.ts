@@ -13,7 +13,7 @@ for (const [day, cells] of [[1, [[0, 0]]], [3, [[0, 0], [1, 1]]],
   }
 }
 manual.push(manualRow(1, 0, 0, 4, 'sword'));
-for (const rate of [2, 4]) manual.push(manualRow(1, 0, 0, rate, 'firstNight'));
+for (const rate of [1.5, 2, 3, 4]) manual.push(manualRow(1, 0, 0, rate, 'firstNight', 200));
 
 const traps = [];
 for (let day = 1; day <= 5; day++) {

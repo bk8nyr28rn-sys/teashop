@@ -109,6 +109,11 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
     for (let i=0; i<29; i++) nightStep(.05);
     return G.day === 1 && N.bows.length === 2 && before - g.hp === 2 * NIGHT.bowDmg;
   }));
+  ok('回自家首夜即使有祖传弩机，五波也都只排普通鬼', await p.evaluate(() =>
+    G.own && !Guidance.open(2) && [3,4,6,7,9].every((count, w) => {
+      startWave(w);
+      return N.spawns.length === count && N.spawns.every(g => g.type === 'evil');
+    })));
   ok('no NaN', !(await p.evaluate(() => /NaN|undefined/.test(document.body.innerHTML.replace(/<script[\s\S]*<\/script>/, '')))));
   console.log('errors', errs);
   await b.close();

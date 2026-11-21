@@ -904,8 +904,9 @@ const GHOSTS = {
   armor: { name: '铁甲鬼', hp: 70, speed: 18, hit: 11, tag: ['甲', '#B8BFC9'] },
 };
 // 守夜的难度：一晚 5 波，守住一波挑一个本事；鬼的血按第几天、第几波变大
-const NIGHT = { waves: 5, spread: 3.5, hpPerDay: 0.2, hpPerWave: 0.06, hitPerDay: 0.12, tap: 10, bowDmg: 12, bowCd: 1.4, allyDmg: 12 };
-function waveCounts(d, w) {
+const NIGHT = { waves: 5, spread: 3.5, hpPerDay: 0.2, hpPerWave: 0.06, hitPerDay: 0.12, tap: 10, bowDmg: 12, bowCd: 1.4, allyDmg: 12, counts: { firstNightEvil: [3, 4, 6, 7, 9] } };
+function waveCounts(d, w, swordOnly = false) {
+  if (d === 1 && swordOnly) return { evil: NIGHT.counts.firstNightEvil[w], fly: 0, shade: 0, armor: 0 };
   return {
     evil: 3 + w + Math.floor(0.4 * (d - 1)),
     fly: w >= 1 ? 1 + Math.floor((d + w - 1) / 3) : 0,
@@ -1745,7 +1746,7 @@ function ownFamily(heir) {
 let N = null, raf = 0, gidN = 0;
 // 一波一波来：这一波清完才挑本事，挑完下一波才来
 function startWave(w) {
-  const c = waveCounts(N.d, w);
+  const c = waveCounts(N.d, w, !N.guardian && !Guidance.open(2));
   const types = Object.entries(c).flatMap(([t, n]) => Array(n).fill(t)).sort(() => Math.random() - 0.5);
   N.spawns = types.map((type, i) => ({ at: N.t + 1.5 + (i * NIGHT.spread) / types.length, type, wave: w, c }));
   N.wave = w;

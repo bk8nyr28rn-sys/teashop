@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyNightAction, ghostAt, ghostCenter, nearestGhost, nightStep, perkAvailable, revealed, startNight, tapMult, waveCounts,
+  applyNightAction, ghostAt, ghostCenter, nearestGhost, nightStep, perkAvailable, revealed, startNight, startWave, tapMult, waveCounts,
 } from '../../src/core/loop/night.js';
 import type { NightGhost, NightState } from '../../src/core/loop/night.js';
 import { DOORS, GHOSTS, MULT, PERKS, type GhostType, type PerkId } from '../../src/core/loop/night-config.js';
@@ -42,6 +42,32 @@ describe('五波、目标和动作', () => {
     expect(waveCounts(5, 4)).toEqual({ evil: 8, fly: 3, shade: 3, armor: 2 });
     expect(waveCounts(3, 2).armor).toBe(1);
     expect(waveCounts(2, 0).shade).toBe(1);
+  });
+
+  it('只有本世首日、工具未开放的亲守用教学敌阵，护家神仍按第五天出鬼', () => {
+    const firstNight = [3, 4, 6, 7, 9];
+    for (const day of [1, 2, 3, 4, 5]) {
+      const { house, person } = inputs({ day, door: 0, bows: 0 });
+      for (const advancedItems of [false, true]) for (const guardian of [false, true]) {
+        const night = startNight(house, person, { seed: 8, advancedItems, guardian });
+        for (const [wave, evil] of firstNight.entries()) {
+          if (wave > 0) { night.picking = true; startWave(night, wave); }
+          const counts = { evil: 0, fly: 0, shade: 0, armor: 0 };
+          for (const spawn of night.spawns) counts[spawn.type]++;
+          const expected = day === 1 && !advancedItems && !guardian
+            ? { evil, fly: 0, shade: 0, armor: 0 } : waveCounts(guardian ? 5 : day, wave);
+          expect(counts).toEqual(expected);
+        }
+      }
+    }
+  });
+
+  it('版本 1 的首夜快照接着打时保留原来的混合鬼群', () => {
+    const n = newTrial({ ...setup, day: 1 }, false);
+    n.ruleVersion = 1;
+    n.picking = true;
+    startWave(n, 1);
+    expect(n.spawns.filter(g => g.type === 'fly')).toHaveLength(1);
   });
 
   it('第一波在 1.5 秒开始并均匀排队，移动速度和血量按鬼种及天数计算', () => {
