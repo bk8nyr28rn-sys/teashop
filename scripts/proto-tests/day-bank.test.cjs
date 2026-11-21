@@ -46,9 +46,9 @@ async function checkCalendar(browser) {
     assert.equal(await page.evaluate(() => G.held), 1);
     const secondTab = await context.newPage();
     await secondTab.goto(url);
-    await secondTab.getByRole('button', { name: '开始下一天' }).click();
+    await sheet(secondTab).getByRole('button', { name: '天亮了', exact:true }).click();
     await page.locator('.day-bank', { hasText: '1 / 3' }).waitFor();
-    await Promise.all([page.waitForEvent('load'), page.getByRole('button', { name: '开始下一天' }).click()]);
+    await Promise.all([page.waitForEvent('load'), sheet(page).getByRole('button', { name: '天亮了', exact:true }).click()]);
     await secondTab.close();
     assert.deepEqual(await state(page), [2, 'home', 1, '2026-11-19']);
     await endLivingNight(page);

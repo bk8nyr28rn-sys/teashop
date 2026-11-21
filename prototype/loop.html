@@ -1053,7 +1053,7 @@ function freshLife(fam, prev) {
     parents: fam.parents || [{ name: surnameOf(fam.name) + '大郎', look: randomLook(), rel: '爹' }, { name: '娘', look: randomLook(), rel: '娘' }],
     spouse: null, love: 0, kids: [], ancestors: fam.ancestors || [], offered: false, own: !!fam.own,
     money: fam.money, door: fam.door, traps: { crossbow: fam.crossbow || 0, lamp: fam.lamp || 0, talisman: fam.talisman || 0 },
-    treasures: [...(fam.treasures || [])], store: {}, bag: [], at: 'home', buddy: null, target: null, item: 'sword',
+    treasures: [...(fam.treasures || [])], store: { ...fam.store }, bag: [], at: 'home', buddy: null, target: null, item: 'sword',
     friends: { ...fam.friends }, held: 0, broken: 0, earned: 0, kills: 0, deathKind: null, deathMsg: '', afterlife: null, reborn: null,
     history: prev ? [...prev.history] : [], look: ME,
   };
@@ -1195,6 +1195,11 @@ function renderWaiting(now = new Date()) {
   const mins = Math.ceil((midnight - now) / 60000);
   const first = G.phase === 'birth';
   if (!$('scene').querySelector('.waiting-yard')) $('scene').innerHTML = `<svg viewBox="0 0 360 300" class="stage waiting-yard" role="img" aria-label="等候天亮的院子">${homeSvg()}</svg>`;
+  if (G.nightReceipt) {
+    $('panel').innerHTML = '<button type="button" class="big main" data-a="receipt">查看这一晚的结果</button>';
+    bindActs({ receipt: () => showNightReceipt(G.nightReceipt) });
+    return;
+  }
   $('panel').innerHTML = `<div class="where"><b>${ready ? '可以天亮了' : '今天的日子过完了'}</b></div>
     <div class="plan">${ready ? `准备好了，就开始第 ${first ? 1 : G.day + 1} 天。` : `下一个现实日的 0 点再领 1 天，还有 ${Math.floor(mins / 60)} 小时 ${mins % 60} 分。`}<br>攒着的天：${G.bankedDays} / ${BANK_CAP}</div>
     <button type="button" class="big main" data-a="dawn"${ready ? '' : ' disabled'}>${first ? '开始新一世的第一天' : '开始下一天'}</button>`;
@@ -1257,11 +1262,9 @@ function homeSvg() {
   if (G.door >= 2) s += lanternSvg(136, 252) + lanternSvg(224, 252);
   if (G.door >= 3) s += lionSvg(120, 298) + lionSvg(240, 298, true);
   if (G.held) s += `<rect x="146" y="222" width="68" height="16" rx="2" fill="#2B2233"/><text x="180" y="234" text-anchor="middle" font-size="10" fill="#E3B341">守住 ${G.held} 夜</text>`;
-  if (Guidance.open(2)) {
-    [40, 320, 92, 268].slice(0, G.traps.crossbow).forEach((x) => { s += crossbowSvg(x, 246); });
-    if (G.traps.lamp) { s += `<path d="M0 250 Q90 262 150 252 M210 252 Q270 262 360 250" stroke="#3A2C26" fill="none"/>`; for (const x of [40, 90, 270, 320]) s += lanternSvg(x, 262, 5); }
-    for (let i = 0; i < G.traps.talisman; i++) s += talismanSvg(166 + i * 28, 272);
-  }
+  [40, 320, 92, 268].slice(0, G.traps.crossbow).forEach((x) => { s += crossbowSvg(x, 246); });
+  if (G.traps.lamp) { s += `<path d="M0 250 Q90 262 150 252 M210 252 Q270 262 360 250" stroke="#3A2C26" fill="none"/>`; for (const x of [40, 90, 270, 320]) s += lanternSvg(x, 262, 5); }
+  for (let i = 0; i < G.traps.talisman; i++) s += talismanSvg(166 + i * 28, 272);
   if (f > 0.75) s += `<rect width="360" height="300" fill="#1B2340" opacity="${(((f - 0.75) / 0.25) * 0.38).toFixed(2)}"/>`;
   return s;
 }
@@ -1282,7 +1285,7 @@ function renderHome() {
       ${left > 0 && !toWharf ? '<button type="button" class="big" data-a="river">到河埠走走</button>' : ''}
       ${G.river?.stone === 'yard' ? '<button type="button" class="big" data-a="place">摆放院石</button>' : ''}
       <button type="button" class="big" data-a="market">去集市卖货<small>仓库 ${storeCount()} 件，值 ${storeValue()} 文</small></button>
-      <button type="button" class="big" data-a="build">修院子<small>${DOORS[G.door].name}（门血 ${DOORS[G.door].hp}）${Guidance.open(2) ? trapSummary() : ''}</small></button>
+      <button type="button" class="big" data-a="build">修院子<small>${DOORS[G.door].name}（门血 ${DOORS[G.door].hp}）${trapSummary()}</small></button>
       ${Guidance.open(3) ? `<button type="button" class="big" data-a="family">家和祠堂<small>${familySummary()}</small></button>` : ''}
       ${Guidance.open(4) ? `<button type="button" class="big" data-a="friends">邻居和交情<small>${NEIGHBORS.map((n) => `${n.who} ${G.friends[n.id]}`).join(' · ')}</small></button>` : ''}
       ${canHeal ? `<button type="button" class="big" data-a="heal">用草药疗伤<small>体力 +1（仓库还有 ${G.store['草药']} 份）</small></button>` : ''}
@@ -1731,7 +1734,7 @@ function N_guard() { return G.phase === 'guard'; }
 function ownFamily(heir) {
   const t = threadName(ri([20, 60]));
   return {
-    own: true, name: G.fam, door: G.door, money: Math.floor(G.money * 0.6), crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
+    own: true, name: G.fam, door: G.door, money: G.money, store: { ...G.store }, crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
     treasures: G.treasures.slice(), thread: t,
     parents: [{ name: heir.name, look: heir.look, rel: heir.kind === '女' ? '娘（上一世你的女儿）' : heir.kind === '徒' ? '师父（上一世你的徒弟）' : '爹（上一世你的儿子）' }, { name: pick(SURNAMES) + '氏', look: randomLook(), rel: heir.kind === '女' ? '爹' : '娘' }],
     ancestors: [...G.ancestors, { name: G.name, look: { ...ME }, expression: playerExpression('calm'), note: `第 ${G.lifeNo} 世的你` }],
@@ -1791,9 +1794,9 @@ function startNight(guardian) {
   const d = guardian ? CFG.lifeDays : G.day;
   const doorMax = DOORS[G.door].hp;
   N = {
-    d, guardian, traps: Guidance.open(2) ? G.traps : {lamp:0, crossbow:0, talisman:0}, t: 0, door: doorMax, doorMax, ghosts: [], spawns: [], ally: null, helpUsed: false, names: [], kills: 0, coins: 0,
+    d, guardian, traps: G.traps, t: 0, door: doorMax, doorMax, ghosts: [], spawns: [], ally: null, helpUsed: false, names: [], kills: 0, coins: 0,
     pk: {}, offer: [], picking: false, rainCount: 0, burnT: 0,
-    over: false, wave: -1, lastHit: '', hintT: 0, bows: [[40, 410], [320, 410], [92, 410], [268, 410]].slice(0, Guidance.open(2) ? G.traps.crossbow : 0).map(([x, y], i) => ({ x, y, cd: 1 + i * 0.35 })),
+    over: false, wave: -1, lastHit: '', hintT: 0, bows: [[40, 410], [320, 410], [92, 410], [268, 410]].slice(0, G.traps.crossbow).map(([x, y], i) => ({ x, y, cd: 1 + i * 0.35 })),
     kid: guardian ? (G.kids[0] ? G.kids[0].look : randomLook()) : null,
     fam: familyHelpers(),
   };
@@ -2131,35 +2134,59 @@ function nightStep(dt) {
   if (!N.spawns.length && !N.ghosts.length) return N.wave >= NIGHT.waves - 1 ? endNight(true) : offerPerks();
 }
 function endNight(won) {
+  if (!N || N.over) return;
+  // 另一个标签页可能已经结算或天亮，旧战斗不能覆盖已写入的结果。
+  const stored = storedGame();
+  if (stored && (stored.day !== G.day || stored.lifeNo !== G.lifeNo || stored.phase !== G.phase || stored.nightReceipt)) {
+    N.over = true; cancelAnimationFrame(raf); location.reload(); return;
+  }
   N.over = true;
   cancelAnimationFrame(raf);
   if (!won) { N.door = 0; updateDoor(); }
   const names = [...new Set(N.names)].slice(0, 6).join('、');
-  let title, body;
+  const paragraphs = [];
   if (won) {
     Guidance.done('fight');
     G.money += N.coins; G.kills += N.kills;
     if (!N.guardian) G.held++;
-    title = '守住了！';
-    body = `<p>打散了 ${N.kills} 个鬼${N.coins ? `，捡到纸钱换了 ${N.coins} 文` : ''}。门还剩 ${Math.ceil(N.door)} / ${N.doorMax}。</p>`;
+    paragraphs.push(`打散了 ${N.kills} 个鬼${N.coins ? `，捡到纸钱换了 ${N.coins} 文` : ''}。门还剩 ${Math.ceil(N.door)} / ${N.doorMax}。`);
   } else {
     if (!N.guardian) G.broken++;
     const lost = Math.floor(G.money * 0.3);
     G.money -= lost;
     const parts = [`抢走了 ${lost} 文`];
-    if (G.treasures.length) { const t = G.treasures.splice(Math.floor(Math.random() * G.treasures.length), 1)[0]; parts.push(`宝物架上的<b>${t.n}</b>`); }
-    title = '门破了！';
-    body = `<p><b>${N.lastHit}</b>砸破了你家的${DOORS[G.door].name}，鬼冲进院子，${parts.join('，还有')}。</p>`;
+    if (G.treasures.length) { const t = G.treasures.splice(Math.floor(Math.random() * G.treasures.length), 1)[0]; parts.push(`宝物架上的${t.n}`); }
+    paragraphs.push(`${N.lastHit}砸破了你家的${DOORS[G.door].name}，鬼冲进院子，${parts.join('，还有')}。`);
   }
   const pks = Object.entries(N.pk).map(([k, n]) => PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、');
-  if (pks) body += `<p>今晚挑的本事：${pks}</p>`;
-  body += `<p class="note">今晚来砸门的：${names}……真游戏里，大部分是电脑鬼，偶尔会有死去的真人玩家变成的厉鬼。</p>`;
-  let next, label;
-  if (N.guardian) { G.afterlife = { kind: 'guard', won }; next = goReborn; label = '天亮了，去投胎'; body = `<p>${won ? '你显灵帮子孙守住了家门。' : '你没能护住子孙的家门。'}</p>` + body; }
-  else if (G.day >= CFG.lifeDays) { next = () => die('old', `${G.day} 天过去了，你老了。`); label = '天亮了……'; }
-  else { G.phase = 'dawn'; next = nextMorning; label = '天亮了'; }
+  if (pks) paragraphs.push(`今晚挑的本事：${pks}`);
+  paragraphs.push(`今晚来砸门的：${names}……真游戏里，大部分是电脑鬼，偶尔会有死去的真人玩家变成的厉鬼。`);
+  if (N.guardian) {
+    G.afterlife = { kind: 'guard', won };
+    paragraphs.unshift(won ? '你显灵帮子孙守住了家门。' : '你没能护住子孙的家门。');
+  }
+  const receipt = { won, paragraphs, next: N.guardian ? 'reborn' : G.day >= CFG.lifeDays ? 'old' : 'morning' };
+  G.nightReceipt = receipt; G.phase = 'dawn';
   save(); Guidance.update();
-  setTimeout(() => sheet({ title, body, buttons: [[label, next, 'main']], focusTitle:true }), won ? 300 : 700);
+  setTimeout(() => { if (G.nightReceipt === receipt) showNightReceipt(receipt); }, won ? 300 : 700);
+}
+function showNightReceipt(receipt) {
+  const label = { morning: '天亮了', old: '天亮了……', reborn: '天亮了，去投胎' }[receipt.next];
+  const proceed = () => {
+    const stored = storedGame();
+    if (stored && (!stored.nightReceipt || stored.day !== G.day || stored.lifeNo !== G.lifeNo || stored.nightReceipt.next !== receipt.next)) return location.reload();
+    delete G.nightReceipt;
+    if (receipt.next === 'old') die('old', `${G.day} 天过去了，你老了。`);
+    else if (receipt.next === 'reborn') goReborn();
+    else nextMorning();
+  };
+  sheet({ title: receipt.won ? '守住了！' : '门破了！', buttons: [[label, proceed, 'main']], focusTitle: true,
+    bind: el => receipt.paragraphs.forEach((text, i) => {
+      const p = document.createElement('p'); p.textContent = text;
+      if (i === receipt.paragraphs.length - 1) p.className = 'note';
+      el.querySelector('.sh-body').append(p);
+    }),
+  });
 }
 function nextMorning() {
   if (dawnAlreadyStarted(false)) return;
@@ -2328,6 +2355,9 @@ function goReborn() {
 }
 function renderReborn() {
   const R = G.reborn;
+  for (const f of R.fams) {
+    if (f.own && !f.store) { f.money = G.money; f.store = { ...G.store }; }
+  }
   // 旧存档在奈何桥只保存了第一个后人。保留已展示的家庭，只补齐另外的后人。
   const ownCount = R.fams.filter(f => f.own).length;
   const missing = G.kids.slice(ownCount, 3);
@@ -2340,7 +2370,7 @@ function renderReborn() {
     ${[70, 120, 180, 240, 290].map((x) => `<line x1="${x}" y1="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 - 12}" x2="${x}" y2="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 + 4}" stroke="#B49AB8" stroke-width="2"/>`).join('')}
     <text x="180" y="40" text-anchor="middle" font-size="18" fill="#E3B341" font-family="var(--font-display)">奈何桥</text>
     <g class="float">${ghostSvg(ME, 'calm', 'elder', 180, 112, 0.18)}</g></svg>`;
-  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? '院子、机关、宝物都还在；祠堂里挂着你的画像 · ' : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · ${f.money} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
+  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? '院子、机关、宝物都还在；祠堂里挂着你的画像 · ' : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · ${f.money + (loot ? 30 : 0)} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
   const loot = G.afterlife && G.afterlife.won && G.afterlife.loot;
   const keep = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt);
   $('panel').innerHTML = `<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>
@@ -2516,6 +2546,7 @@ Guidance.bind();
 if (G.phase === 'night' || G.phase === 'guard') startNight(G.phase === 'guard');
 else if (G.phase === 'haunt') startHaunt();
 else { if (G.phase === 'map' && G.bag == null) G.bag = []; render(); }
+if (G.phase === 'dawn' && G.nightReceipt) showNightReceipt(G.nightReceipt);
 window.addEventListener('focus', updateCalendar);
 window.addEventListener('storage', event => { if (event.key === 'wulin-loop') updateCalendar(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) updateCalendar(); });

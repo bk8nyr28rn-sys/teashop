@@ -36,7 +36,12 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   await p.evaluate(() => { SPEED = 3; });
   await p.waitForTimeout(2500);
   await p.screenshot({ path: path.join(OUT, 'loop', 'f3-night.png') });
-  await p.evaluate(() => { N.over = true; cancelAnimationFrame(raf); die('old', '测试。'); });
+  await p.evaluate(() => {
+    N.over = true; cancelAnimationFrame(raf);
+    River.enter(); G.river.stone = 'yard'; G.river.yardSlot = 2;
+    G.money = 100; G.store = {柴:3}; G.door = 1; G.traps = {crossbow:2,lamp:1,talisman:1};
+    G.treasures = [{n:'古玉',v:90}]; die('old', '测试。');
+  });
   await p.click('[data-a="skip"]');
   ok('own family offered first', await p.evaluate(() => G.reborn.fams[0].own === true));
   const heirs = await p.evaluate(() => G.kids.map(k => k.name));
@@ -51,11 +56,37 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   await p.reload();
   ok('old save gains its second heir and keeps existing candidates', await ownChoices.count() === 2 && await p.evaluate(original => JSON.stringify(G.reborn.fams.filter((_, i) => i !== 1)) === JSON.stringify(original), originalFamilies));
   const choices = await p.evaluate(() => G.reborn.fams);
+  const bridgeSave = await p.evaluate(() => JSON.parse(localStorage.getItem('wulin-loop')));
+  // 两个独立新标签各自载入同一份奈何桥旧档，用页面上的候选卡核对实收。
+  for (const [index, own] of [[0, true], [choices.findIndex(f => !f.own), false]]) {
+    const branch = await b.newPage({ viewport: { width: 320, height: 640 } });
+    try {
+      await branch.addInitScript(save => {
+        for (const f of save.reborn.fams.filter(f => f.own)) {
+          f.money = 60; delete f.store;
+        }
+        localStorage.setItem('wulin-loop', JSON.stringify(save));
+      }, bridgeSave);
+      await branch.goto('file://' + TMP);
+      const card = branch.locator('[data-fam="' + index + '"]');
+      const actualMoney = own ? 100 : choices[index].money;
+      ok('旧档候选卡金额与当前家庭一致', (await card.innerText()).includes(actualMoney + ' 文'));
+      await card.click();
+      const assets = await branch.evaluate(() => [G.money, G.store, G.parents[0].rel, G.own]);
+      ok(own ? '投回徒弟家，100 文和柴 3 件原样留下' : '投别家，只得该候选卡的家产', assets[0] === actualMoney &&
+        assets[3] === own && (own ? assets[1].柴 === 3 && assets[2].includes('上一世你的徒弟') : Object.keys(assets[1]).length === 0));
+    } finally { await branch.close(); }
+  }
   await p.reload();
   ok('heir choices persist on reload', await p.evaluate(saved => JSON.stringify(saved) === JSON.stringify(G.reborn.fams), choices));
   await p.screenshot({ path: path.join(OUT, 'loop', 'f4-reborn.png'), fullPage: true, animations: 'disabled' });
   const prevName = await p.evaluate(() => G.name);
+  ok('候选卡写明实收 100 文', (await ownChoices.nth(1).innerText()).includes('100 文'));
   await ownChoices.nth(1).click();
+  ok('回家钱、仓货、门、机关、宝物、院石全部保留', await p.evaluate(() =>
+    G.money === 100 && G.store.柴 === 3 && G.door === 1 && G.traps.crossbow === 2 &&
+    G.traps.lamp === 1 && G.traps.talisman === 1 && G.treasures[0].n === '古玉' &&
+    G.river.stone === 'yard' && G.river.yardSlot === 2));
   ok('second heir becomes the parent', await p.evaluate(name => G.own && G.lifeNo === 2 && G.parents[0].name === name && /上一世你的[儿女]/.test(G.parents[0].rel), heirs[1]));
   ok('ancestor portrait of past self', await p.evaluate((n) => G.ancestors.some((a) => a.name === n), prevName));
   await p.click('[data-a="family"]');
@@ -65,6 +96,19 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   await p.locator('#sheet .sh-btns button', { hasText: '去祠堂' }).click();
   ok('hall renders portraits', (await p.locator('.pt').count()) >= 1);
   await p.screenshot({ path: path.join(OUT, 'loop', 'f5-hall.png') });
+  await p.evaluate(() => { closeSheet(); G.allFeatures = false; save(); render(); });
+  await p.click('[data-a=build]');
+  ok('回自家第一天不显示买机关', await p.locator('[data-buy]').count() === 0);
+  await p.getByRole('button',{name:'回去',exact:true}).click();
+  await p.click('[data-a=night]');
+  ok('两台祖传弩机首夜各射一箭', await p.evaluate(() => {
+    cancelAnimationFrame(raf);
+    spawnGhost(N.spawns[0]); N.spawns = [];
+    const g = N.ghosts[0]; g.y = 230;
+    const before = g.hp;
+    for (let i=0; i<29; i++) nightStep(.05);
+    return G.day === 1 && N.bows.length === 2 && before - g.hp === 2 * NIGHT.bowDmg;
+  }));
   ok('no NaN', !(await p.evaluate(() => /NaN|undefined/.test(document.body.innerHTML.replace(/<script[\s\S]*<\/script>/, '')))));
   console.log('errors', errs);
   await b.close();

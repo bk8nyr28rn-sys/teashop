@@ -10,6 +10,7 @@
     "sync:draw": "node scripts/sync-shared-draw.mjs",
     "test:proto": "node scripts/proto-tests/run-all.cjs",
     "balance:night": "node scripts/proto-tests/night-balance.cjs",
+    "balance:loop": "tsx scripts/loop-night-balance.ts",
     "balance:haunt": "node scripts/proto-tests/haunt-balance.cjs"
   },
   "repository": {
