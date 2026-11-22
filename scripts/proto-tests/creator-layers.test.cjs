@@ -107,7 +107,7 @@ const { OUT, ROOT, enableAllFeatures } = require('./lib.cjs');
     await page.locator('#avatar-dialog').waitFor({state:'hidden'});
     await page.reload();
     await enableAllFeatures(page);
-    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('wulin-loop')).look);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('wulin-loop')).account.look);
     assert.equal(saved.draw.baseExpr.h8,'happy');
     for (const k of ['hairFront','top','sleeve','bottom']) {
       assert.ok(saved.draw[k].length > 0 && saved.draw.customOnly[k]);
@@ -123,10 +123,10 @@ const { OUT, ROOT, enableAllFeatures } = require('./lib.cjs');
     await top(); await snap('home');
     await page.locator('#show-expressions').click(); await snap('expressions');
     await page.locator('[data-expression="h8"]').click();
-    await page.evaluate(() => {
-      G.day=3; G.time=CFG.dusk;
+    await page.evaluate(async () => {
+      G.phase='home'; G.day=3; G.time=CFG.dusk;
       G.kids.push({name:'林小青',kind:'徒',look:randomLook(),grade:'良才',power:1.05});
-      startNight(false); cancelAnimationFrame(raf);
+      save(); await startNight(false); cancelAnimationFrame(raf);
       for(let i=0;i<90;i++) nightStep(.05);
     });
     assert.ok(await page.locator('#nplayer [data-draw-layer="top"]').count());

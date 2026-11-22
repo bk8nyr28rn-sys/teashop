@@ -10,6 +10,7 @@ const { wrap } = require('./lib.cjs');
     await page.goto(pathToFileURL(wrap('loop')).href);
     await page.getByRole('button', { name: '开始', exact: true }).click();
     await page.locator('[data-a=night]').click();
+    await page.locator('[data-item]').first().waitFor();
     assert.equal(await page.locator('[data-item]').count(), 1);
 
     // 只加速等待和出剑，实际出怪、页面挑本事和第五波结算均走游戏入口。
@@ -28,6 +29,7 @@ const { wrap } = require('./lib.cjs');
       if (wave < 4) await page.locator('#sheet .perk').first().click();
     }
     await page.getByRole('button', { name: '天亮了', exact: true }).click();
+    await page.waitForFunction(() => G.day === 2);
     assert.deepEqual(await page.evaluate(() => [G.day, G.kills, G.held]), [2, 29, 1]);
     console.log('PASS 带路首夜五波实际出生 3、4、6、7、9 只普通鬼，挑完四次本事后自然天亮');
   } finally {

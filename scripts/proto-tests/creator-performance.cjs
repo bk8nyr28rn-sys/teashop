@@ -22,8 +22,8 @@ const { OUT, wrap } = require('./lib.cjs');
         const result = await page.evaluate(async code => {
           const sample = validatedLook(decode(code));
           const start = performance.now();
-          G = freshLife(FIRST_FAMILY, null);
-          G.allFeatures = true; G.item = 'lamp'; startNight(false); N.spawns = [];
+          G.phase = 'home'; G.nightPlan = null;
+          G.allFeatures = true; G.item = 'lamp'; save(); await startNight(false); N.spawns = [];
           for (let i = 0; i < 10; i++) {
             spawnGhost({type: 'armor', wave: 0});
             const g = N.ghosts.at(-1);

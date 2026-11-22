@@ -5,6 +5,8 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="../../../assets/fonts/prototype.css">
 <script src="../../../assets/avatar.js"></script>
+<script src="../../../assets/loop-core.js"></script>
+<script src="../../../assets/loop-storage.js"></script>
 <link rel="stylesheet" href="../../../assets/riverside.css">
 <script src="../../../assets/riverside.js"></script>
 <link rel="stylesheet" href="../../../assets/guidance.css">
@@ -52,6 +54,7 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .bank-toggle { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--bg); cursor: pointer; }
 .bank-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
 .hud-r { display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wallets { display: grid; gap: 1px; font-size: 12px; line-height: 1.3; }
 .hp { display: inline-flex; gap: 3px; }
 .hp i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--seal); }
 .hp i.on { background: var(--seal); }
@@ -124,6 +127,16 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .market-stock li > div { flex: 1; }
 .market-stock small { display: block; color: var(--muted); }
 .market-stock button { min-height: 40px; white-space: nowrap; }
+.market-owner { display: grid; gap: 6px; }
+.market-owner + .market-owner { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 10px; }
+.market-owner h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin: 0; font-size: 16px; }
+.market-owner h3 span { font-size: 12px; font-weight: 400; color: var(--muted); }
+.market-owner .mini { min-height: 36px; }
+.market-owner .market-bulk { justify-self: start; }
+.market-transfer { border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; }
+.market-transfer summary { cursor: pointer; }
+.market-transfer label { display: inline-flex; align-items: center; gap: 4px; margin: 6px 4px 0 0; }
+.market-transfer input { width: 4.5em; padding: 4px; }
 .buddy-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .buddy-compare section { padding: 10px 12px; border-radius: 12px; background: var(--bg); }
 .buddy-compare h3 { margin: 0; color: var(--accent); font-size: 16px; }
@@ -872,7 +885,7 @@ const SPOTS = [
   return { ...sp, id, x: 180 + RINGS[sp.ring].r * Math.cos(angle), y: 180 + RINGS[sp.ring].r * Math.sin(angle) };
 });
 const HOME = { name: '家', x: 180, y: 180 };
-const GOODS = { 柴: 3, 时蔬: 5, 草药: 6, 兽皮: 14, 铁矿: 18, 古物: 40 };
+const GOODS = LoopCore.GOODS;
 const TREASURES = [['古玉', 90], ['夜明珠', 140], ['青铜剑', 110], ['金步摇', 120], ['玉玺残片', 160], ['夜行衣', 80]];
 const TREASURE_COLOR = { 古玉: '#7FC8A9', 夜明珠: '#DDEBFF', 青铜剑: '#6E9E8C', 金步摇: '#E3B341', 玉玺残片: '#C9E3D3', 夜行衣: '#3A3F55' };
 
@@ -1001,12 +1014,25 @@ function ghostSvg(s, expr, age, x, y, k) {
 
 // ---------------- 存档 ----------------
 let G = null;
-const BANK_CAP = 3;
+const BANK_CAP = LoopCore.BANK_CAP;
+const withGameLock = LoopStorage.exclusive;
+let observedRevision = null;
 function localDateKey(now = new Date()) {
   return [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'), String(now.getDate()).padStart(2, '0')].join('-');
 }
-function storedGame() {
-  try { return JSON.parse(localStorage.getItem('wulin-loop')); } catch { return null; }
+function storedGame(raw = LoopStorage.read()) {
+  const archive = LoopCore.migrateSave(raw, localDateKey());
+  return archive && LoopCore.toView(archive);
+}
+function adoptStoredGame() {
+  const raw = LoopStorage.read();
+  const view = storedGame(raw);
+  if (view) {
+    G = view;
+    observedRevision = raw.revision ?? null;
+    observedBank = JSON.stringify(bankFields(G));
+  }
+  return view;
 }
 function bankFields(game) {
   return { bankedDays: game.bankedDays, lastGrantDate: game.lastGrantDate, unlimitedDays: game.unlimitedDays };
@@ -1014,29 +1040,20 @@ function bankFields(game) {
 let observedBank = '';
 // 旧标签页的普通存档也要带上别处刚领到或用掉的天。
 function pullBank(stored) {
-  if (stored?.v !== 3 || !Number.isInteger(stored.bankedDays) || !stored.lastGrantDate) return;
+  if (!stored || !Number.isInteger(stored.bankedDays) || !stored.lastGrantDate) return;
   const bank = bankFields(stored), snapshot = JSON.stringify(bank);
   if (snapshot !== observedBank) { Object.assign(G, bank); observedBank = snapshot; }
 }
 function accrueDays(now = new Date()) {
-  const today = localDateKey(now);
-  // 先取本地年月日，再按日历日相减；夏令时的 23 / 25 小时同样算一天。
-  const days = (Date.parse(today + 'T00:00:00Z') - Date.parse(G.lastGrantDate + 'T00:00:00Z')) / 86400000;
-  if (days <= 0 || !Number.isFinite(days)) return false;
-  G.bankedDays = Math.min(BANK_CAP, G.bankedDays + days);
-  G.lastGrantDate = today;
-  return true;
+  return LoopCore.accrueDays(G, localDateKey(now));
 }
 function spendDawn() {
-  pullBank(storedGame()); accrueDays();
-  if (G.unlimitedDays) return true;
-  if (G.bankedDays === 0) return false;
-  G.bankedDays--;
-  return true;
+  pullBank(storedGame());
+  return LoopCore.spendDawn(G, localDateKey());
 }
 function dawnAlreadyStarted(first) {
   const stored = storedGame();
-  if (stored?.v !== 3) return false;
+  if (!stored) return false;
   const later = stored.lifeNo > G.lifeNo || (stored.lifeNo === G.lifeNo && stored.day > G.day);
   const sameFirstDay = first && stored.lifeNo === G.lifeNo && stored.day === G.day && !['intro', 'birth'].includes(stored.phase);
   if (!later && !sameFirstDay) return false;
@@ -1046,22 +1063,40 @@ function dawnAlreadyStarted(first) {
 }
 const FIRST_FAMILY = { name: '林家', money: 20, door: 0, treasures: [], friends: { wang: 26, li: 8, zhao: 0 }, thread: '知己' };
 function freshLife(fam, prev) {
-  return {
-    v: 3, ...(prev ? bankFields(prev) : { bankedDays: BANK_CAP, lastGrantDate: localDateKey(), unlimitedDays: false }),
+  const life = {
+    v: 4, ...(prev ? bankFields(prev) : { ...LoopCore.makeDayBank(localDateKey()), worldId: LoopStorage.revision() }),
     guideSeen: prev?.guideSeen || [], guideOff: !!prev?.guideOff, allFeatures: !!prev?.allFeatures,
     lifeNo: prev ? prev.lifeNo + 1 : 1, fam: fam.name, thread: fam.thread, phase: prev ? 'birth' : 'intro', day: 1, time: CFG.dayStart, hp: CFG.hpMax,
     name: surnameOf(fam.name) + pick(GIVEN_ME), grade: GRADES[fam.thread][0], power: GRADES[fam.thread][1],
     parents: fam.parents || [{ name: surnameOf(fam.name) + '大郎', look: randomLook(), rel: '爹' }, { name: '娘', look: randomLook(), rel: '娘' }],
     spouse: null, love: 0, kids: [], ancestors: fam.ancestors || [], offered: false, own: !!fam.own,
-    money: fam.money, door: fam.door, traps: { crossbow: fam.crossbow || 0, lamp: fam.lamp || 0, talisman: fam.talisman || 0 },
+    chest: fam.money, purse: 0, goods: {}, personalTreasures: [], door: fam.door, traps: { crossbow: fam.crossbow || 0, lamp: fam.lamp || 0, talisman: fam.talisman || 0 },
     treasures: [...(fam.treasures || [])], store: { ...fam.store }, bag: [], at: 'home', buddy: null, target: null, item: 'sword',
     friends: { ...fam.friends }, held: 0, broken: 0, earned: 0, kills: 0, deathKind: null, deathMsg: '', afterlife: null, reborn: null,
     history: prev ? [...prev.history] : [], look: ME,
   };
+  return prev ? life : LoopCore.toView(LoopCore.fromView(life));
 }
-function writeGame(game) {
-  localStorage.setItem('wulin-loop', JSON.stringify(game));
+function writeGame(game, reset = false) {
+  const expected = observedRevision;
+  const archive = LoopCore.fromView(game);
+  archive.revision = LoopStorage.revision();
+  const result = LoopStorage.write(archive, expected, () => location.reload(), reset);
+  if (result === false) return false;
+  observedRevision = archive.revision;
   observedBank = JSON.stringify(bankFields(game));
+  return result;
+}
+function saveError() { toast('存档写入失败，请检查浏览器存储后重试。'); }
+function persistGuideSeen() {
+  if (!LoopStorage.read()) { save(); return; }
+  const seen = G.guideSeen.slice();
+  LoopStorage.updateAccount(account => {
+    const merged = [...new Set([...(account.guideSeen || []), ...seen])];
+    if (merged.length === account.guideSeen?.length) return false;
+    account.guideSeen = merged;
+    return true;
+  }).catch(saveError);
 }
 function save() {
   try {
@@ -1069,18 +1104,13 @@ function save() {
     pullBank(stored); accrueDays();
     if (stored?.lifeNo === G.lifeNo && stored.guideSeen?.length)
       G.guideSeen = [...new Set([...(G.guideSeen || []), ...stored.guideSeen])];
-    writeGame(G);
-  } catch {}
+    const result = writeGame(G);
+    if (result instanceof Promise) result.catch(saveError);
+    return result;
+  } catch { saveError(); return false; }
 }
 function loadGame() {
-  const o = storedGame();
-  if (!o || ![2, 3].includes(o.v)) return null;
-  o.v = 3;
-  o.bankedDays = Number.isInteger(o.bankedDays) ? clamp(o.bankedDays, 0, BANK_CAP) : BANK_CAP;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(o.lastGrantDate) || !Number.isFinite(Date.parse(o.lastGrantDate))) o.lastGrantDate = localDateKey();
-  o.unlimitedDays = o.unlimitedDays === true;
-  observedBank = JSON.stringify(bankFields(o));
-  return o;
+  return adoptStoredGame();
 }
 
 // ---------------- 小工具 ----------------
@@ -1090,8 +1120,7 @@ function hm(m) { m = Math.max(0, Math.round(m)); return `${Math.floor(m / 60)}:$
 function dur(m) { m = Math.max(0, Math.round(m)); const h = Math.floor(m / 60), r = m % 60; return h ? (r ? `${h} 小时 ${r} 分` : `${h} 小时`) : `${r} 分`; }
 function dayFrac() { return clamp((G.time - CFG.dayStart) / (CFG.dusk - CFG.dayStart), 0, 1); }
 function bagCap() { return CFG.bag + (G.buddy ? CFG.bagBuddy : 0); }
-function storeCount() { return Object.values(G.store).reduce((a, n) => a + n, 0); }
-function storeValue() { return Object.entries(G.store).reduce((a, [k, n]) => a + GOODS[k] * n, 0); }
+function storeCount(stock = G.store) { return Object.values(stock).reduce((a, n) => a + n, 0); }
 function posOf(at) { return at === 'home' ? HOME : SPOTS[at]; }
 function walkMin(a, b) {
   const p = posOf(a), q = posOf(b);
@@ -1165,7 +1194,7 @@ function renderHud() {
   const ghostly = ['death', 'haunt', 'reborn', 'guard'].includes(G.phase);
   const age = ageOf(G.day);
   $('hud').innerHTML = `<div class="hud-l"><b>${G.phase === 'guard' ? '护家神' : G.phase === 'haunt' ? '厉鬼' : ghostly ? '阴间' : `第 ${G.day} 天`}</b><span>${ghostly ? `第 ${G.lifeNo} 世走完了` : `${G.name} · ${AGE_NAME[age]} · 第 ${G.lifeNo} 世`}</span><span class="day-bank">攒着的天：${G.bankedDays} / ${BANK_CAP}</span></div>
-    <div class="hud-r">${ghostly ? '' : `<span class="hp" role="img" aria-label="体力 ${G.hp} / ${CFG.hpMax}">${'<i class="on"></i>'.repeat(Math.max(0, G.hp))}${'<i></i>'.repeat(Math.max(0, CFG.hpMax - G.hp))}</span><span>${G.money} 文</span>${Guidance.open(3) || G.treasures.length ? `<span>宝物 ${G.treasures.length}</span>` : ''}`}<button type="button" class="icon" id="menu">设置</button></div>`;
+    <div class="hud-r">${ghostly ? '' : `<span class="hp" role="img" aria-label="体力 ${G.hp} / ${CFG.hpMax}">${'<i class="on"></i>'.repeat(Math.max(0, G.hp))}${'<i></i>'.repeat(Math.max(0, CFG.hpMax - G.hp))}</span><span class="wallets"><span>钱箱 ${G.chest} 文</span><span>钱袋 ${G.purse} 文</span></span>`}<button type="button" class="icon" id="menu">设置</button></div>`;
   if (Guidance.open(4)) {
     const expressions = document.createElement('button');
     expressions.type = 'button'; expressions.className = 'icon'; expressions.id = 'show-expressions';
@@ -1219,7 +1248,8 @@ function updateCalendar() {
   pullBank(stored);
   if (accrueDays() && stored) {
     // 跨零点时只更新余额，保留另一标签页已写入的游戏进度。
-    try { writeGame({ ...stored, ...bankFields(G) }); } catch {}
+    const today = localDateKey();
+    LoopStorage.updateAccount(account => LoopCore.accrueDays(account, today)).catch(saveError);
   }
   if (before !== JSON.stringify(bankFields(G))) renderHud();
   if (G.phase === 'dawn' || G.phase === 'birth') renderWaiting();
@@ -1279,94 +1309,170 @@ function renderHome() {
     return;
   }
   const toWharf = !Guidance.open(2) || River.firstVisit();
-  const canHeal = G.hp < CFG.hpMax && (G.store['草药'] || 0) > 0;
+  const canHeal = G.hp < CFG.hpMax && (G.goods.草药 > 0 || G.store.草药 > 0);
   $('panel').innerHTML = `${clockHtml()}
     <div class="acts">
       ${left > 0 ? `<button type="button" class="big" data-a="out">${toWharf ? '出门 · 去河埠' : '出门找东西'}<small>${toWharf ? '推开家门，沿河走走' : '越远东西越好，也越危险。天黑前要回来'}</small></button>` : ''}
       ${left > 0 && !toWharf ? '<button type="button" class="big" data-a="river">到河埠走走</button>' : ''}
       ${G.river?.stone === 'yard' ? '<button type="button" class="big" data-a="place">摆放院石</button>' : ''}
-      <button type="button" class="big" data-a="market">去集市卖货<small>仓库 ${storeCount()} 件，值 ${storeValue()} 文</small></button>
+      <button type="button" class="big" data-a="market">去集市卖货<small>我的 ${storeCount(G.goods) + G.personalTreasures.length} 件 · 家里的 ${storeCount() + G.treasures.length} 件</small></button>
       <button type="button" class="big" data-a="build">修院子<small>${DOORS[G.door].name}（门血 ${DOORS[G.door].hp}）${trapSummary()}</small></button>
       ${Guidance.open(3) ? `<button type="button" class="big" data-a="family">家和祠堂<small>${familySummary()}</small></button>` : ''}
       ${Guidance.open(4) ? `<button type="button" class="big" data-a="friends">邻居和交情<small>${NEIGHBORS.map((n) => `${n.who} ${G.friends[n.id]}`).join(' · ')}</small></button>` : ''}
-      ${canHeal ? `<button type="button" class="big" data-a="heal">用草药疗伤<small>体力 +1（仓库还有 ${G.store['草药']} 份）</small></button>` : ''}
+      ${canHeal ? `<button type="button" class="big" data-a="heal">用草药疗伤<small>体力 +1 · 用${G.goods.草药 ? '自己的' : '仓库的'}草药</small></button>` : ''}
       <button type="button" class="big ${left > 0 ? 'ghosty' : 'main'}" data-a="night">${left > 0 ? '在家歇到天黑' : '天黑了，去守夜'}<small>${left > 0 ? `还有 ${dur(left)} 天黑，鬼会来砸门` : '鬼要来砸门了'}</small></button>
     </div>`;
   bindActs({ out: () => askBuddy(toWharf), river: () => askBuddy(true), place: River.placeStone, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, heal, night: () => { G.time = Math.max(G.time, CFG.dusk); startNight(false); } });
 }
-function heal() { Guidance.done('heal'); G.store['草药']--; G.hp = Math.min(CFG.hpMax, G.hp + 1); save(); render(); toast('敷了草药，体力 +1'); }
+function heal() {
+  if (G.hp >= CFG.hpMax) return;
+  const owner = LoopCore.useHerb(G, G);
+  if (!owner) return;
+  Guidance.done('heal');
+  G.hp++;
+  save(); render();
+  toast(`用了${owner === 'person' ? '自己的' : '仓库的'}草药，体力 +1`);
+}
+
+function marketSection(owner) {
+  const mine = owner === 'person';
+  const stock = mine ? G.goods : G.store, treasures = mine ? G.personalTreasures : G.treasures;
+  const goods = Object.entries(stock).filter(([, n]) => n > 0);
+  const pocket = mine ? '钱袋' : '钱箱';
+  const rows = goods.map(([kind, n]) => `<li data-good-kind="${kind}"><div><b>${kind} ×${n}</b><small>每件 ${GOODS[kind]} 文 · 共 ${GOODS[kind] * n} 文</small></div>
+    <button type="button" class="mini" data-quantity="one" aria-label="卖 1 件${kind}">卖 1 件</button>
+    <button type="button" class="mini" data-quantity="all" aria-label="全卖${kind}">全卖</button></li>`).join('');
+  const valuableRows = treasures.map((t, i) => `<li><b>${t.n}</b><span>${t.v} 文</span>
+    ${mine ? `<button type="button" class="mini" data-shelve="${i}">上架</button>` : ''}
+    <button type="button" class="mini" data-sell="${i}">卖掉</button></li>`).join('');
+  return `<section class="market-owner" data-owner="${owner}" aria-label="${mine ? '我的' : '家里的'}">
+    <h3>${mine ? '我的' : '家里的'}<span>卖了进${pocket} · 现有 ${mine ? G.purse : G.chest} 文</span></h3>
+    ${rows ? `<ul class="list market-stock">${rows}</ul>` : ''}
+    ${rows ? `<button type="button" class="mini market-bulk" data-sell-all>普通货全卖了（+${LoopCore.goodsValue(stock)} 文）</button>` : ''}
+    ${valuableRows ? `<small>${mine ? '我的宝物' : '宝物架'}</small><ul class="list">${valuableRows}</ul>` : ''}
+    ${!rows && !valuableRows ? `<small class="note">${mine ? '手里还没有货。' : '仓库和宝物架都空着。'}</small>` : ''}</section>`;
+}
 
 function openMarket() {
-  const goods = Object.entries(G.store).filter(([, n]) => n > 0);
-  const rows = goods.map(([k, n]) => `<li data-good-kind="${k}"><div><b>${k} ×${n}</b><small>每件 ${GOODS[k]} 文 · 共 ${GOODS[k] * n} 文</small></div>
-    <button type="button" class="mini" data-quantity="one" aria-label="卖 1 件${k}">卖 1 件</button>
-    <button type="button" class="mini" data-quantity="all" aria-label="全卖${k}">全卖</button></li>`).join('') || '<li class="note">仓库是空的。出门找点东西回来吧。</li>';
-  const tre = G.treasures.map((t, i) => `<li>${t.n}<span>${t.v} 文</span><button type="button" class="mini" data-sell="${i}">卖掉</button></li>`).join('');
+  const hasThings = storeCount(G.goods) + G.personalTreasures.length > 0;
+  const transfer = (hasThings || G.purse) ? `<details class="market-transfer"><summary>放进家里</summary>
+    <small class="note">存进家里就归全家，钱箱只能花在家上。</small>
+    ${hasThings ? '<p><button type="button" class="mini" data-store-all>物品全归家（货进仓库，宝物上架）</button></p>' : ''}
+    ${G.purse ? `<label>存钱<input id="deposit-amount" type="number" inputmode="numeric" min="1" max="${G.purse}" step="1" value="${G.purse}">文</label><button type="button" class="mini" data-deposit>放进钱箱</button>` : ''}</details>` : '';
   sheet({
     title: '集市', dismiss: true,
-    body: `${River.marketGreeting()}<ul class="list market-stock">${rows}</ul>${tre ? `<div class="sub">宝物架</div><p class="note">宝物摆在家里更有面子，但夜里门被砸破，可能被鬼抢走。</p><ul class="list">${tre}</ul>` : ''}`,
-    buttons: [[`货全卖了（+${storeValue()} 文）`, sellAll, 'main', !goods.length], ['回去', null]],
+    body: River.marketGreeting() + marketSection('person') + marketSection('house') + transfer,
+    buttons: [['回去', null]],
     bind: (el) => {
-      el.querySelectorAll('[data-quantity]').forEach((button) => {
-        button.onclick = () => sellGoods(button.closest('[data-good-kind]').dataset.goodKind, button.dataset.quantity);
-      });
-      el.querySelectorAll('[data-sell]').forEach((b) => { b.onclick = () => { const t = G.treasures.splice(+b.dataset.sell, 1)[0]; G.money += t.v; G.earned += t.v; save(); render(); toast(`卖了${t.n}，+${t.v} 文`); openMarket(); }; });
+      for (const section of el.querySelectorAll('[data-owner]')) {
+        const owner = section.dataset.owner;
+        section.querySelectorAll('[data-quantity]').forEach(b => {
+          b.onclick = () => sellGoods(owner, b.closest('[data-good-kind]').dataset.goodKind, b.dataset.quantity);
+        });
+        const bulk = section.querySelector('[data-sell-all]');
+        if (bulk) bulk.onclick = () => sellAll(owner);
+        section.querySelectorAll('[data-sell]').forEach(b => {
+          b.onclick = () => {
+            const item = LoopCore.sellTreasure(G, G, owner, Number(b.dataset.sell));
+            if (item) sold(owner, item.v, item.n);
+          };
+        });
+        section.querySelectorAll('[data-shelve]').forEach(b => {
+          b.onclick = () => {
+            if (LoopCore.shelveTreasure(G, G, Number(b.dataset.shelve))) refreshMarket('已摆上家里的宝物架');
+          };
+        });
+      }
+      const store = el.querySelector('[data-store-all]');
+      if (store) store.onclick = () => {
+        LoopCore.storeBelongings(G, G);
+        refreshMarket('货已进仓，宝物已上架');
+      };
+      const deposit = el.querySelector('[data-deposit]');
+      if (deposit) deposit.onclick = () => {
+        const input = el.querySelector('#deposit-amount'), n = input.valueAsNumber;
+        if (!LoopCore.depositCoins(G, G, n)) { input.focus(); toast('请输入钱袋里够付的整文数'); return; }
+        refreshMarket(`钱袋里的 ${n} 文已放进钱箱`);
+      };
     },
   });
-  Guidance.speak('仓里的货可以一件件卖，舍不得的就留着。', true);
+  Guidance.speak('货可以一件件卖，也能全卖。', true);
 }
-function sellGoods(kind, quantity) {
-  const stock = G.store[kind];
-  if (!stock) return;
+
+function refreshMarket(message) { save(); render(); openMarket(); toast(message); }
+
+function sold(owner, value, label) {
+  if (!value) return;
   Guidance.done('sell'); G.guideSoldDay = G.day;
-  const count = quantity === 'all' ? stock : 1;
-  if (count === stock) delete G.store[kind];
-  else G.store[kind] -= count;
-  const value = GOODS[kind] * count;
-  G.money += value; G.earned += value;
-  save(); render(); openMarket();
-  const next = $('sheet').querySelector(`[data-good-kind="${kind}"] [data-quantity="one"]`)
-    || $('sheet').querySelector('.sh-btns button:last-child');
-  next.focus({ preventScroll: true });
-  toast(`卖了${kind} ×${count}，+${value} 文`);
+  G.earned += value;
+  refreshMarket(`卖了${label}，${owner === 'person' ? '钱袋' : '钱箱'} +${value} 文`);
 }
-function sellAll() { Guidance.done('sell'); G.guideSoldDay = G.day; const v = storeValue(); G.money += v; G.earned += v; G.store = {}; save(); render(); toast(`卖了 ${v} 文`); }
+
+function sellGoods(owner, kind, quantity) {
+  const value = LoopCore.sellOrdinary(G, G, owner, kind, quantity === 'all' ? 'all' : 1);
+  sold(owner, value, `${kind} ×${value / GOODS[kind]}`);
+  $('sheet').querySelector(`[data-owner="${owner}"] [data-good-kind="${kind}"] [data-quantity="one"]`)?.focus({preventScroll: true});
+}
+
+function sellAll(owner) { sold(owner, LoopCore.sellAllOrdinary(G, G, owner), '普通货'); }
+
+function paymentText({chest, purse, shortfall}) {
+  return `钱箱 ${chest} 文 + 钱袋 ${purse} 文${shortfall ? `，还差 ${shortfall} 文` : ''}`;
+}
 
 function openBuild() {
   const next = DOORS[G.door + 1];
-  const trapRows = Object.entries(TRAPS).map(([k, t]) => `<li><div><b>${t.name}</b> ${G.traps[k]}/${t.max}<br><small class="note">${t.desc}</small></div><span></span><button type="button" class="mini" data-buy="${k}"${G.traps[k] >= t.max || G.money < t.cost ? ' disabled' : ''}>${G.traps[k] >= t.max ? '满了' : `买 ${t.cost} 文`}</button></li>`).join('');
+  const doorQuote = next && LoopCore.quoteHome(G, G, next.cost);
+  const trapRows = Object.entries(TRAPS).map(([key, trap]) => {
+    const quote = LoopCore.quoteHome(G, G, trap.cost), full = G.traps[key] >= trap.max;
+    return `<li><div><b>${trap.name}</b> ${G.traps[key]}/${trap.max}<br><small class="note">${trap.desc}${full ? '' : `<br>${paymentText(quote)}`}</small></div><span></span><button type="button" class="mini" data-buy="${key}"${full || quote.shortfall ? ' disabled' : ''}>${full ? '满了' : `买 ${trap.cost} 文`}</button></li>`;
+  }).join('');
   sheet({
     title: '修院子', dismiss: true,
     body: `<p>现在是<b>${DOORS[G.door].name}</b>，门血 ${DOORS[G.door].hp}。</p>
-      ${next ? `<button type="button" class="big${G.money >= next.cost ? ' main' : ''}" id="up-door"${G.money < next.cost ? ' disabled' : ''}>换成${next.name}<small>门血 ${next.hp} · ${next.cost} 文</small></button>` : '<p class="note">已经是最气派的门了。</p>'}
-      ${Guidance.open(2) ? `<div class="sub">机关</div><ul class="list">${trapRows}</ul>
-      <p class="note">院子越修越气派：灯笼、石狮子、护院大阵都会画出来，路过的人都能看到。</p>` : ''}`,
+      ${next ? `<button type="button" class="big${doorQuote.shortfall ? '' : ' main'}" id="up-door"${doorQuote.shortfall ? ' disabled' : ''}>换成${next.name}（${next.cost} 文）<small>门血 ${next.hp} · ${paymentText(doorQuote)}</small></button>` : '<p class="note">已经是最气派的门了。</p>'}
+      ${Guidance.open(2) ? `<div class="sub">机关</div><ul class="list">${trapRows}</ul>` : ''}`,
     buttons: [['回去', null]],
     bind: (el) => {
       const up = el.querySelector('#up-door');
-      if (up) up.onclick = () => { Guidance.done('door'); G.money -= next.cost; G.door++; save(); render(); toast(`换成了${next.name}`); openBuild(); };
-      el.querySelectorAll('[data-buy]').forEach((b) => { b.onclick = () => { const t = TRAPS[b.dataset.buy]; G.money -= t.cost; G.traps[b.dataset.buy]++; save(); render(); toast(`装了${t.name}`); openBuild(); }; });
+      if (up) up.onclick = () => {
+        if (next !== DOORS[G.door + 1]) return;
+        const payment = LoopCore.payHome(G, G, next.cost);
+        if (!payment) return;
+        Guidance.done('door'); G.door++;
+        save(); render(); openBuild(); toast(`换成了${next.name}，${paymentText(payment)}`);
+      };
+      el.querySelectorAll('[data-buy]').forEach(b => {
+        b.onclick = () => {
+          const key = b.dataset.buy, trap = TRAPS[key];
+          if (G.traps[key] >= trap.max) return;
+          const payment = LoopCore.payHome(G, G, trap.cost);
+          if (!payment) return;
+          G.traps[key]++;
+          save(); render(); openBuild(); toast(`装了${trap.name}，${paymentText(payment)}`);
+        };
+      });
     },
   });
   Guidance.speak(Guidance.open(2) ? '院墙上能装机关了，装好就能夜夜替你守门。' : '攒够四十文，这道柴门就能换成木门。', true);
 }
 
 function openFriends() {
-  const best = Object.entries(G.store).filter(([, n]) => n > 0).sort((a, b) => GOODS[b[0]] - GOODS[a[0]])[0];
+  const best = Object.entries(G.goods).filter(([, n]) => n > 0).sort((a, b) => GOODS[b[0]] - GOODS[a[0]])[0];
   const rows = NEIGHBORS.map((n) => {
     const v = G.friends[n.id];
     const can = [v >= CFG.buddyAt ? '能结伴' : '', v >= CFG.helpAt ? '能驰援' : ''].filter(Boolean).join(' · ') || '还不熟';
     return `<div class="fr"><div class="fr-top"><b>${n.fam} · ${n.who}</b><span class="note">交情 ${v} · ${can}</span></div>
       <div class="fbar" role="img" aria-label="交情 ${v}，20 能结伴，40 能驰援"><i style="width:${v}%"></i><s style="left:${CFG.buddyAt}%"></s><s style="left:${CFG.helpAt}%"></s></div>
-      <div class="fr-btns"><button type="button" class="mini" data-coin="${n.id}"${G.money < 10 ? ' disabled' : ''}>送 10 文（交情 +5）</button><button type="button" class="mini" data-good="${n.id}"${best ? '' : ' disabled'}>送${best ? best[0] : '一件货'}（交情 +8）</button></div></div>`;
+      <div class="fr-btns"><button type="button" class="mini" data-coin="${n.id}"${G.purse < 10 ? ' disabled' : ''}>钱袋送 10 文（交情 +5）</button><button type="button" class="mini" data-good="${n.id}"${best ? '' : ' disabled'}>送自己的${best ? best[0] : '货'}（交情 +8）</button></div></div>`;
   }).join('');
   sheet({
     title: '邻居和交情', dismiss: true,
     body: `<p class="note">交情靠做过的事攒：一起出门、帮着守门、送东西。交情 20 能<b>结伴</b>出门（更安全、多背 3 件、倒下有人扛你回家）；40 能<b>驰援</b>（夜里被砸门时能喊他来帮忙）。真游戏里邻居是真人玩家。</p>${rows}`,
     buttons: [['回去', null]],
     bind: (el) => {
-      el.querySelectorAll('[data-coin]').forEach((b) => { b.onclick = () => { G.money -= 10; addFriend(b.dataset.coin, 5); save(); render(); openFriends(); }; });
-      el.querySelectorAll('[data-good]').forEach((b) => { b.onclick = () => { G.store[best[0]]--; addFriend(b.dataset.good, 8); save(); render(); openFriends(); }; });
+      el.querySelectorAll('[data-coin]').forEach((b) => { b.onclick = () => { if (!LoopCore.payPersonal(G, 10)) return; addFriend(b.dataset.coin, 5); save(); render(); openFriends(); }; });
+      el.querySelectorAll('[data-good]').forEach((b) => { b.onclick = () => { if (!best || !LoopCore.givePersonalGood(G, best[0])) return; addFriend(b.dataset.good, 8); save(); render(); openFriends(); }; });
     },
   });
 }
@@ -1639,18 +1745,16 @@ function goHome() {
     afterArrive();
   });
 }
-// 进院门：东西放进仓库和宝物架，结伴的交情 +5
+// 进院门：背回的货和宝物先归自己，结伴的交情 +5
 function arriveHome(handDelivered = false) {
   Guidance.done('late');
   if (handDelivered || G.bag.length) Guidance.done('carry');
   if (G.river) G.river.fromWharf = false;
-  const goods = G.bag.filter((x) => !x.tre), tre = G.bag.filter((x) => x.tre);
-  for (const g of goods) G.store[g.n] = (G.store[g.n] || 0) + 1;
-  G.treasures.push(...tre);
   const parts = [];
-  if (G.bag.length) parts.push(`带回来：${G.bag.map((x) => x.n).join('、')}`);
+  if (G.bag.length) parts.push(`自己带回了${G.bag.map((x) => x.n).join('、')}`);
+  LoopCore.unpackBag(G);
   if (G.buddy) { addFriend(G.buddy, 5); parts.push(`和${nb(G.buddy).who}的交情 +5`); }
-  G.bag = []; G.buddy = null; G.at = 'home'; G.target = null; G.phase = 'home';
+  G.buddy = null; G.at = 'home'; G.target = null; G.phase = 'home';
   return parts.join('；');
 }
 function afterArrive() { if (G.time >= CFG.dusk) startNight(false); else render(); }
@@ -1681,17 +1785,21 @@ function offerMatch() {
   sheet({
     title: '你长大了',
     body: `<p>可以找个有缘人牵红线，以后生孩子；也可以收个徒弟。两条路都能有后人，以后都能投胎回自己家。</p><p class="note">真游戏里，有缘人和徒弟都是真人玩家；好友点你的分享链接，就能生在你家或者拜你为师。</p>`,
-    buttons: [...c.map((p) => [`和${p.name}牵红线`, () => { G.spouse = p; G.love = 10; save(); render(); toast(`和${p.name}牵上了红线`); }, 'main']), ['收个徒弟（30 文）', takeDisciple, '', G.money < 30], ['先不急', null]],
+    buttons: [...c.map((p) => [`和${p.name}牵红线`, () => { G.spouse = p; G.love = 10; save(); render(); toast(`和${p.name}牵上了红线`); }, 'main']), discipleButton(), ['先不急', null]],
   });
 }
+function discipleButton() {
+  const quote = LoopCore.quoteHome(G, G, 30);
+  return [`收个徒弟（30 文）<small>${paymentText(quote)}</small>`, takeDisciple, '', !!quote.shortfall];
+}
 function takeDisciple() {
-  if (G.money < 30) return toast('钱不够');
-  G.money -= 30;
+  const payment = LoopCore.payHome(G, G, 30);
+  if (!payment) return toast('钱不够');
   const [grade, power] = G.held >= 3 ? ['上等', 1.1] : G.held >= 1 ? ['良才', 1.05] : ['寻常', 1];
   const d = { name: pick(SURNAMES) + pick(GIVEN_ME), look: randomLook(), grade, power, kind: '徒' };
   G.kids.push(d);
   save(); render();
-  toast(`${d.name}拜你为师，品级${grade}（看你守住了几夜）`);
+  toast(`${d.name}拜你为师，品级${grade}。已付${paymentText(payment)}`);
 }
 function openFamily() {
   const adult = Guidance.open(3);
@@ -1705,7 +1813,7 @@ function openFamily() {
     buttons: [
       ...(G.spouse ? [['陪伴（花 1 个时辰，红线 +12）', () => { if (G.time + 120 > CFG.dusk) return toast('天快黑了，没时间了'); G.time += 120; G.love = Math.min(100, G.love + 12); save(); render(); toast('陪了一个时辰，红线 +12'); openFamily(); }, 'main', CFG.dusk - G.time < 120]] : []),
       ...(adult && !G.spouse ? [['找有缘人', offerMatch, 'main']] : []),
-      ...(adult && G.kids.filter((k) => k.kind === '徒').length < 2 ? [['收个徒弟（30 文）', takeDisciple, '', G.money < 30]] : []),
+      ...(adult && G.kids.filter((k) => k.kind === '徒').length < 2 ? [discipleButton()] : []),
       ['去祠堂', openHall],
       ['回去', null],
     ],
@@ -1735,10 +1843,10 @@ function N_guard() { return G.phase === 'guard'; }
 function ownFamily(heir) {
   const t = threadName(ri([20, 60]));
   return {
-    own: true, name: G.fam, door: G.door, money: G.money, store: { ...G.store }, crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
+    own: true, houseId: G.houseId, name: G.fam, door: G.door, money: G.chest, store: { ...G.store }, crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
     treasures: G.treasures.slice(), thread: t,
     parents: [{ name: heir.name, look: heir.look, rel: heir.kind === '女' ? '娘（上一世你的女儿）' : heir.kind === '徒' ? '师父（上一世你的徒弟）' : '爹（上一世你的儿子）' }, { name: pick(SURNAMES) + '氏', look: randomLook(), rel: heir.kind === '女' ? '爹' : '娘' }],
-    ancestors: [...G.ancestors, { name: G.name, look: { ...ME }, expression: playerExpression('calm'), note: `第 ${G.lifeNo} 世的你` }],
+    ancestors: G.ancestors,
   };
 }
 
@@ -1785,16 +1893,36 @@ function choosePerk(id) {
   startWave(N.wave + 1);
   N.last = performance.now();
 }
-function startNight(guardian) {
+async function startNight(guardian) {
+  const requested = { houseId: G.houseId, lifeId: G.lifeId, day: G.day, phase: G.phase };
+  const phase = guardian ? 'guard' : 'night';
+  const plan = await withGameLock(() => {
+    const stored = storedGame();
+    if (stored && (stored.houseId !== requested.houseId || stored.lifeId !== requested.lifeId
+        || stored.day !== requested.day || stored.nightReceipt
+        || (stored.phase !== requested.phase && stored.phase !== phase))) {
+      location.reload(); return null;
+    }
+    if (G.phase !== requested.phase || G.lifeId !== requested.lifeId || G.day !== requested.day) return null;
+    if (stored?.nightPlan && stored.phase === phase) {
+      adoptStoredGame();
+      return LoopCore.beginNightLedger(G, guardian, G.nightPlan.seed);
+    }
+    const seed = crypto.getRandomValues(new Uint32Array(1))[0];
+    const opened = LoopCore.beginNightLedger(G, guardian, seed);
+    if (!opened) return null;
+    Guidance.done('rest');
+    if (!Guidance.open(2)) G.item = 'sword';
+    return save() ? opened : null;
+  });
+  if (!plan || !G.nightPlan || !LoopCore.sameNight(plan, G.nightPlan)) return;
+  if (N && !N.over && LoopCore.sameNight(N.plan, plan)) return;
   cancelAnimationFrame(raf);
   closeSheet();
-  Guidance.done('rest');
-  G.phase = guardian ? 'guard' : 'night';
-  if (!Guidance.open(2)) G.item = 'sword';
-  save();
   const d = guardian ? CFG.lifeDays : G.day;
   const doorMax = DOORS[G.door].hp;
   N = {
+    plan, startingFriends: { ...G.friends },
     d, guardian, traps: G.traps, t: 0, door: doorMax, doorMax, ghosts: [], spawns: [], ally: null, helpUsed: false, names: [], kills: 0, coins: 0,
     pk: {}, offer: [], picking: false, rainCount: 0, burnT: 0,
     over: false, wave: -1, lastHit: '', hintT: 0, bows: [[40, 410], [320, 410], [92, 410], [268, 410]].slice(0, G.traps.crossbow).map(([x, y], i) => ({ x, y, cd: 1 + i * 0.35 })),
@@ -2134,53 +2262,62 @@ function nightStep(dt) {
   if (N.door <= 0) return endNight(false);
   if (!N.spawns.length && !N.ghosts.length) return N.wave >= NIGHT.waves - 1 ? endNight(true) : offerPerks();
 }
+function describeNight(receipt, night) {
+  const paragraphs = [];
+  if (receipt.guardian) paragraphs.push(receipt.won ? '你显灵帮子孙守住了家门。' : '你没能护住子孙的家门。');
+  if (receipt.won) {
+    const coins = receipt.earnedMoney ? `，捡到的纸钱换了 ${receipt.earnedMoney} 文，收进钱袋` : '';
+    paragraphs.push(`打散了 ${night.kills} 个鬼${coins}。门还剩 ${Math.ceil(night.door)} / ${night.doorMax}。`);
+    if (receipt.guardian && receipt.earnedMoney) paragraphs.push('投胎时，这笔纸钱会留在原来的家里。');
+  } else {
+    const treasure = receipt.lostTreasure ? `宝物架上的${receipt.lostTreasure.n}没了。` : '';
+    paragraphs.push(`${night.lastHit}砸破了你家的${DOORS[G.door].name}。鬼翻到你的钱袋，抢走了 ${receipt.purseLost} 文；撬开钱箱，抢走了 ${receipt.chestLost} 文。${treasure}`);
+  }
+  const perks = Object.entries(night.pk).map(([id, count]) => PERKS[id].n + (count > 1 ? ` ×${count}` : '')).join('、');
+  if (perks) paragraphs.push(`今晚挑的本事：${perks}`);
+  const names = [...new Set(night.names)].slice(0, 6).join('、');
+  if (names) paragraphs.push(`今晚来砸门的：${names}……真游戏里，大部分是电脑鬼，偶尔会有死去的真人玩家变成的厉鬼。`);
+  return paragraphs;
+}
 function endNight(won) {
   if (!N || N.over) return;
-  // 另一个标签页可能已经结算或天亮，旧战斗不能覆盖已写入的结果。
-  const stored = storedGame();
-  if (stored && (stored.day !== G.day || stored.lifeNo !== G.lifeNo || stored.phase !== G.phase || stored.nightReceipt)) {
-    N.over = true; cancelAnimationFrame(raf); location.reload(); return;
-  }
-  N.over = true;
+  const battle = N, expected = battle.plan;
+  battle.over = true;
   cancelAnimationFrame(raf);
-  if (!won) { N.door = 0; updateDoor(); }
-  const names = [...new Set(N.names)].slice(0, 6).join('、');
-  const paragraphs = [];
-  if (won) {
-    Guidance.done('fight');
-    G.money += N.coins; G.kills += N.kills;
-    if (!N.guardian) G.held++;
-    paragraphs.push(`打散了 ${N.kills} 个鬼${N.coins ? `，捡到纸钱换了 ${N.coins} 文` : ''}。门还剩 ${Math.ceil(N.door)} / ${N.doorMax}。`);
-  } else {
-    if (!N.guardian) G.broken++;
-    const lost = Math.floor(G.money * 0.3);
-    G.money -= lost;
-    const parts = [`抢走了 ${lost} 文`];
-    if (G.treasures.length) { const t = G.treasures.splice(Math.floor(Math.random() * G.treasures.length), 1)[0]; parts.push(`宝物架上的${t.n}`); }
-    paragraphs.push(`${N.lastHit}砸破了你家的${DOORS[G.door].name}，鬼冲进院子，${parts.join('，还有')}。`);
-  }
-  const pks = Object.entries(N.pk).map(([k, n]) => PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、');
-  if (pks) paragraphs.push(`今晚挑的本事：${pks}`);
-  paragraphs.push(`今晚来砸门的：${names}……真游戏里，大部分是电脑鬼，偶尔会有死去的真人玩家变成的厉鬼。`);
-  if (N.guardian) {
-    G.afterlife = { kind: 'guard', won };
-    paragraphs.unshift(won ? '你显灵帮子孙守住了家门。' : '你没能护住子孙的家门。');
-  }
-  const receipt = { won, paragraphs, next: N.guardian ? 'reborn' : G.day >= CFG.lifeDays ? 'old' : 'morning' };
-  G.nightReceipt = receipt; G.phase = 'dawn';
-  save(); Guidance.update();
-  setTimeout(() => { if (G.nightReceipt === receipt) showNightReceipt(receipt); }, won ? 300 : 700);
+  if (!won) { battle.door = 0; updateDoor(); }
+  const item = G.item, friends = { ...G.friends };
+  return withGameLock(() => {
+    const stored = storedGame();
+    if (stored?.phase === 'dawn' && stored.nightReceipt && LoopCore.sameNight(expected, stored.nightReceipt)) {
+      adoptStoredGame(); showNightReceipt(G.nightReceipt); return;
+    }
+    if (!stored?.nightPlan || stored.phase !== (expected.guardian ? 'guard' : 'night')
+        || !LoopCore.sameNight(expected, stored.nightPlan)) { location.reload(); return; }
+    adoptStoredGame();
+    const receipt = LoopCore.settleNightLedger(G, expected, { won, kills: battle.kills, coins: battle.coins },
+      result => describeNight(result, battle));
+    if (!receipt) { location.reload(); return; }
+    G.item = item;
+    for (const [id, value] of Object.entries(friends)) {
+      if (value > (battle.startingFriends[id] || 0)) G.friends[id] = Math.max(value, G.friends[id] || 0);
+    }
+    if (!save()) return;
+    if (won) Guidance.done('fight');
+    Guidance.update();
+    setTimeout(() => { if (G.nightReceipt && LoopCore.sameNight(G.nightReceipt, receipt)) showNightReceipt(receipt); }, won ? 300 : 700);
+  });
 }
 function showNightReceipt(receipt) {
   const label = { morning: '天亮了', old: '天亮了……', reborn: '天亮了，去投胎' }[receipt.next];
-  const proceed = () => {
+  const proceed = () => withGameLock(() => {
     const stored = storedGame();
-    if (stored && (!stored.nightReceipt || stored.day !== G.day || stored.lifeNo !== G.lifeNo || stored.nightReceipt.next !== receipt.next)) return location.reload();
-    delete G.nightReceipt;
+    if (stored?.phase !== 'dawn' || !stored.nightReceipt || !LoopCore.sameNight(stored.nightReceipt, receipt)) return location.reload();
+    adoptStoredGame();
+    G.nightReceipt = null;
     if (receipt.next === 'old') die('old', `${G.day} 天过去了，你老了。`);
     else if (receipt.next === 'reborn') goReborn();
     else nextMorning();
-  };
+  });
   sheet({ title: receipt.won ? '守住了！' : '门破了！', buttons: [[label, proceed, 'main']], focusTitle: true,
     bind: el => receipt.paragraphs.forEach((text, i) => {
       const p = document.createElement('p'); p.textContent = text;
@@ -2202,7 +2339,13 @@ function nextMorning() {
 }
 
 // ================= 死后 =================
-function die(kind, msg) { cancelAnimationFrame(raf); G.phase = 'death'; G.deathKind = kind; G.deathMsg = msg; save(); render(); }
+function die(kind, msg) {
+  cancelAnimationFrame(raf);
+  G.phase = 'death'; G.deathKind = kind; G.deathMsg = msg;
+  const portrait = { name: G.name, look: ME, expression: playerExpression('calm'), note: `第 ${G.lifeNo} 世的你` };
+  LoopCore.finishLife(G, portrait);
+  save(); render();
+}
 function renderDeath() {
   $('scene').innerHTML = `<svg viewBox="0 0 360 300" class="stage" role="img" aria-label="你变成了鬼"><rect width="360" height="300" fill="url(#hsky)"/><circle cx="60" cy="60" r="18" fill="#F4F1E3" opacity="0.8"/>
     <path d="M0 250 Q90 230 180 246 Q270 262 360 240 V300 H0 Z" fill="#20142E"/><g class="float">${ghostSvg(ME, G.deathKind === 'early' ? 'sad' : 'calm', 'elder', 180, 262, 0.5)}</g></svg>`;
@@ -2345,6 +2488,7 @@ function newFamily(tier) {
 }
 function goReborn() {
   cancelAnimationFrame(raf);
+  LoopCore.leaveGuardianReward(G);
   const rows = karmaRows(), total = rows.reduce((a, r) => a + r[2], 0);
   const tier = total < 30 ? 0 : total < 70 ? 1 : 2;
   const heirs = G.kids.slice(0, 3);
@@ -2356,9 +2500,6 @@ function goReborn() {
 }
 function renderReborn() {
   const R = G.reborn;
-  for (const f of R.fams) {
-    if (f.own && !f.store) { f.money = G.money; f.store = { ...G.store }; }
-  }
   // 旧存档在奈何桥只保存了第一个后人。保留已展示的家庭，只补齐另外的后人。
   const ownCount = R.fams.filter(f => f.own).length;
   const missing = G.kids.slice(ownCount, 3);
@@ -2371,7 +2512,7 @@ function renderReborn() {
     ${[70, 120, 180, 240, 290].map((x) => `<line x1="${x}" y1="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 - 12}" x2="${x}" y2="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 + 4}" stroke="#B49AB8" stroke-width="2"/>`).join('')}
     <text x="180" y="40" text-anchor="middle" font-size="18" fill="#E3B341" font-family="var(--font-display)">奈何桥</text>
     <g class="float">${ghostSvg(ME, 'calm', 'elder', 180, 112, 0.18)}</g></svg>`;
-  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? '院子、机关、宝物都还在；祠堂里挂着你的画像 · ' : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · ${f.money + (loot ? 30 : 0)} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
+  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? '院子、机关、宝物都还在；祠堂里挂着你的画像 · ' : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · 钱箱 ${f.money} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
   const loot = G.afterlife && G.afterlife.won && G.afterlife.loot;
   const keep = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt);
   $('panel').innerHTML = `<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>
@@ -2386,21 +2527,21 @@ function reborn(f) {
   const fam = { ...f, treasures: [...f.treasures], friends: {} };
   for (const n of NEIGHBORS) fam.friends[n.id] = prev.friends[n.id] >= CFG.helpAt ? Math.floor(prev.friends[n.id] / 2) : ri([0, 15]);
   const A = prev.afterlife;
-  if (A && A.won && A.loot) { fam.treasures.push(A.loot); fam.money += 30; }
   if (!fam.own) fam.ancestors = Array.from({ length: 2 }, (_, i) => ({ name: surnameOf(fam.name) + ['老太公', '太奶奶'][i], look: randomLook(), note: '祖上' }));
   G = freshLife(fam, prev);
   River.inherit(prev, fam.own);
+  G = LoopCore.nextLifeView(G, prev, !!fam.own, A?.kind === 'haunt' && A.won ? A.loot : null);
   G.history.push({ life: prev.lifeNo, fam: prev.fam, days: prev.day, held: prev.held, karma: prev.reborn.total });
   firstMorning();
   toast(`投胎到了${f.name}。`);
 }
 
 // ================= 设置 =================
-function applyLook(raw) {
+async function applyLook(raw) {
   const look = validatedLook(raw);
   // 先写完整存档。写入失败时保留原形象和捏人台草稿，可重试或取消。
   pullBank(storedGame()); accrueDays();
-  writeGame({ ...G, look });
+  if (!await writeGame({ ...G, look })) throw new DOMException('游戏进度已更新');
   G.look = ME = look;
   try { localStorage.setItem('wulin-loop-look', JSON.stringify(look)); } catch (e) {}
   refreshAppearance();
@@ -2436,13 +2577,13 @@ function closeEditor(finished) {
   else cancelEditor();
 }
 avatarDialog.addEventListener('cancel', e => { e.preventDefault(); closeEditor(false); });
-window.addEventListener('message', event => {
+window.addEventListener('message', async event => {
   const peer = avatarDialog.querySelector('iframe')?.contentWindow;
   if (!avatarDialog.open || !isAvatarPeer(event, peer)) return;
   if (event.data.type === 'ready') sendAvatar(peer, 'init', { look: ME });
   if (event.data.type === 'cancel') closeEditor(false);
   if (event.data.type === 'finish') {
-    try { applyLook(event.data.look); }
+    try { await applyLook(event.data.look); }
     catch (e) {
       sendAvatar(peer, 'error', { message: e instanceof DOMException ? '存档写入失败，请检查浏览器存储后重试。' : '形象数据无效，请检查后重试。' });
       return;
@@ -2484,12 +2625,12 @@ function openMenu() {
       const expressions = el.querySelector('#settings-expressions');
       if (expressions) expressions.onclick = openExpressions;
       el.querySelector('#code-out').value = encode(ME);
-      el.querySelector('#use-code').onclick = () => {
-        try { applyLook(decode(el.querySelector('#code-in').value)); el.querySelector('#code-out').value = encode(ME); el.querySelector('#code-msg').textContent = '换好了'; }
+      el.querySelector('#use-code').onclick = async () => {
+        try { await applyLook(decode(el.querySelector('#code-in').value)); el.querySelector('#code-out').value = encode(ME); el.querySelector('#code-msg').textContent = '换好了'; }
         catch (e) { el.querySelector('#code-msg').textContent = e instanceof DOMException && e.name !== 'InvalidCharacterError' ? '存档写入失败，请检查浏览器存储。' : '这串码读不出来，请检查捏人码是否完整。'; }
       };
       el.querySelector('#ff').onclick = () => { closeSheet(); G.day = CFG.lifeDays; G.phase = 'home'; G.at = 'home'; G.bag = []; G.buddy = null; save(); render(); toast('快进到了最后一天'); };
-      el.querySelector('#restart').onclick = () => { closeSheet(); cancelAnimationFrame(raf); N = null; H = null; G = freshLife(FIRST_FAMILY, null); writeGame(G); render(); };
+      el.querySelector('#restart').onclick = async () => { closeSheet(); cancelAnimationFrame(raf); N = null; H = null; G = freshLife(FIRST_FAMILY, null); if (await writeGame(G, true)) render(); };
     },
   });
 }
@@ -2539,7 +2680,7 @@ document.addEventListener('keydown', (e) => {
 // ================= 启动 =================
 G = loadGame();
 if (!G) G = freshLife(FIRST_FAMILY, null);
-else { accrueDays(); save(); }
+else if (accrueDays() || LoopStorage.read().v < 4) save();
 if (G.look) { try { ME = validatedLook(G.look); } catch (e) {} }
 G.look = ME;
 if (alignUnlockedScene()) save();

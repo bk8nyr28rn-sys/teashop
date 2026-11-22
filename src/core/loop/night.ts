@@ -3,6 +3,7 @@ import { AGE_FX, balanceAge, CFG, nextRandom, RULE_VERSION } from './base';
 import { DOORS, GHOSTS, MULT, NIGHT, PERKS, waveCounts } from './night-config';
 import type { GhostType, PerkId } from './night-config';
 import type { House, Item, Person, Treasure } from './state';
+import { nightPayout, planNightLoot, type NightLootPlan } from './settlement';
 
 export { waveCounts } from './night-config';
 
@@ -15,7 +16,7 @@ export interface NightOptions {
   helpEnabled?: boolean;
   spouse?: boolean;
   childPowers?: readonly number[];
-  // 映射旧单钱堆的数额。胜负只给金额，不指定最终扣家里的钱箱还是人的钱袋。
+  // 兼容第一阶段模拟器的显式钱箱余额。
   lossBase?: number;
 }
 
@@ -63,6 +64,8 @@ export interface NightResult {
   creditedKills: number;
   earnedMoney: number;
   lostMoney: number;
+  purseLost: number;
+  chestLost: number;
   lostTreasureIndex: number | null;
   lostTreasure: Treasure | null;
   held: number;
@@ -86,6 +89,8 @@ export interface NightState {
   item: Item;
   traps: House['traps'];
   lossBase: number;
+  purse: number;
+  lootPlan: NightLootPlan;
   treasures: Treasure[];
   friends: Record<string, number>;
   friendship: Record<string, number>;
@@ -183,6 +188,7 @@ export function startNight(house: House, person: Person, options: NightOptions):
     advancedItems, helpEnabled: options.helpEnabled ?? true,
     hp: person.hp, power: person.power, item: advancedItems ? person.item : 'sword',
     traps: { ...house.traps }, lossBase: options.lossBase ?? house.chest,
+    purse: person.purse, lootPlan: planNightLoot(options.seed, house.treasures),
     treasures: house.treasures.map(t => ({ ...t })),
     friends: { ...person.friends }, friendship: {}, t: 0, door: door.hp, doorMax: door.hp,
     wave: -1, spawns: [], ghosts: [], pk: {}, offer: [], picking: false,
@@ -448,12 +454,13 @@ function helpDefend(n: NightState): void {
 function endNight(n: NightState, won: boolean): void {
   n.over = true;
   if (!won) n.door = 0;
-  const lostTreasureIndex = !won && n.treasures.length ? Math.floor(nextRandom(n) * n.treasures.length) : null;
+  // 第一阶段的战斗快照只有 seed 与旧钱箱；首次恢复同样用独立流补齐。
+  const plan = n.lootPlan ?? planNightLoot(n.seed, n.treasures);
+  const payout = nightPayout(plan, { purse: n.purse ?? 0, chest: n.lossBase, treasures: n.treasures }, won, n.coins);
   n.result = {
     won, kills: n.kills, coins: n.coins, door: n.door, doorMax: n.doorMax,
-    creditedKills: won ? n.kills : 0, earnedMoney: won ? n.coins : 0,
-    lostMoney: won ? 0 : Math.floor(n.lossBase * NIGHT.lossFraction),
-    lostTreasureIndex, lostTreasure: lostTreasureIndex === null ? null : { ...n.treasures[lostTreasureIndex]! },
+    creditedKills: won ? n.kills : 0, ...payout,
+    lostMoney: payout.purseLost + payout.chestLost,
     held: won && !n.guardian ? 1 : 0, broken: !won && !n.guardian ? 1 : 0,
     friendship: { ...n.friendship },
   };

@@ -12,10 +12,11 @@ const { OUT, wrap } = require('./lib.cjs');
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
     await page.goto(pathToFileURL(wrap('loop')).href);
-    await page.evaluate(() => {
+    await page.evaluate(async () => {
       closeSheet();
+      G.phase = 'home';
       G.day = CFG.lifeDays; G.time = CFG.dusk; G.item = 'lamp';
-      startNight(false); cancelAnimationFrame(raf);
+      save(); await startNight(false); cancelAnimationFrame(raf);
       startWave(NIGHT.waves - 1);
       // 复现最后一波只剩六个鬼的瞬间。用真实的生成、走到门口和受伤逻辑。
       for (const type of ['armor', 'fly', 'shade', 'armor', 'fly', 'shade']) {

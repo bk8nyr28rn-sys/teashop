@@ -45,7 +45,7 @@ async function checkEdition(browser, gamePath, creatorPath, takeScreenshots) {
     await page.locator('#avatar-dialog').waitFor({ state: 'hidden' });
     const readSave = () => page.evaluate(() => localStorage.getItem('wulin-loop'));
     const saved = await readSave();
-    assert.equal(JSON.parse(saved).look.head, 'hat');
+    assert.equal(JSON.parse(saved).account.look.head, 'hat');
     assert.equal(await page.evaluate(() => ME.head), 'hat');
     if (takeScreenshots) await page.screenshot({ path: path.join(OUT, 'back-in-game.png'), animations: 'disabled' });
     await page.reload();

@@ -54,7 +54,7 @@ const { wrap, OUT, enableAllFeatures } = require('./lib.cjs');
     await enableAllFeatures(page);
     await click('[data-a="out"]');
     await button('一个人去').click();
-    const initial = await page.evaluate(() => JSON.stringify(G));
+    const initial = await page.evaluate(() => JSON.stringify(LoopStorage.read()));
     const reset = async () => {
       // 用同一清晨的快照测试互斥路线，如“同一根木头烧柴或搭桥”。
       await page.goto('about:blank');
@@ -165,6 +165,7 @@ const { wrap, OUT, enableAllFeatures } = require('./lib.cjs');
     assert.equal(await page.locator('[data-yard-stone="2"]').count(), 1);
     await page.reload();
     await click('[data-a="night"]');
+    await page.locator('#nsvg').waitFor();
     assert.equal(await page.locator('#nsvg [data-yard-stone="2"]').count(), 1);
     await page.waitForTimeout(650); // 等昼夜主题渐变结束再留图。
     await snap('04-night');
@@ -173,6 +174,7 @@ const { wrap, OUT, enableAllFeatures } = require('./lib.cjs');
       endNight(true);
     });
     await button('天亮了').click();
+    await page.waitForFunction(() => G.phase === 'home' && G.day === 2);
     await page.evaluate(() => {
       if (!$('sheet').hidden) closeSheet();
     });
@@ -203,7 +205,7 @@ const { wrap, OUT, enableAllFeatures } = require('./lib.cjs');
     assert.equal((await page.evaluate(() => G.time)) - walkStart, 30);
     await click('[data-a="market"]');
     await page.getByRole('button', { name: '卖 1 件柴' }).click();
-    assert.equal(await page.evaluate(() => G.money), 23);
+    assert.deepEqual(await page.evaluate(() => [G.purse, G.chest, G.goods.柴, G.store.柴 || 0]), [3, 20, 6, 0]);
     await reset();
     await at('herb');
     await act('carry');
@@ -222,7 +224,7 @@ const { wrap, OUT, enableAllFeatures } = require('./lib.cjs');
     await at('far');
     assert.equal((await page.locator('[data-spot]').count()) >= 8, true);
     await click('[data-a="home"]');
-    assert.equal(await page.evaluate(() => G.store['草药']), 1, '从原地图立刻折返，河埠采的药也入库');
+    assert.deepEqual(await page.evaluate(() => [G.goods.草药, G.store.草药 || 0]), [1, 0], '从原地图立刻折返，河埠采的药仍归自己');
     await reset();
     await page.evaluate(() => {
       G.time = 710;
@@ -240,7 +242,7 @@ const { wrap, OUT, enableAllFeatures } = require('./lib.cjs');
     await at('home');
     await act('walkHome');
     await page.locator('[data-a="market"]').waitFor();
-    assert.equal(await page.evaluate(() => G.store['草药']), 1);
+    assert.deepEqual(await page.evaluate(() => [G.goods.草药, G.store.草药 || 0]), [1, 0]);
     await click('#menu');
     await page.evaluate(() => {
       Object.defineProperty(navigator, 'clipboard', {

@@ -53,14 +53,15 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   await drainSheets();
   if ((await p.evaluate(() => G.phase)) === 'map') { await p.click('[data-a="home"]'); await p.waitForTimeout(250); }
   await drainSheets();
-  const st = await p.evaluate(() => ({ phase: G.phase, store: G.store, tre: G.treasures.length, wang: G.friends.wang, time: G.time }));
+  const st = await p.evaluate(() => ({ phase: G.phase, goods: G.goods, tre: G.personalTreasures.length, wang: G.friends.wang, time: G.time }));
   ok('back home with goods', st.phase === 'home' || st.phase === 'night', JSON.stringify(st));
   if (st.phase === 'home') {
     await p.click('[data-a="market"]');
     await p.screenshot({ path: path.join(shots, '3-market.png') });
-    const sell = p.locator('#sheet .sh-btns button', { hasText: '全卖了' });
-    if (await sell.isEnabled()) await sell.click(); else await sheetBtn('回去');
-    await p.evaluate(() => { G.money += 200; save(); render(); });
+    const sell = p.locator('[data-owner="person"] [data-sell-all]');
+    if (await sell.count() && await sell.isEnabled()) await sell.click();
+    await sheetBtn('回去');
+    await p.evaluate(() => { G.purse += 200; save(); render(); });
     await p.click('[data-a="build"]');
     await p.click('#up-door');
     await p.click('[data-buy="crossbow"]');
@@ -99,6 +100,7 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
     return false;
   };
   await p.evaluate(() => { SPEED = 3; });
+  await p.waitForFunction(() => N && !N.over && G.phase === 'night');
   ok('night started', ['night', 'guard'].includes(await p.evaluate(() => G.phase)));
   await clean('night');
   // call for help once
@@ -108,25 +110,27 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   const night1 = await sheetTitle();
   await p.screenshot({ path: path.join(shots, '7-night-end.png') });
   await p.locator('#sheet .sh-btns button').first().click();
+  await p.waitForFunction(() => G.day === 2 && G.phase === 'home');
   ok('next morning', (await p.evaluate(() => G.day)) === 2, String(await p.evaluate(() => G.day)));
 
   // ---- balance probes: idle night should break the door; smart on last day ----
-  await p.evaluate(() => { G.time = CFG.dusk; startNight(false); });
+  await p.evaluate(async () => { G.time = CFG.dusk; await startNight(false); });
   await nightBot('idle');
   ok('idle player loses the door', (await sheetTitle()).includes('门破了'), await sheetTitle());
   const lossBody = await p.textContent('#sheet .sh-body');
-  ok('door broken takes money/treasure', /抢走了/.test(lossBody), lossBody.slice(0, 80));
+  ok('door broken itemizes the purse and the chest', /钱袋/.test(lossBody) && /钱箱/.test(lossBody), lossBody.slice(0, 80));
   await p.locator('#sheet .sh-btns button').first().click();
+  await p.waitForFunction(() => G.day === 3 && G.phase === 'home');
 
   // ---- fast-forward to the last day, die, haunt ----
   await p.click('#menu');
   await p.click('#ff');
   ok('fast-forward', (await p.evaluate(() => G.day)) === await p.evaluate(() => CFG.lifeDays));
-  await p.evaluate(() => { G.time = CFG.dusk; startNight(false); });
+  await p.evaluate(async () => { G.time = CFG.dusk; await startNight(false); });
   await nightBot('smart');
   const lastNight = await sheetTitle();
   await p.locator('#sheet .sh-btns button').first().click();
-  await p.waitForTimeout(100);
+  await p.waitForFunction(() => G.phase === 'death');
   ok('death screen', (await p.evaluate(() => G.phase)) === 'death', lastNight);
   await clean('death'); await overflow('death');
   await p.screenshot({ path: path.join(shots, '8-death.png') });
@@ -155,17 +159,19 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   await p.click('#menu'); await p.click('#ff');
   await p.evaluate(() => { die('old', '测试。'); });
   await p.click('[data-a="guard"]');
+  await p.waitForFunction(() => N && !N.over && G.phase === 'guard');
   ok('guardian night', (await p.evaluate(() => G.phase)) === 'guard');
   await p.evaluate(() => { SPEED = 3; });
   await p.waitForTimeout(1500);
   await p.screenshot({ path: path.join(shots, '11-guard.png') });
   await nightBot('smart');
   await p.locator('#sheet .sh-btns button').first().click();
+  await p.waitForFunction(() => G.phase === 'reborn');
   ok('guardian → reborn', (await p.evaluate(() => G.phase)) === 'reborn' && (await p.evaluate(() => G.reborn.rows.some((r) => r[0] === '当护家神'))));
 
   // ---- reload mid-night restarts the night ----
   await p.locator('[data-fam="1"]').click();
-  await p.evaluate(() => { G.time = CFG.dusk; startNight(false); });
+  await p.evaluate(async () => { G.time = CFG.dusk; await startNight(false); });
   await p.reload(); await p.waitForTimeout(300);
   ok('reload during night restarts it', await p.evaluate(() => G.phase === 'night' && N && !N.over));
 
@@ -176,6 +182,7 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   await p.click('#share-look summary');
   await p.fill('#code-in', code);
   await p.click('#use-code');
+  await p.getByText('换好了', { exact: true }).waitFor();
   ok('share code import', (await p.evaluate(() => ME.hairColor)) === '#C8402E');
 
   // ---- desktop layout ----
@@ -185,7 +192,7 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
   await pd.goto('file://' + TMP);
   await pd.evaluate(() => localStorage.clear()); await pd.reload(); await pd.waitForTimeout(200);
   await pd.getByRole('button', {name:'开始', exact:true}).click();
-  await pd.evaluate(() => { G.time = CFG.dusk; startNight(false); SPEED = 1; });
+  await pd.evaluate(async () => { G.time = CFG.dusk; await startNight(false); SPEED = 1; });
   await pd.waitForTimeout(9000);
   await pd.screenshot({ path: path.join(shots, '12-desktop-night.png') });
 

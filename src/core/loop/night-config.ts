@@ -51,7 +51,7 @@ export type PerkId = keyof typeof PERKS;
 export const NIGHT = {
   waves: 5, spread: 3.5, hpPerDay: 0.2, hpPerWave: 0.06, hitPerDay: 0.12,
   tap: 10, bowDmg: 12, bowCd: 1.4, allyDmg: 12,
-  step: 0.05, waveDelay: 1.5, offerCount: 3, lossFraction: 0.3,
+  step: 0.05, waveDelay: 1.5, offerCount: 3,
   counts: {
     firstNightEvil: [3, 4, 6, 7, 9],
     evilBase: 3, evilPerDay: 0.4, extraEvery: 3,

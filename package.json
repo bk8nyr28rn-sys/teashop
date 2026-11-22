@@ -7,6 +7,7 @@
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.sim.json",
     "sim": "tsx src/sim/cli.ts",
     "build:web": "node scripts/build-web.mjs",
+    "build:loop": "node scripts/build-loop-core.mjs",
     "sync:draw": "node scripts/sync-shared-draw.mjs",
     "test:proto": "node scripts/proto-tests/run-all.cjs",
     "balance:night": "node scripts/proto-tests/night-balance.cjs",

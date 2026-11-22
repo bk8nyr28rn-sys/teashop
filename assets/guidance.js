@@ -7,12 +7,12 @@ const Guidance = (() => {
     porter: ['带着绳去看看挑担人', '他的筐卡在水边，你腰上正好有根绳。', '周伯的筐上岸了。'],
     carry: ['把手里的东西带回院子', '点右下角的「家门口」，走近后再点「回家」，东西就会随你进院。', '东西到家了。'],
     late: ['天快黑了，回家吧', '离天黑不到一个时辰，再耽搁就难赶路了。', '已经进了自家院门。'],
-    sell: ['拿一件存货去集市卖', '仓里的东西能卖钱，想留下的可以单独留着。', '这笔钱落袋了。', 'market'],
-    door: ['换扇结实的木门', '柴门只有 140 点门血，手里的 40 文已经够换木门了。', '木门立起来了。', 'build'],
-    heal: ['用仓里的草药敷一下伤', '你受了伤，仓库里正好有草药，敷了能回一点体力。', '伤轻了一些。', 'heal'],
+    sell: ['带货去集市卖', '自己背回来的货，在「我的」里能全卖，也能一件件卖。', '这笔钱收到了。', 'market'],
+    door: ['换扇结实的木门', '换木门要 40 文，家里的钱加上卖货的钱已经够了。', '木门立起来了。', 'build'],
+    heal: ['用草药敷一下伤', '一份草药能回一点体力，先用自己的，再用仓库的。', '伤轻了一些。', 'heal'],
     field: ['挑个想去的地方，看看线索', '点地图上的地名，就能先看今天会碰到什么。', '这条路心里有数了。', 'out'],
     trail: ['照着眼前的线索找一次', '到了地方可以稳稳找，也可以照线索多冒一点险。', '在这里找过一回了。'],
-    family: ['回家看看祠堂里的画像', '你长大了，从「家和祠堂」进去就能认一认祖宗。', '这张脸记住了。', 'family'],
+    family: ['钱存进钱箱更安全，只能花在家上', '今天可以进「家和祠堂」，认一认守过这个家的祖宗。', '这张脸记住了。', 'family'],
     rest: ['回屋歇脚，等天黑守门', '今天可以收工了，也可以趁天亮再出去一趟。', '该提剑守门了。', 'night'],
     fight: ['守住自家的门', '点靠近家门的鬼，守完一波就能挑本事。', '这一夜守住了。'],
     dawn: ['等天亮，再过一天', '攒着的天能用来开始新一天，日子用完就等下个现实日。', '新的一天开始了。', 'dawn'],
@@ -35,9 +35,11 @@ const Guidance = (() => {
     if (G.phase === 'map') return G.at === 'home' && G.target == null ? 'field' : 'trail';
     if (G.phase !== 'home') return null;
     if (G.time >= CFG.dusk) return 'rest';
-    if (G.hp < CFG.hpMax && G.store['草药'] > 0) return 'heal';
-    if (G.door === 0 && G.money >= DOORS[1].cost) return 'door';
-    if (storeCount() && !soldToday()) return 'sell';
+    if (G.day === 3 && !G.guideHall) return 'family';
+    if (G.hp < CFG.hpMax && (G.goods.草药 > 0 || G.store.草药 > 0)) return 'heal';
+    if (G.door === 0 && !LoopCore.quoteHome(G, G, DOORS[1].cost).shortfall) return 'door';
+    const remaining = storeCount(G.goods) + storeCount() + G.personalTreasures.length + G.treasures.length;
+    if (remaining && (!soldToday() || (G.day === 1 && G.door === 0))) return 'sell';
     if (CFG.dusk - G.time < 120) return 'rest';
     if (G.day >= 3 && !G.guideHall) return 'family';
     if (G.day === 1 && River.firstVisit()) return 'wharf';
@@ -50,7 +52,7 @@ const Guidance = (() => {
     if (id === 'dawn' && G.phase === 'intro')
       return ['推开院门，过第一天', '今天从自家小院开始，河埠就在门外。', '天亮了。', 'start'];
     if (id === 'carry' && G.phase === 'map')
-      return ['把背包里的东西带回院子', '按「回家」就能把背包里的东西送进仓库。', thoughts.carry[2]];
+      return ['把背包里的东西带回院子', '按「回家」就能把这趟的收获带回去，东西先归你。', thoughts.carry[2]];
     if (id === 'rest' && G.time >= CFG.dusk)
       return ['天黑了，去守门', '鬼要来砸门了，从院里就能去守夜。', thoughts.rest[2], 'night'];
     if (id === 'late' && G.time >= CFG.dusk)
@@ -94,10 +96,7 @@ const Guidance = (() => {
     speechTimer = setTimeout(silence, 5500);
     G.guideSeen.push(text);
     // A guide timeout in an older tab must never roll back the actual game.
-    try {
-      if (stored && stored.lifeNo === G.lifeNo) localStorage.setItem('wulin-loop', JSON.stringify({...stored, guideSeen:G.guideSeen}));
-      else save();
-    } catch {}
+    persistGuideSeen();
   }
   function update() {
     const id = pickThought(), copy = id && wording(id);

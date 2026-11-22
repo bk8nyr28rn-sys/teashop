@@ -1,6 +1,7 @@
 const { chromium, devices } = require('playwright');
 const fs = require('fs');
 const path = require('path');
+const { isDeepStrictEqual } = require('node:util');
 const { OUT, wrap, enableUnlimitedDays, enableAllFeatures } = require('./lib.cjs');
 const TMP = wrap('loop');
 const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' — ' + x : ''));
@@ -21,7 +22,7 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   await p.screenshot({ path: path.join(OUT, 'loop', 'f1-match.png') });
   await p.locator('#sheet .sh-btns button').first().click();
   ok('spouse set', await p.evaluate(() => !!G.spouse && G.love === 10));
-  await p.evaluate(() => { G.money = 100; save(); render(); });
+  await p.evaluate(() => { G.chest = 100; save(); render(); });
   await p.click('[data-a="family"]');
   await p.locator('#sheet .sh-btns button', { hasText: '陪伴' }).click();
   ok('accompany raises love and costs time', await p.evaluate(() => G.love >= 22 && G.time === CFG.dayStart + 120));
@@ -31,7 +32,7 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   ok('child born with grade from thread', await p.evaluate(() => G.kids.some((k) => k.kind !== '徒' && k.grade === '上等')), await p.textContent('#sh-t'));
   await p.locator('#sheet .sh-btns button').first().click();
   await p.screenshot({ path: path.join(OUT, 'loop', 'f2-home.png') });
-  await p.evaluate(() => { G.time = CFG.dusk; startNight(false); });
+  await p.evaluate(async () => { G.time = CFG.dusk; await startNight(false); });
   ok('family helps at night', await p.evaluate(() => N.fam.length === 3), String(await p.evaluate(() => N.fam.length)));
   await p.evaluate(() => { SPEED = 3; });
   await p.waitForTimeout(2500);
@@ -39,7 +40,7 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   await p.evaluate(() => {
     N.over = true; cancelAnimationFrame(raf);
     River.enter(); G.river.stone = 'yard'; G.river.yardSlot = 2;
-    G.money = 100; G.store = {柴:3}; G.door = 1; G.traps = {crossbow:2,lamp:1,talisman:1};
+    G.chest = 100; G.store = {柴:3}; G.door = 1; G.traps = {crossbow:2,lamp:1,talisman:1};
     G.treasures = [{n:'古玉',v:90}]; die('old', '测试。');
   });
   await p.click('[data-a="skip"]');
@@ -54,9 +55,16 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
     return G.reborn.fams;
   });
   await p.reload();
-  ok('old save gains its second heir and keeps existing candidates', await ownChoices.count() === 2 && await p.evaluate(original => JSON.stringify(G.reborn.fams.filter((_, i) => i !== 1)) === JSON.stringify(original), originalFamilies));
+  ok('old save gains its second heir and keeps existing candidates', await ownChoices.count() === 2 &&
+    isDeepStrictEqual(await p.evaluate(() => G.reborn.fams.filter((_, i) => i !== 1)), originalFamilies));
   const choices = await p.evaluate(() => G.reborn.fams);
-  const bridgeSave = await p.evaluate(() => JSON.parse(localStorage.getItem('wulin-loop')));
+  const bridgeSave = await p.evaluate(() => {
+    const old = { ...G, v: 3, money: G.chest };
+    for (const key of ['chest','purse','goods','personalTreasures','houseId','lifeId','abandoned',
+      'receipts','nightId','nightPlan','nightReceipt','estateSettled']) delete old[key];
+    old.ancestors = old.ancestors.filter(a => !a.lifeId);
+    return JSON.parse(JSON.stringify(old));
+  });
   // 两个独立新标签各自载入同一份奈何桥旧档，用页面上的候选卡核对实收。
   for (const [index, own] of [[0, true], [choices.findIndex(f => !f.own), false]]) {
     const branch = await b.newPage({ viewport: { width: 320, height: 640 } });
@@ -72,19 +80,19 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
       const actualMoney = own ? 100 : choices[index].money;
       ok('旧档候选卡金额与当前家庭一致', (await card.innerText()).includes(actualMoney + ' 文'));
       await card.click();
-      const assets = await branch.evaluate(() => [G.money, G.store, G.parents[0].rel, G.own]);
+      const assets = await branch.evaluate(() => [G.chest, G.store, G.parents[0].rel, G.own]);
       ok(own ? '投回徒弟家，100 文和柴 3 件原样留下' : '投别家，只得该候选卡的家产', assets[0] === actualMoney &&
         assets[3] === own && (own ? assets[1].柴 === 3 && assets[2].includes('上一世你的徒弟') : Object.keys(assets[1]).length === 0));
     } finally { await branch.close(); }
   }
   await p.reload();
-  ok('heir choices persist on reload', await p.evaluate(saved => JSON.stringify(saved) === JSON.stringify(G.reborn.fams), choices));
+  ok('heir choices persist on reload', isDeepStrictEqual(await p.evaluate(() => G.reborn.fams), choices));
   await p.screenshot({ path: path.join(OUT, 'loop', 'f4-reborn.png'), fullPage: true, animations: 'disabled' });
   const prevName = await p.evaluate(() => G.name);
   ok('候选卡写明实收 100 文', (await ownChoices.nth(1).innerText()).includes('100 文'));
   await ownChoices.nth(1).click();
   ok('回家钱、仓货、门、机关、宝物、院石全部保留', await p.evaluate(() =>
-    G.money === 100 && G.store.柴 === 3 && G.door === 1 && G.traps.crossbow === 2 &&
+    G.chest === 100 && G.purse === 0 && G.store.柴 === 3 && G.door === 1 && G.traps.crossbow === 2 &&
     G.traps.lamp === 1 && G.traps.talisman === 1 && G.treasures[0].n === '古玉' &&
     G.river.stone === 'yard' && G.river.yardSlot === 2));
   ok('second heir becomes the parent', await p.evaluate(name => G.own && G.lifeNo === 2 && G.parents[0].name === name && /上一世你的[儿女]/.test(G.parents[0].rel), heirs[1]));
@@ -101,6 +109,7 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   ok('回自家第一天不显示买机关', await p.locator('[data-buy]').count() === 0);
   await p.getByRole('button',{name:'回去',exact:true}).click();
   await p.click('[data-a=night]');
+  await p.locator('#nsvg').waitFor();
   ok('两台祖传弩机首夜各射一箭', await p.evaluate(() => {
     cancelAnimationFrame(raf);
     spawnGhost(N.spawns[0]); N.spawns = [];

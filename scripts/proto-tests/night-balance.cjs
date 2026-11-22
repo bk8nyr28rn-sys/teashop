@@ -5,8 +5,14 @@ const { wrap } = require('./lib.cjs');
 const compareCore = process.argv.includes('--compare-core');
 const overrides = JSON.parse(process.argv.slice(2).find(arg => arg !== '--compare-core') || '{}');
 
-function simulateBatch({ day, door, bows, rate, strategy, first, count, overrides, compareCore }) {
+async function simulateBatch({ day, door, bows, rate, strategy, first, count, overrides, compareCore }) {
   const originalRandom = Math.random;
+  // 每局是独立的新账号。模拟器用内存存档，页面正式入口仍然走跨标签的提交锁。
+  const disk = { save, storedGame, adoptStoredGame };
+  let snapshot;
+  save = () => { snapshot = structuredClone(G); return true; };
+  storedGame = () => snapshot;
+  adoptStoredGame = () => (G = structuredClone(snapshot));
   const originalWave = startWave, originalSpawn = spawnGhost, originalOffer = offerPerks;
   const results = [];
   let trial, spawnIndex, combatRoll;
@@ -49,8 +55,8 @@ function simulateBatch({ day, door, bows, rate, strategy, first, count, override
       if (compareCore) combatRoll = stream(seed(-1, 0));
       G = freshLife({ ...FIRST_FAMILY, door, crossbow: bows }, null);
       G.guideOff = true; G.allFeatures = strategy !== 'firstNight';
-      G.day = day; G.time = CFG.dusk; G.item = 'sword';
-      startNight(false); cancelAnimationFrame(raf);
+      G.phase = 'home'; G.nightId = trial; G.day = day; G.time = CFG.dusk; G.item = 'sword'; save();
+      await startNight(false); cancelAnimationFrame(raf);
       let tapT = 0, switches = 0, wasted = 0, pending = null, taps = 0, misses = 0;
       for (let step = 0; step < 8000 && !N.over; step++) {
         if (N.picking) {
@@ -76,9 +82,11 @@ function simulateBatch({ day, door, bows, rate, strategy, first, count, override
         }
       }
       if (!N.over) throw new Error('模拟超出步数上限');
+      await withGameLock(() => {}); // 本局的异步结算完全提交后，再建下一局。
       results.push({ win: N.door > 0, hp: Math.max(0, N.door) / N.doorMax, kills: N.kills, coins: N.coins, switches, wasted, taps, misses });
     }
   } finally {
+    ({ save, storedGame, adoptStoredGame } = disk);
     Math.random = originalRandom; hitAt = originalHit; startWave = originalWave; spawnGhost = originalSpawn; offerPerks = originalOffer;
   }
   return results;

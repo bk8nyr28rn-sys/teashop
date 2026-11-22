@@ -334,7 +334,7 @@ const River = (() => {
       case 'raft':
         return btn('raftHome', '回家 · 5 分') + btn('untie', '收排');
       case 'home':
-        return btn('walkHome', '回家 · 30 分');
+        return btn('walkHome', type(r.hand) === 'wood' ? '回家劈柴 · 30 分' : '回家 · 30 分');
       case 'ditch':
         if (r.bridge && !high()) return btn('bridgeHome', '回家 · 12 分', 'bridge');
         return btn('bridge', r.bridge ? '桥已淹' : '搭桥', 'bridge', high() || type(r.hand) !== 'wood');
@@ -582,7 +582,7 @@ const River = (() => {
   function describe(id) {
     const r = state();
     if (id === 'far') return '远路难提重物。先放下手里的东西，或带它回家。';
-    if (id === 'wood0' || id === 'wood1' || id === 'wood2') return '木头在码头边轻轻相碰，能搬，也能绑。';
+    if (type(id) === 'wood') return `这根长木能绑排，搬回家也能劈成 ${LoopCore.FIREWOOD_PER_LOG} 件柴。`;
     if (id === 'porter')
       return r.helped ? '周伯瞧见你，腾出手来招了招。' : '周伯把扁担抵在岸上，一头箩筐卡住了。';
     return (
@@ -752,7 +752,7 @@ const River = (() => {
     const wood = type(r.hand) === 'wood';
     if (wood) {
       put(r.hand, 'firewood');
-      G.store['柴'] = (G.store['柴'] || 0) + 1;
+      LoopCore.splitFirewood(G);
     }
     if (stone) {
       r.stone = 'yard';
@@ -762,7 +762,7 @@ const River = (() => {
     r.helper = false;
     r.focus = null;
     const packed = arriveHome(stone || wood);
-    // 先提交抵家状态，过渡中刷新也只入库一次。
+    // 先提交抵家状态，过渡中刷新也只收到一次东西。
     save();
     const hero = $('rb-player');
     const craft = $('rb-map').querySelector('[data-r-target="raft"]');
@@ -801,7 +801,7 @@ const River = (() => {
       window.render();
       if (stone) placeStone();
       else {
-        toast([route + '到了家', packed].filter(Boolean).join('。'));
+        toast([route + '到了家', wood ? `劈出 ${LoopCore.FIREWOOD_PER_LOG} 件柴，都归你` : '', packed].filter(Boolean).join('。'));
         afterArrive();
       }
     };

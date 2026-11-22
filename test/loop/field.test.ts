@@ -212,7 +212,7 @@ describe('采集、标记、分货和归家', () => {
     expect(s.shareRemainder.wang).toBe(0);
   });
 
-  it('分成按各伙伴累计，带回的货宝分开入库，自己和家里的钱都不变', () => {
+  it('分成按各伙伴累计，带回的货宝归自己，自己和家里的钱都不变', () => {
     const s = atSite(2, 'wang');
     s.person.purse = 12;
     s.house.chest = 37;
@@ -240,8 +240,9 @@ describe('采集、标记、分货和归家', () => {
     expect(fight(resumed)).toMatchObject({ outcome: 'won', kept: [{ n: '夜行衣', tre: true, v: 80 }] });
     goHome(resumed);
     expect(resumed.person.bag).toEqual([]);
-    expect(resumed.house.treasures).toEqual([{ n: '夜行衣', v: 80 }]);
-    expect(Object.values(resumed.house.store).reduce((a, b) => a + b, 0)).toBe(3);
+    expect(resumed.person.personalTreasures).toEqual([{ n: '夜行衣', v: 80 }]);
+    expect(Object.values(resumed.person.goods).reduce((a, b) => a + b, 0)).toBe(3);
+    expect(resumed.house).toMatchObject({ treasures: [], store: {} });
     expect([resumed.person.purse, resumed.house.chest]).toEqual([12, 37]);
   });
 });
@@ -294,7 +295,7 @@ describe('遇险、倒下和遇暮', () => {
     expect(flee(s)).toBeNull();
   });
 
-  it.each([0, 3, 6])('结伴在地点 %i 倒下：损失前半向上取整，剩余入库，人由伙伴扛回', id => {
+  it.each([0, 3, 6])('结伴在地点 %i 倒下：损失前半向上取整，伙伴扛回的人保有余物', id => {
     const s = inDanger(id, 'wang');
     s.person.bag = [...cargo];
     s.person.hp = 1;
@@ -304,7 +305,8 @@ describe('遇险、倒下和遇暮', () => {
     expect(s.person.hp).toBe(1);
     expect(s.person.time).toBe(time + back);
     expect(s.ground[id]).toEqual(cargo.slice(0, 2));
-    expect(s.house.store).toEqual({ 柴: 1 });
+    expect(s.person.goods).toEqual({ 柴: 1 });
+    expect(s.house.store).toEqual({});
     expect(s.house.treasures).toEqual([]);
     expect(s.phase).toBe('home');
     expect(s.person.friends.wang).toBe(31);
@@ -384,8 +386,9 @@ describe('遇险、倒下和遇暮', () => {
     const carry = reload(s);
     carry.rngState = 7;
     expect(escapeDusk(carry, 'carry')).toEqual({ outcome: 'escaped', lost: [] });
-    expect(carry.house.store).toEqual({ 柴: 2 });
-    expect(carry.house.treasures).toEqual([{ n: '古玉', v: 90 }]);
+    expect(carry.person.goods).toEqual({ 柴: 2 });
+    expect(carry.person.personalTreasures).toEqual([{ n: '古玉', v: 90 }]);
+    expect(carry.house).toMatchObject({ store: {}, treasures: [] });
     expect(carry.person.hp).toBe(3);
     const seed = s.rngState;
     expect(escapeDusk(s, 'drop')).toEqual({ outcome: 'escaped', lost: cargo });

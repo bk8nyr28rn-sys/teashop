@@ -93,14 +93,15 @@ describe('攒天和时辰', () => {
     expect(resumed).toEqual(stream);
   });
 
-  it('用公开入口开第一天、采货归仓，再把同一户人家的快照交给守夜', () => {
+  it('用公开入口开第一天、采货归己，再把同一户人家的快照交给守夜', () => {
     const bank = makeDayBank('2026-11-20'), field = makeField(1);
     expect(startDay(bank, field.person, '2026-11-20', 'first')).toBe(true);
     expect(goOut(field)).toBe(true);
     expect(walkTo(field, 2)).toBe(true);
     expect(gather(field)?.kept).toHaveLength(2);
     expect(goHome(field)).toBe(true);
-    expect(Object.values(field.house.store).reduce((a, b) => a + b, 0)).toBe(2);
+    expect(Object.values(field.person.goods).reduce((a, b) => a + b, 0)).toBe(2);
+    expect(field.house.store).toEqual({});
     expect(field.person.bag).toEqual([]);
     field.person.time = CFG.dusk; // 在家歇到天黑。
     const before = JSON.stringify(field);

@@ -17,13 +17,17 @@ async function toggleUnlimited(page, checked) {
 }
 async function endLivingNight(page, takeDawn = true) {
   await page.getByRole('button', { name: /在家歇到天黑/ }).click();
+  await page.waitForFunction(() => N && !N.over && G.phase === 'night');
   const before = await balance(page);
   // 仅缩短战斗，结算、天亮按钮和扣天都沿用正式入口。
   await page.evaluate(() => endNight(true));
   const dawn = sheet(page).getByRole('button', { name: '天亮了', exact: true });
   await dawn.waitFor();
   assert.equal(await balance(page), before, '守夜与结算不再花天');
-  if (takeDawn) await dawn.click();
+  if (takeDawn) {
+    await dawn.click();
+    await page.waitForFunction(() => !G.nightReceipt);
+  }
 }
 async function checkCalendar(browser) {
   const context = await browser.newContext({ viewport, timezoneId: 'Asia/Shanghai' });
@@ -74,7 +78,7 @@ async function checkCalendar(browser) {
     await other.getByRole('button', { name: '开始下一天' }).click();
     await page.locator('.day-bank', { hasText: '0 / 3' }).waitFor();
     await page.clock.fastForward(60000);
-    assert.equal((await saved(page)).day, 4, '后台刷新余额保留前台的游戏进度');
+    assert.equal((await saved(page)).person.day, 4, '后台刷新余额保留前台的游戏进度');
     await other.close();
     await page.reload();
     assert.deepEqual(await state(page), [4, 'home', 0, '2026-11-20']);
@@ -84,7 +88,7 @@ async function checkCalendar(browser) {
     await page.clock.setSystemTime(new Date('2026-11-27T08:00:00+08:00'));
     await page.reload();
     assert.deepEqual(await state(page), [4, 'home', 3, '2026-11-27']);
-    assert.equal((await saved(page)).bankedDays, 3);
+    assert.equal((await saved(page)).account.bankedDays, 3);
     // 满额那天也记录日期，花一天下次打开不会立即再领。
     await endLivingNight(page);
     await page.reload();
@@ -128,10 +132,11 @@ async function checkMigrationAndDst(browser) {
     await page.reload();
     assert.deepEqual(await state(page), [3, 'map', 3, '2026-03-07']);
     const migrated = await saved(page);
-    assert.equal(migrated.v, 3);
-    assert.equal(migrated.money, 73);
-    assert.equal(migrated.at, 1);
-    assert.equal(migrated.unlimitedDays, false);
+    assert.equal(migrated.v, 4);
+    assert.equal(migrated.houses[migrated.person.houseId].chest, 73);
+    assert.equal(migrated.person.purse, 0);
+    assert.equal(migrated.person.at, 1);
+    assert.equal(migrated.account.unlimitedDays, false);
     await page.evaluate(() => { G.bankedDays = 0; save(); });
     await page.clock.setSystemTime(new Date('2026-03-09T00:02:00-04:00'));
     await page.reload();

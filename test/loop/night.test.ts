@@ -354,13 +354,17 @@ describe('结算和回放', () => {
     for (const win of [false, true]) {
       const { house, person } = inputs(setup);
       const family = { ...house, chest: 109, treasures: [{ n: '玉', v: 32 }, { n: '珠', v: 80 }], store: { wood: 3 } };
+      person.purse = 53;
       const before = copy([family, person]);
       const n = startNight(family, person, { seed: 7, guardian });
       n.wave = 4; n.spawns = []; n.door = win ? 8 : 0; n.coins = 24; n.kills = 6;
       nightStep(n);
       expect(n.result).toMatchObject({ won: win, door: win ? 8 : 0, doorMax: DOORS[1]!.hp, coins: 24, kills: 6,
         held: Number(!guardian && win), broken: Number(!guardian && !win), earnedMoney: win ? 24 : 0,
-        creditedKills: win ? 6 : 0, lostMoney: win ? 0 : 32 });
+        creditedKills: win ? 6 : 0,
+        purseLost: win ? 0 : Math.floor(53 * n.lootPlan.purseTenths / 10),
+        chestLost: win ? 0 : Math.floor(109 * n.lootPlan.chestTenths / 10) });
+      expect(n.result!.lostMoney).toBe(n.result!.purseLost + n.result!.chestLost);
       if (win) expect(n.result?.lostTreasure).toBeNull();
       else expect(n.result?.lostTreasure).toEqual(family.treasures[n.result!.lostTreasureIndex!]);
       const finish = copy(n);

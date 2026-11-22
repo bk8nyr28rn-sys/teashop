@@ -1,6 +1,6 @@
 # 交接说明（给接手的工程师或 AI 代理）
 
-> 更新：2026-11-21。
+> 更新：2026-11-22。
 > **先读 `docs/ROADMAP.md`**（现在的方向，最前面是「已定 / 待定 / 点子池」总表），**再读本文件**，要动手就看 `docs/CODEX_TASKS.md`。
 > 冲突时的优先级：`docs/ROADMAP.md` 的已定 > 本文件 > 代码里的测试 > `docs/DESIGN_v2.1.md`（最旧，很多已过时）。
 
@@ -15,7 +15,7 @@
 | 在哪 | `docs/proto/loop/index.html`（一日一夜样机）、`docs/art/creator/index.html`（武林捏人台），都是单文件页面 | `src/core`（规则）、`src/sim`（模拟器）、`src/web`（网页壳）、`test/` |
 | 状态 | 能玩、有浏览器测试和难度模拟；规则写在页面的脚本里，还没进 `src/core` | 94 个测试全过；红线、存档、确定性随机这些底子以后还要用 |
 
-**下一步的大活**就是把样机里的规则搬进 `src/core/loop/`。顺序按 `docs/SESSION_REVIEW.md` 最后的分阶段表。第一阶段（时间、野外、五波守夜）已经做完，见 `docs/STAGE1_REPORT.md`；页面还没改成调用核心。第一晚只来普通鬼的小任务也做完了（11-21）。下一步：`docs/STAGE2_SPEC.md`（家的存档、两个口袋、一晚只结算一次）。
+**下一步的大活**就是把样机里的规则搬进 `src/core/loop/`。顺序按 `docs/SESSION_REVIEW.md` 最后的分阶段表。第一阶段（时间、野外、五波守夜）已经做完，见 `docs/STAGE1_REPORT.md`；页面还没改成调用核心。第一晚只来普通鬼的小任务也做完了（11-21）。第二阶段（家的存档、两个口袋、一晚只结算一次）也做完了（11-22），见 `docs/qa/stage2/README.md`。下一步是第三阶段（机关代守、回来时的摘要），开工前要先和产品负责人定代守怎么算。
 
 玩法的两把尺子（产品负责人定的，每个改动都拿它验收）：**一，玩家觉得爽；二，自由度尽可能高**（目标定死，方法放开）。
 
@@ -29,6 +29,7 @@ npm test             # 旧原型的单元测试，当前 94 个全部通过
 npm run typecheck    # 两次类型检查：核心用不含 DOM 和 Node 的配置单独检查
 npm run sim          # 旧原型的数值模拟（6 类玩家 × 200 人 × 30 天，约 1 秒）
 npm run build:web    # 打包旧原型：dist/web/teashop.html
+npm run build:loop   # 把 src/core/loop/browser.ts 打包成 assets/loop-core.js，给样机用（--check 只检查）
 
 # 新方向的样机（需要 Playwright：npm i --no-save playwright && npx playwright install chromium）
 npm run test:proto     # 捏人台和一日一夜样机的浏览器测试，截图在系统临时目录的 teashop-proto 下
@@ -77,7 +78,7 @@ design/                   11 月 14 日的旧设计稿画布（有已删掉的�
 | 死后 | `die`、`renderDeath`、`startHaunt`、`hauntStep`、`endHaunt` | 护家神 / 厉鬼 |
 | 投胎 | `karmaRows`、`goReborn`、`newFamily`、`reborn` | 因果分、三户人家、回自己家 |
 
-状态都在全局 `G`（存进 localStorage 的 `wulin-loop`，版本 `v: 2`）；夜里的临时状态在 `N`，当厉鬼时在 `H`。`SPEED` 可以让测试加速。
+状态都在全局 `G`；存进 localStorage 的 `wulin-loop`，现在是 `v: 4`，分成 `account`（账号：攒天、带路、捏的脸）、`person`（这一世的人：钱袋、自己的货、背包）、`houses[houseId]`（每户人家：钱箱、仓库、宝物架、院子、门、机关、画像、守夜回执），字段见 `docs/qa/stage2/README.md`。存档、迁移、两个口袋和夜里结算的规则在 `src/core/loop/`（`economy.ts`、`household.ts`、`settlement.ts`），用 `npm run build:loop` 打包成 `assets/loop-core.js`，**改规则改核心，不要改打包出来的文件**；跨标签写存档用 `assets/loop-storage.js` 的锁。夜里的临时状态在 `N`，当厉鬼时在 `H`。`SPEED` 可以让测试加速。
 
 ## 3. 新方向不能破坏的规则
 
@@ -143,7 +144,8 @@ design/                   11 月 14 日的旧设计稿画布（有已删掉的�
 
 | 项目 | 说明 |
 | --- | --- |
-| 页面还没接规则核心 | 时间、野外、守夜已经在 `src/core/loop/`（有单元测试，和样机逐局对得上），但样机页面还在用自己脚本里的那一份；两边改规则要一起改，改完跑 `npm run balance:night -- --compare-core` |
+| 页面只接了一半规则核心 | 存档、两个口袋、夜里结算已经由页面调用核心（`assets/loop-core.js`）。但时间、野外、守夜的打斗，页面还在用自己脚本里的那一份；这几块改规则要两边一起改，改完跑 `npm run balance:night -- --compare-core` |
+| 河边浮木变成 7 件柴 | 第二阶段为了让第一天能换上木门，搬回家的一根浮木从 1 件柴改成 7 件（21 文）。每一世河边只有 3 根浮木，所以不会让钱涨得没边；第四阶段做经营时再一起看 |
 | 只靠机关守不住 | 零操作只靠机关，几乎每晚都破门（`docs/STAGE1_REPORT.md` 表二）。第三阶段的机关代守要专门设计结算 |
 | 门口图标会叠 | 鬼挤在门口时，头上的图标和血条叠在一起 |
 | 后人选不了 | 有好几个后人时，投胎默认去第一个后人家，玩家不能挑 |

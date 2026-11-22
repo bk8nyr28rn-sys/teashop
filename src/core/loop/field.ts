@@ -2,6 +2,7 @@ import { Rng } from '../rng';
 import { AGE_FX, balanceAge, CFG, nextRandom, RULE_VERSION } from './base';
 import { FIELD_CONFIG as F, HOME, RINGS, SPOTS, TREASURES, type Spot } from './field-config';
 import { makeHouse, makePerson, type House, type Loot, type Person } from './state';
+import { unpackBag } from './economy';
 
 type Place = number | 'home';
 type DuskReason = 'walk' | 'return' | 'gather' | 'mark' | 'flee';
@@ -190,12 +191,8 @@ export function fightChance(s: FieldState): number | null {
 }
 
 function arriveHome(s: FieldState) {
-  for (const item of s.person.bag) {
-    if (item.tre) s.house.treasures.push({ n: item.n, v: item.v });
-    else s.house.store[item.n] = (s.house.store[item.n] || 0) + 1;
-  }
+  unpackBag(s.person);
   if (s.buddy) s.person.friends[s.buddy] = Math.min(F.maxFriendship, (s.person.friends[s.buddy] || 0) + F.returnFriendship);
-  s.person.bag = [];
   s.buddy = null;
   s.at = 'home';
   s.phase = 'home';

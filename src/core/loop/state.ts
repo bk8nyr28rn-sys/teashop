@@ -20,6 +20,8 @@ export interface Person {
   hp: number;
   bag: Loot[];
   purse: number;
+  goods: Record<string, number>;
+  personalTreasures: Treasure[];
   item: Item;
   power: number;
   friends: Record<string, number>;
@@ -31,7 +33,7 @@ export function makeHouse(): House {
 
 export function makePerson(): Person {
   return {
-    day: 1, time: CFG.dayStart, hp: CFG.hpMax, bag: [], purse: 0, item: 'sword',
+    day: 1, time: CFG.dayStart, hp: CFG.hpMax, bag: [], purse: 0, goods: {}, personalTreasures: [], item: 'sword',
     power: FIRST_PERSON.power, friends: { ...FIRST_PERSON.friends },
   };
 }
