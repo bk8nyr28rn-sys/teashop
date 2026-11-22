@@ -165,6 +165,7 @@ const { wrap, OUT, enableAllFeatures } = require('./lib.cjs');
     assert.equal(await page.locator('[data-yard-stone="2"]').count(), 1);
     await page.reload();
     await click('[data-a="night"]');
+    await click('[data-a="manual"]');
     await page.locator('#nsvg').waitFor();
     assert.equal(await page.locator('#nsvg [data-yard-stone="2"]').count(), 1);
     await page.waitForTimeout(650); // 等昼夜主题渐变结束再留图。

@@ -19,3 +19,5 @@ export * from './night-config';
 export * from './household';
 export * from './economy';
 export * from './settlement';
+export * from './auto-defense';
+export * from './absence';

@@ -10,6 +10,7 @@ const { wrap } = require('./lib.cjs');
     await page.goto(pathToFileURL(wrap('loop')).href);
     await page.getByRole('button', { name: '开始', exact: true }).click();
     await page.locator('[data-a=night]').click();
+    await page.locator('[data-a=manual]').click();
     await page.locator('[data-item]').first().waitFor();
     assert.equal(await page.locator('[data-item]').count(), 1);
 

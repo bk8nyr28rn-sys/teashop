@@ -109,6 +109,7 @@ const ok = (n, c, x = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (x ? ' �
   ok('回自家第一天不显示买机关', await p.locator('[data-buy]').count() === 0);
   await p.getByRole('button',{name:'回去',exact:true}).click();
   await p.click('[data-a=night]');
+  await p.click('[data-a=manual]');
   await p.locator('#nsvg').waitFor();
   ok('两台祖传弩机首夜各射一箭', await p.evaluate(() => {
     cancelAnimationFrame(raf);

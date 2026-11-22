@@ -799,9 +799,9 @@ const River = (() => {
       .forEach((b) => (b.disabled = true));
     const finish = () => {
       window.render();
-      if (stone) placeStone();
+      if (stone && G.time < CFG.dusk) placeStone();
       else {
-        toast([route + '到了家', wood ? `劈出 ${LoopCore.FIREWOOD_PER_LOG} 件柴，都归你` : '', packed].filter(Boolean).join('。'));
+        toast([route + '到了家', stone ? '青纹石已放在院里' : '', wood ? `劈出 ${LoopCore.FIREWOOD_PER_LOG} 件柴，都归你` : '', packed].filter(Boolean).join('。'));
         afterArrive();
       }
     };

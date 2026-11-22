@@ -14,6 +14,8 @@ const LoopStorage = (() => {
     snapshot.account.guideSeen = [...new Set([...(disk.account.guideSeen || []), ...(snapshot.account.guideSeen || [])])];
     if (disk.account.lastGrantDate > snapshot.account.lastGrantDate)
       LoopCore.accrueDays(snapshot.account, disk.account.lastGrantDate);
+    if (disk.account.lastActiveDate > (snapshot.account.lastActiveDate || ''))
+      snapshot.account.lastActiveDate = disk.account.lastActiveDate;
   }
 
   function lockInDatabase(run) {
@@ -65,10 +67,12 @@ const LoopStorage = (() => {
     }).finally(() => { if (queued === snapshot) queued = null; });
   }
   function updateAccount(change) {
-    return exclusive(() => {
+    const apply = () => {
       const disk = readDisk();
       if (disk?.v === 4 && change(disk.account)) localStorage.setItem(slot, JSON.stringify(disk));
-    });
+    };
+    if (locked) { apply(); return Promise.resolve(); }
+    return exclusive(apply);
   }
   // 只恢复能接在当前版本之后的操作；另一标签已推进的旧分支不能覆盖现有进度。
   const interrupted = Object.keys(localStorage).filter(k => k.startsWith(pendingPrefix));

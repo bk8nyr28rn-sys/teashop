@@ -7,6 +7,7 @@
 <script src="../assets/avatar.js"></script>
 <script src="../assets/loop-core.js"></script>
 <script src="../assets/loop-storage.js"></script>
+<script src="../assets/house-watch.js"></script>
 <link rel="stylesheet" href="../assets/riverside.css">
 <script src="../assets/riverside.js"></script>
 <link rel="stylesheet" href="../assets/guidance.css">
@@ -51,6 +52,8 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .hud-l span { font-size: 12px; color: var(--muted); }
 .hud-l .day-bank { flex-basis: 100%; white-space: nowrap; color: var(--accent); }
 .waiting-yard { filter: brightness(.67) saturate(.65); }
+.waiting-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.waiting-actions button { min-height: 46px; }
 .bank-toggle { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--bg); cursor: pointer; }
 .bank-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
 .hud-r { display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -121,6 +124,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .sh-btns button.main { background: var(--seal); border-color: var(--seal); color: var(--on-seal); }
 .sh-btns button.perk { text-align: left; border: 2px solid var(--gold); padding: 8px 12px; }
 .sh-btns button small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
+.sh-btns .night-choice { text-align: left; min-height: 64px; padding: 9px 14px; }
+.sh-btns .night-choice small { margin-top: 2px; }
+.sh-btns .choice-back { min-height: 40px; background: transparent; border-style: dashed; }
+.trap-offers { display: grid; gap: 6px; }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .list li { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--bg); }
 .list li > span { margin-left: auto; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -1064,7 +1071,7 @@ function dawnAlreadyStarted(first) {
 const FIRST_FAMILY = { name: '林家', money: 20, door: 0, treasures: [], friends: { wang: 26, li: 8, zhao: 0 }, thread: '知己' };
 function freshLife(fam, prev) {
   const life = {
-    v: 4, ...(prev ? bankFields(prev) : { ...LoopCore.makeDayBank(localDateKey()), worldId: LoopStorage.revision() }),
+    v: 4, ...(prev ? bankFields(prev) : { ...LoopCore.makeDayBank(localDateKey()), lastActiveDate: localDateKey(), worldId: LoopStorage.revision() }),
     guideSeen: prev?.guideSeen || [], guideOff: !!prev?.guideOff, allFeatures: !!prev?.allFeatures,
     lifeNo: prev ? prev.lifeNo + 1 : 1, fam: fam.name, thread: fam.thread, phase: prev ? 'birth' : 'intro', day: 1, time: CFG.dayStart, hp: CFG.hpMax,
     name: surnameOf(fam.name) + pick(GIVEN_ME), grade: GRADES[fam.thread][0], power: GRADES[fam.thread][1],
@@ -1232,8 +1239,30 @@ function renderWaiting(now = new Date()) {
   }
   $('panel').innerHTML = `<div class="where"><b>${ready ? '可以天亮了' : '今天的日子过完了'}</b></div>
     <div class="plan">${ready ? `准备好了，就开始第 ${first ? 1 : G.day + 1} 天。` : `下一个现实日的 0 点再领 1 天，还有 ${Math.floor(mins / 60)} 小时 ${mins % 60} 分。`}<br>攒着的天：${G.bankedDays} / ${BANK_CAP}</div>
-    <button type="button" class="big main" data-a="dawn"${ready ? '' : ' disabled'}>${first ? '开始新一世的第一天' : '开始下一天'}</button>`;
-  bindActs({ dawn: first ? firstMorning : nextMorning });
+    <button type="button" class="big main" data-a="dawn"${ready ? '' : ' disabled'}>${first ? '开始新一世的第一天' : '开始下一天'}</button>
+    <div class="waiting-actions">
+      <button type="button" class="mini" data-a="reports">家宅战报</button>
+      <button type="button" class="mini" data-a="summary">回来时的摘要</button>
+      <button type="button" class="mini" data-a="yard">看院子</button>
+      <button type="button" class="mini" data-a="family">家人和祠堂</button>
+    </div>${ready ? '' : `<div class="waiting-actions">
+      <button type="button" class="mini" disabled data-a="market">明天才能去集市买卖</button>
+      <button type="button" class="mini" disabled data-a="build">明天才能修院子</button>
+      <button type="button" class="mini" disabled data-a="deposit">明天才能存钱</button>
+      <button type="button" class="mini" disabled data-a="out">明天才能出门</button>
+      <button type="button" class="mini" disabled data-a="night">明天才能再过夜</button>
+      ${G.river?.stone === 'yard' ? '<button type="button" class="mini" disabled data-a="place">明天才能摆放院石</button>' : ''}
+    </div>`}`;
+  bindActs({ dawn: first ? firstMorning : nextMorning, reports: () => showHouseReports(), summary: () => openReturnSummary(), yard: openWaitingYard, family: openFamily });
+}
+function openWaitingYard() {
+  sheet({
+    title: `${G.fam}的院子`, dismiss: true, focusTitle: true,
+    body: `<svg viewBox="0 0 360 300" class="stage" role="img" aria-label="自家的院子">${homeSvg()}</svg>
+      <p>${DOORS[G.door].name} · 门血 ${DOORS[G.door].hp}${trapSummary()}</p>
+      <p class="note">仓库 ${storeCount()} 件 · 宝物架 ${G.treasures.length} 件 · 钱箱 ${G.chest} 文</p>`,
+    buttons: [['回去', null]],
+  });
 }
 function firstMorning() {
   if (G.phase !== 'intro' && G.phase !== 'birth') return;
@@ -1255,7 +1284,7 @@ function updateCalendar() {
   if (G.phase === 'dawn' || G.phase === 'birth') renderWaiting();
 }
 function scheduleCalendar() {
-  setTimeout(() => { updateCalendar(); scheduleCalendar(); }, 60000 - Date.now() % 60000);
+  setTimeout(() => { if (!document.hidden) visitCalendar(true); scheduleCalendar(); }, 60000 - Date.now() % 60000);
 }
 
 // ================= 院子（白天） =================
@@ -1322,7 +1351,31 @@ function renderHome() {
       ${canHeal ? `<button type="button" class="big" data-a="heal">用草药疗伤<small>体力 +1 · 用${G.goods.草药 ? '自己的' : '仓库的'}草药</small></button>` : ''}
       <button type="button" class="big ${left > 0 ? 'ghosty' : 'main'}" data-a="night">${left > 0 ? '在家歇到天黑' : '天黑了，去守夜'}<small>${left > 0 ? `还有 ${dur(left)} 天黑，鬼会来砸门` : '鬼要来砸门了'}</small></button>
     </div>`;
-  bindActs({ out: () => askBuddy(toWharf), river: () => askBuddy(true), place: River.placeStone, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, heal, night: () => { G.time = Math.max(G.time, CFG.dusk); startNight(false); } });
+  bindActs({ out: () => askBuddy(toWharf), river: () => askBuddy(true), place: River.placeStone, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, heal, night: chooseNightWatch });
+}
+function chooseNightWatch() {
+  if (G.phase !== 'home') return;
+  const chance = LoopCore.chanceLabel(LoopCore.defenseChance(G.day, G.door, G.traps));
+  const limit = LoopCore.autoLossLimit(G.chest, G.lifeNo);
+  const protection = G.lifeNo === 1 ? '第一世有保护，' : '';
+  const commit = start => {
+    if (G.phase !== 'home') return;
+    G.time = Math.max(G.time, CFG.dusk);
+    return start();
+  };
+  sheet({
+    title: '今晚怎么守门？', dismiss: true, focusTitle: true,
+    body: `<p>第 ${G.day} 晚 · ${DOORS[G.door].name}${trapSummary()}</p>`,
+    buttons: [
+      ['亲手守<small>亲自迎敌，波间能挑本事。守住得全份因果。</small>', () => commit(() => startNight(false)), 'night-choice'],
+      [`交给机关<small>守住的把握${chance} · ${protection}门破了钱箱最多丢 ${limit} 文。守住得半份因果。</small>`, () => commit(delegateNight), 'night-choice'],
+      ['回院子', null, 'choice-back'],
+    ],
+    bind: el => {
+      el.querySelector('[data-i="0"]').dataset.a = 'manual';
+      el.querySelector('[data-i="1"]').dataset.a = 'delegate';
+    },
+  });
 }
 function heal() {
   if (G.hp >= CFG.hpMax) return;
@@ -1423,15 +1476,26 @@ function paymentText({chest, purse, shortfall}) {
 function openBuild() {
   const next = DOORS[G.door + 1];
   const doorQuote = next && LoopCore.quoteHome(G, G, next.cost);
+  const currentChance = LoopCore.defenseChance(G.day, G.door, G.traps);
+  const currentLabel = LoopCore.chanceLabel(currentChance);
+  const preview = (door, traps) => {
+    const upgraded = LoopCore.defenseChance(G.day, door, traps);
+    const after = LoopCore.chanceLabel(upgraded);
+    const detail = after === currentLabel && upgraded > currentChance ? '（略有提高）' : '';
+    return `交给机关守的把握：${currentLabel} → ${after}${detail}`;
+  };
   const trapRows = Object.entries(TRAPS).map(([key, trap]) => {
     const quote = LoopCore.quoteHome(G, G, trap.cost), full = G.traps[key] >= trap.max;
-    return `<li><div><b>${trap.name}</b> ${G.traps[key]}/${trap.max}<br><small class="note">${trap.desc}${full ? '' : `<br>${paymentText(quote)}`}</small></div><span></span><button type="button" class="mini" data-buy="${key}"${full || quote.shortfall ? ' disabled' : ''}>${full ? '满了' : `买 ${trap.cost} 文`}</button></li>`;
+    return `<button type="button" class="big" data-buy="${key}"${full || quote.shortfall ? ' disabled' : ''}>
+      ${trap.name} ${G.traps[key]}/${trap.max} · ${full ? '装满了' : `买 ${trap.cost} 文`}
+      <small>${trap.desc}</small>${full ? '' : `<small>${paymentText(quote)}</small><small>${preview(G.door, {...G.traps, [key]: G.traps[key] + 1})}</small>`}
+    </button>`;
   }).join('');
   sheet({
     title: '修院子', dismiss: true,
     body: `<p>现在是<b>${DOORS[G.door].name}</b>，门血 ${DOORS[G.door].hp}。</p>
-      ${next ? `<button type="button" class="big${doorQuote.shortfall ? '' : ' main'}" id="up-door"${doorQuote.shortfall ? ' disabled' : ''}>换成${next.name}（${next.cost} 文）<small>门血 ${next.hp} · ${paymentText(doorQuote)}</small></button>` : '<p class="note">已经是最气派的门了。</p>'}
-      ${Guidance.open(2) ? `<div class="sub">机关</div><ul class="list">${trapRows}</ul>` : ''}`,
+      ${next ? `<button type="button" class="big${doorQuote.shortfall ? '' : ' main'}" id="up-door"${doorQuote.shortfall ? ' disabled' : ''}>换成${next.name}（${next.cost} 文）<small>门血 ${next.hp} · ${paymentText(doorQuote)}</small><small>${preview(G.door + 1, G.traps)}</small></button>` : '<p class="note">已经是最气派的门了。</p>'}
+      ${Guidance.open(2) ? `<div class="sub">机关</div><div class="trap-offers">${trapRows}</div>` : ''}`,
     buttons: [['回去', null]],
     bind: (el) => {
       const up = el.querySelector('#up-door');
@@ -1734,7 +1798,7 @@ function duskChoices(lead) {
 function goHome() {
   if (busy) return;
   River.leavingMap();
-  if (G.at === 'home') { Guidance.done('late'); G.phase = 'home'; G.buddy = null; save(); render(); return; }
+  if (G.at === 'home') { Guidance.done('late'); G.phase = 'home'; G.buddy = null; save(); render(); if (G.time >= CFG.dusk) chooseNightWatch(); return; }
   const m = walkMin(G.at, 'home');
   moveToken(HOME, () => {
     if (G.time + m > CFG.dusk) { G.time = CFG.dusk; save(); return dusk('走到半路，天就黑了。'); }
@@ -1757,7 +1821,7 @@ function arriveHome(handDelivered = false) {
   G.buddy = null; G.at = 'home'; G.target = null; G.phase = 'home';
   return parts.join('；');
 }
-function afterArrive() { if (G.time >= CFG.dusk) startNight(false); else render(); }
+function afterArrive() { if (G.time >= CFG.dusk) chooseNightWatch(); else render(); }
 
 // ================= 家：结缘、孩子、徒弟、祠堂 =================
 function familySummary() {
@@ -1790,7 +1854,8 @@ function offerMatch() {
 }
 function discipleButton() {
   const quote = LoopCore.quoteHome(G, G, 30);
-  return [`收个徒弟（30 文）<small>${paymentText(quote)}</small>`, takeDisciple, '', !!quote.shortfall];
+  const waiting = G.phase !== 'home';
+  return [`收个徒弟（30 文）<small>${waiting ? '明天才能收徒' : paymentText(quote)}</small>`, takeDisciple, '', waiting || !!quote.shortfall];
 }
 function takeDisciple() {
   const payment = LoopCore.payHome(G, G, 30);
@@ -1803,6 +1868,7 @@ function takeDisciple() {
 }
 function openFamily() {
   const adult = Guidance.open(3);
+  const waiting = G.phase !== 'home';
   const fam = G.kids.map((k) => `<li>${k.name}<span>${k.kind === '徒' ? '徒弟' : k.kind === '子' ? '儿子' : '女儿'} · ${k.grade}</span></li>`).join('');
   sheet({
     title: `${G.fam} · ${G.name}`, dismiss: true,
@@ -1811,8 +1877,8 @@ function openFamily() {
       ${G.spouse ? `<div class="fr"><div class="fr-top"><b>${G.spouse.name}</b><span class="note">红线 ${threadName(G.love)}（${G.love}）</span></div><div class="fbar" role="img" aria-label="红线 ${G.love}"><i style="width:${G.love}%"></i><s style="left:20%"></s><s style="left:45%"></s><s style="left:70%"></s></div><p class="note">红线到知己以后会生孩子；越浓，孩子品级越好（最多差三成）。一辈子里最多到挚爱。</p></div>` : `<p class="note">${adult ? '还没牵红线。' : '长大以后可以结缘、收徒。'}</p>`}
       ${fam ? `<div class="sub">后人</div><ul class="list">${fam}</ul><p class="note">夜里，一家人会帮着守门。</p>` : ''}`,
     buttons: [
-      ...(G.spouse ? [['陪伴（花 1 个时辰，红线 +12）', () => { if (G.time + 120 > CFG.dusk) return toast('天快黑了，没时间了'); G.time += 120; G.love = Math.min(100, G.love + 12); save(); render(); toast('陪了一个时辰，红线 +12'); openFamily(); }, 'main', CFG.dusk - G.time < 120]] : []),
-      ...(adult && !G.spouse ? [['找有缘人', offerMatch, 'main']] : []),
+      ...(G.spouse ? [[`陪伴（花 1 个时辰，红线 +12）${waiting ? '<small>明天才能陪伴家人</small>' : ''}`, () => { if (G.time + 120 > CFG.dusk) return toast('天快黑了，没时间了'); G.time += 120; G.love = Math.min(100, G.love + 12); save(); render(); toast('陪了一个时辰，红线 +12'); openFamily(); }, 'main', waiting || CFG.dusk - G.time < 120]] : []),
+      ...(adult && !G.spouse ? [[waiting ? '明天才能找有缘人' : '找有缘人', offerMatch, 'main', waiting]] : []),
       ...(adult && G.kids.filter((k) => k.kind === '徒').length < 2 ? [discipleButton()] : []),
       ['去祠堂', openHall],
       ['回去', null],
@@ -1824,7 +1890,9 @@ function portrait(a) {
   return `<figure class="pt"><svg viewBox="30 -6 180 190" role="img" aria-label="${a.name}的画像"><rect x="30" y="-6" width="180" height="190" fill="#E8DCC2"/>${personSvg(a.look, a.expression || 'calm', 'elder')}</svg><figcaption><b>${a.name}</b><span>${a.note}</span></figcaption></figure>`;
 }
 function openHall() {
-  Guidance.done('family'); G.guideHall = true; save(); Guidance.update();
+  if (G.phase === 'home' && !G.guideHall) {
+    Guidance.done('family'); G.guideHall = true; save(); Guidance.update();
+  }
   const list = G.ancestors.length ? G.ancestors : [Guidance.ancestor()];
   sheet({
     title: `${G.fam}祠堂`, dismiss: true,
@@ -1874,6 +1942,9 @@ function offerPerks() {
   N.picking = true;
   const pool = Object.keys(PERKS).filter(perkAvailable).sort(() => Math.random() - 0.5);
   N.offer = pool.slice(0, 3);
+  showPerkChoice();
+}
+function showPerkChoice() {
   const have = Object.entries(N.pk).map(([id, n]) => PERKS[id].n + (n > 1 ? ` ×${n}` : '')).join('、');
   sheet({
     title: `第 ${N.wave + 1} 波守住了！挑一个本事`, focusTitle: true,
@@ -1929,6 +2000,9 @@ async function startNight(guardian) {
     kid: guardian ? (G.kids[0] ? G.kids[0].look : randomLook()) : null,
     fam: familyHelpers(),
   };
+  const resume = G.battleResume;
+  const restoring = resume && LoopCore.sameNight(resume.key, plan);
+  if (restoring) Object.assign(N, resume.battle);
   N.lights = nightLights();
   document.body.dataset.phase = G.phase;
   renderHud();
@@ -1941,7 +2015,17 @@ async function startNight(guardian) {
   svg.addEventListener('pointerdown', (e) => { if (N.over) return; e.preventDefault(); const p = toSvg(svg, e); hitAt(p.x, p.y); });
   $('nfam').innerHTML = N.fam.map((f) => person(f.look, 'angry', f.age, f.x, 498, f.age === 'child' ? 0.2 : 0.19)).join('');
   updateDoor();
-  startWave(0);
+  if (restoring) {
+    const ghosts = N.ghosts;
+    N.ghosts = [];
+    for (const g of ghosts) {
+      gidN = Math.max(gidN, g.id);
+      mountGhost(g);
+    }
+    $('nwave').textContent = resume.waveText;
+    if (N.ally) $('nally').innerHTML = person(lookOf(INSPIRE[N.ally.n.look][1]), 'angry', 'adult', 60, 498, 0.2);
+    if (N.picking) showPerkChoice();
+  } else startWave(0);
   if (guardian) toast('你是护家神：子孙在守门，你在旁边显灵。');
   N.last = performance.now();
   raf = requestAnimationFrame(nightLoop);
@@ -2059,10 +2143,15 @@ function spawnGhost(sp) {
   const g = { id: ++gidN, type: sp.type, hp: T.hp * hpMul, max: T.hp * hpMul, lane: rnd(-0.85, 0.85), x: 180, y: rnd(96, 122), ox: 0, k: 0.55, tx: 180 + rnd(-48, 48), ty: 424 + rnd(-6, 4), speed: T.speed * rnd(0.85, 1.15), state: 'walk', bashT: rnd(0.2, 0.8), name: ghostName(), ph: rnd(0, 6.28), hit: T.hit, flash: 0, lit: null };
   if (sp.type === 'fly') g.ty -= 34;
   N.names.push(g.name);
+  g.look = randomLook(); g.expr = pick(['angry', 'rage', 'gloomy']); g.age = Math.random() < 0.5 ? 'elder' : 'adult';
+  mountGhost(g);
+}
+function mountGhost(g) {
+  const T = GHOSTS[g.type];
   const el = document.createElementNS(NS, 'g');
-  el.setAttribute('class', 'ghost ' + sp.type);
+  el.setAttribute('class', 'ghost ' + g.type);
   const tag = T.tag ? `<g transform="translate(0 -15)"><circle r="10" fill="${T.tag[1]}" stroke="#0B0F1E" stroke-width="1.5"/><text y="4.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1E2A2C">${T.tag[0]}</text></g>` : '';
-  el.innerHTML = `<g class="gb"><ellipse cx="0" cy="-44" rx="32" ry="48" fill="url(#gglow)"/>${ghostSvg(randomLook(), pick(['angry', 'rage', 'gloomy']), Math.random() < 0.5 ? 'elder' : 'adult', 0, 0, 0.2)}</g>`;
+  el.innerHTML = `<g class="gb"><ellipse cx="0" cy="-44" rx="32" ry="48" fill="url(#gglow)"/>${ghostSvg(g.look, g.expr, g.age, 0, 0, 0.2)}</g>`;
   const label = document.createElementNS(NS, 'g');
   label.innerHTML = `<g class="hpw"><rect x="-17" y="-3" width="34" height="6" rx="3" fill="#0B0F1E" opacity="0.85"/><rect class="hpb" x="-17" y="-3" width="34" height="6" rx="3" fill="#FF6B6B"/></g>
       ${tag}
@@ -2072,6 +2161,17 @@ function spawnGhost(sp) {
   g.el = el; g.gb = el.querySelector('.gb'); g.label = label; g.hpb = label.querySelector('.hpb'); g.hpw = label.querySelector('.hpw');
   N.ghosts.push(g);
   refreshGhost(g);
+}
+// 离页时只保存数值和形象。重开用这些数据重建 SVG，已出现的鬼、门血和本事都接着上回。
+function checkpointNight() {
+  if (!N || N.over || !G.nightPlan || !LoopCore.sameNight(N.plan, G.nightPlan)) return;
+  const raw = LoopStorage.read();
+  if (!raw || raw.revision !== observedRevision) return;
+  const { plan, last, lights, ghosts, ...battle } = N;
+  const key = { houseId: plan.houseId, lifeId: plan.lifeId, nightId: plan.nightId, day: plan.day, guardian: plan.guardian };
+  G.battleResume = { key, waveText: $('nwave').textContent, battle: { ...battle,
+    ghosts: ghosts.map(({ el, gb, label, hpb, hpw, ...data }) => data) } };
+  save();
 }
 function refreshGhost(g) {
   const vis = revealed(g), c = ghostCenter(g);
@@ -2297,6 +2397,7 @@ function endNight(won) {
     const receipt = LoopCore.settleNightLedger(G, expected, { won, kills: battle.kills, coins: battle.coins },
       result => describeNight(result, battle));
     if (!receipt) { location.reload(); return; }
+    delete G.battleResume;
     G.item = item;
     for (const [id, value] of Object.entries(friends)) {
       if (value > (battle.startingFriends[id] || 0)) G.friends[id] = Math.max(value, G.friends[id] || 0);
@@ -2318,7 +2419,8 @@ function showNightReceipt(receipt) {
     else if (receipt.next === 'reborn') goReborn();
     else nextMorning();
   });
-  sheet({ title: receipt.won ? '守住了！' : '门破了！', buttons: [[label, proceed, 'main']], focusTitle: true,
+  const automated = receipt.mode === 'delegated' || receipt.mode === 'offline';
+  sheet({ title: automated ? (receipt.won ? '机关守住了' : '机关没守住') : (receipt.won ? '守住了！' : '门破了！'), buttons: [[label, proceed, 'main']], focusTitle: true,
     bind: el => receipt.paragraphs.forEach((text, i) => {
       const p = document.createElement('p'); p.textContent = text;
       if (i === receipt.paragraphs.length - 1) p.className = 'note';
@@ -2466,15 +2568,13 @@ function endHaunt(r) {
 function karmaRows() {
   const fr = NEIGHBORS.reduce((a, n) => a + G.friends[n.id], 0);
   const rows = [
-    ['守住的夜', `${G.held} 夜`, G.held * 8],
-    ['门被砸破', `${G.broken} 次`, -G.broken * 4],
-    ['赚的钱', `${G.earned} 文`, Math.floor(G.earned / 20)],
+    ['家业', `亲守 ${G.held - (G.autoHeld || 0)} 夜，机关守住 ${G.autoHeld || 0} 夜，亲守破门 ${G.broken} 次，赚 ${G.earned} 文`, LoopCore.nightKarma(G.held, G.autoHeld || 0, G.broken, G.earned)],
     ['交情', `合计 ${fr}`, Math.floor(fr / 10)],
     ['养育', `${G.kids.length} 个孩子或徒弟`, Math.min(40, G.kids.length * 10)],
     ['红线', G.spouse ? threadName(G.love) : '没有', G.spouse ? { 相识: 0, 知己: 5, 倾心: 15, 挚爱: 25 }[threadName(G.love)] : 0],
   ];
   const A = G.afterlife;
-  if (A && A.kind === 'guard') rows.push(['当护家神', A.won ? '守住了' : '没守住', A.won ? 20 : 5]);
+  if (A && A.kind === 'guard' && !A.automatic) rows.push(['当护家神', A.won ? '守住了' : '没守住', A.won ? 20 : 5]);
   if (A && A.kind === 'haunt') rows.push(['当厉鬼', A.won ? '得手了' : A.caught ? '被收进葫芦' : '没砸开', A.won ? 5 : A.caught ? -10 : 0]);
   if (G.deathKind === 'early') rows.push(['英年早逝', '', -5]);
   return rows;
@@ -2593,6 +2693,8 @@ window.addEventListener('message', async event => {
 });
 function openMenu() {
   const playing = G.phase === 'home' || G.phase === 'map';
+  const waiting = G.phase === 'dawn' || G.phase === 'birth';
+  const canReadReports = !['night', 'guard', 'haunt'].includes(G.phase);
   sheet({
     title: '设置', dismiss: true,
     body: `<button type="button" class="big main" id="edit-look">改样子</button>
@@ -2602,15 +2704,21 @@ function openMenu() {
       <label for="code-in">导入别人的人</label><textarea id="code-in" placeholder="WULIN1:..."></textarea><button type="button" class="big" id="use-code">用这个人</button><p class="note" id="code-msg" role="status"></p></details>
       <label class="bank-toggle"><input type="checkbox" id="river-text"${G.river?.textOn ? ' checked' : ''}>文字说明（河埠）</label>
       <label class="bank-toggle"><input type="checkbox" id="ancestor-on"${G.guideOff ? '' : ' checked'}>祖宗带路</label>
+      ${canReadReports ? '<div class="waiting-actions"><button type="button" class="mini" data-a="reports">家宅战报</button><button type="button" class="mini" data-a="summary">回来时的摘要</button></div>' : ''}
       <div class="sub">试玩用</div>
       <label class="bank-toggle"><input type="checkbox" id="all-features"${G.allFeatures ? ' checked' : ''}>全部开放（试玩用）</label>
       <button type="button" class="big" id="copy-river-log">复制试玩记录</button><div id="river-copy-status" role="status"></div>
       <label class="bank-toggle"><input type="checkbox" id="unlimited-days"${G.unlimitedDays ? ' checked' : ''}>不限天数（试玩用）</label>
-      <button type="button" class="big" id="ff"${playing && G.day < CFG.lifeDays ? '' : ' disabled'}>快进到最后一天<small>直接试老死、当鬼和投胎</small></button>
+      <button type="button" class="big" id="ff"${playing && G.day < CFG.lifeDays ? '' : ' disabled'}>快进到最后一天<small>${waiting && !G.bankedDays && !G.unlimitedDays ? '明天才能快进' : '直接试老死、当鬼和投胎'}</small></button>
       <button type="button" class="big" id="restart">从头再来<small>清掉这一局，回到第一世</small></button>
       <p class="note">这是样机：邻居、来砸门的鬼、被你砸门的人家都用电脑代替；所有数字都是占位。</p>`,
     buttons: [['关上', null]],
     bind: (el) => {
+      const reports = el.querySelector('[data-a=reports]');
+      if (reports) {
+        reports.onclick = () => showHouseReports();
+        el.querySelector('[data-a=summary]').onclick = () => openReturnSummary();
+      }
       el.querySelector('#ancestor-on').onchange = e => {
         G.guideOff = !e.target.checked; Guidance.silence(); save(); Guidance.resetIdle();
       };
@@ -2680,18 +2788,27 @@ document.addEventListener('keydown', (e) => {
 // ================= 启动 =================
 G = loadGame();
 if (!G) G = freshLife(FIRST_FAMILY, null);
-else if (accrueDays() || LoopStorage.read().v < 4) save();
+else if (!G.lastActiveDate) {
+  LoopCore.markActiveDate(G, localDateKey());
+  save();
+} else if (localDateKey() <= G.lastActiveDate && accrueDays()) save();
 if (G.look) { try { ME = validatedLook(G.look); } catch (e) {} }
 G.look = ME;
-if (alignUnlockedScene()) save();
 Guidance.bind();
-if (G.phase === 'night' || G.phase === 'guard') startNight(G.phase === 'guard');
-else if (G.phase === 'haunt') startHaunt();
-else { if (G.phase === 'map' && G.bag == null) G.bag = []; render(); }
-if (G.phase === 'dawn' && G.nightReceipt) showNightReceipt(G.nightReceipt);
-window.addEventListener('focus', updateCalendar);
+if (localDateKey() > G.lastActiveDate) {
+  if (!document.hidden) visitCalendar(false, true);
+} else {
+  if (alignUnlockedScene()) save();
+  resumeScene();
+}
+window.addEventListener('focus', () => visitCalendar());
 window.addEventListener('storage', event => { if (event.key === 'wulin-loop') updateCalendar(); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden) updateCalendar(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { lastVisibleTick = 0; checkpointNight(); }
+  else visitCalendar(false, !document.body.dataset.phase);
+});
+window.addEventListener('pagehide', checkpointNight);
+window.addEventListener('pageshow', e => { if (e.persisted) visitCalendar(); });
 scheduleCalendar();
 </script>
 </body></html>

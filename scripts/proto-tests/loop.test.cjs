@@ -78,6 +78,7 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
     await p.screenshot({ path: path.join(shots, '5-home-upgraded.png') });
     await clean('home upgraded');
     await p.click('[data-a="night"]');
+    await p.click('[data-a="manual"]');
   }
 
   // ---- night with a smart bot ----

@@ -17,6 +17,7 @@ async function toggleUnlimited(page, checked) {
 }
 async function endLivingNight(page, takeDawn = true) {
   await page.getByRole('button', { name: /在家歇到天黑/ }).click();
+  await page.locator('[data-a=manual]').click();
   await page.waitForFunction(() => N && !N.over && G.phase === 'night');
   const before = await balance(page);
   // 仅缩短战斗，结算、天亮按钮和扣天都沿用正式入口。
@@ -49,6 +50,7 @@ async function checkCalendar(browser) {
     await page.reload();
     assert.equal(await page.evaluate(() => G.held), 1);
     const secondTab = await context.newPage();
+    await secondTab.clock.install({ time: new Date('2026-11-19T23:58:20+08:00') });
     await secondTab.goto(url);
     await sheet(secondTab).getByRole('button', { name: '天亮了', exact:true }).click();
     await page.locator('.day-bank', { hasText: '1 / 3' }).waitFor();
@@ -68,8 +70,10 @@ async function checkCalendar(browser) {
 
     // 两个标签页跨过同一个本地零点；轮流前台、刷新也只能领一次。
     const other = await context.newPage();
+    await other.clock.install({ time: new Date('2026-11-19T23:58:40+08:00') });
     await other.goto(url);
     await page.clock.fastForward(120000);
+    await other.clock.fastForward(120000);
     await page.getByRole('button', { name: '开始下一天', disabled: false }).waitFor();
     await other.getByRole('button', { name: '开始下一天', disabled: false }).waitFor();
     assert.deepEqual(await state(page), [3, 'dawn', 1, '2026-11-20']);
@@ -87,10 +91,13 @@ async function checkCalendar(browser) {
     assert.deepEqual(await state(page), [4, 'home', 0, '2026-11-20'], '时钟回拨不重复发天');
     await page.clock.setSystemTime(new Date('2026-11-27T08:00:00+08:00'));
     await page.reload();
-    assert.deepEqual(await state(page), [4, 'home', 3, '2026-11-27']);
+    await page.getByRole('heading', {name:'你不在的这段日子'}).waitFor();
+    assert.deepEqual(await state(page), [4, 'dawn', 3, '2026-11-27']);
     assert.equal((await saved(page)).account.bankedDays, 3);
     // 满额那天也记录日期，花一天下次打开不会立即再领。
-    await endLivingNight(page);
+    await page.getByRole('button', {name:'知道了',exact:true}).click();
+    await page.getByRole('button', {name:'天亮了',exact:true}).click();
+    await page.waitForFunction(() => G.day === 5);
     await page.reload();
     assert.deepEqual(await state(page), [5, 'home', 2, '2026-11-27']);
     await page.evaluate(() => die('old', '本世走完了。'));
@@ -126,6 +133,7 @@ async function checkMigrationAndDst(browser) {
     await page.getByRole('button', { name: '开始', exact: true }).click();
     await page.evaluate(() => {
       const old = { ...G, v: 2, day: 3, phase: 'map', at: 1, money: 73 };
+      delete old.lastActiveDate;
       delete old.bankedDays; delete old.lastGrantDate; delete old.unlimitedDays;
       localStorage.setItem('wulin-loop', JSON.stringify(old));
     });
@@ -140,7 +148,8 @@ async function checkMigrationAndDst(browser) {
     await page.evaluate(() => { G.bankedDays = 0; save(); });
     await page.clock.setSystemTime(new Date('2026-03-09T00:02:00-04:00'));
     await page.reload();
-    assert.deepEqual(await state(page), [3, 'map', 2, '2026-03-09']);
+    await page.getByRole('heading', {name:'你不在的这段日子'}).waitFor();
+    assert.deepEqual(await state(page), [3, 'dawn', 2, '2026-03-09']);
     console.log('PASS v2 正在游玩的存档原地迁移、赠三天、跨夏令时按本地日期发放');
   } finally { await context.close(); }
 }

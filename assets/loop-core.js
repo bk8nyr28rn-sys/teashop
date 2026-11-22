@@ -22,30 +22,40 @@ var LoopCore = (() => {
   // src/core/loop/browser.ts
   var browser_exports = {};
   __export(browser_exports, {
+    AUTO_DEFENSE: () => AUTO_DEFENSE,
     BANK_CAP: () => BANK_CAP,
     FIREWOOD_PER_LOG: () => FIREWOOD_PER_LOG,
     GOODS: () => GOODS,
     accrueDays: () => accrueDays,
     addLifePortrait: () => addLifePortrait,
+    autoLossLimit: () => autoLossLimit,
     beginNightLedger: () => beginNightLedger,
+    chanceLabel: () => chanceLabel,
+    defenseChance: () => defenseChance,
     depositCoins: () => depositCoins,
     finishLife: () => finishLife,
     fromView: () => fromView,
+    getAbsenceSummary: () => getAbsenceSummary,
     givePersonalGood: () => givePersonalGood,
     goodsValue: () => goodsValue,
     leaveGuardianReward: () => leaveGuardianReward,
     makeDayBank: () => makeDayBank,
+    markAbsenceRead: () => markAbsenceRead,
+    markActiveDate: () => markActiveDate,
     migrateSave: () => migrateSave,
     nextLifeView: () => nextLifeView,
+    nightKarma: () => nightKarma,
     nightPayout: () => nightPayout,
     payHome: () => payHome,
     payPersonal: () => payPersonal,
     planNightLoot: () => planNightLoot,
     quoteHome: () => quoteHome,
+    reconcileAbsence: () => reconcileAbsence,
     sameNight: () => sameNight,
     sellAllOrdinary: () => sellAllOrdinary,
     sellOrdinary: () => sellOrdinary,
     sellTreasure: () => sellTreasure,
+    settleAutoNight: () => settleAutoNight,
     settleEstate: () => settleEstate,
     settleNightLedger: () => settleNightLedger,
     shelveTreasure: () => shelveTreasure,
@@ -103,25 +113,41 @@ var LoopCore = (() => {
 
   // src/core/loop/time.ts
   var BANK_CAP = 3;
-  function calendarOrdinal(key) {
+  function monthLengths(year) {
+    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
+    return [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+  }
+  function dateOrdinal(key) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) throw new RangeError("日期须为 YYYY-MM-DD");
     const year = Number(key.slice(0, 4));
     const month = Number(key.slice(5, 7));
     const day = Number(key.slice(8, 10));
-    const leap = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-    const monthLengths = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-    if (year < 1 || month < 1 || month > 12 || day < 1 || day > monthLengths[month - 1]) {
+    const lengths = monthLengths(year);
+    if (year < 1 || month < 1 || month > 12 || day < 1 || day > lengths[month - 1]) {
       throw new RangeError("无效的公历日期");
     }
     const pastYears = year - 1;
-    return 365 * pastYears + Math.floor(pastYears / 4) - Math.floor(pastYears / 100) + Math.floor(pastYears / 400) + monthLengths.slice(0, month - 1).reduce((a, b) => a + b, day);
+    return 365 * pastYears + Math.floor(pastYears / 4) - Math.floor(pastYears / 100) + Math.floor(pastYears / 400) + lengths.slice(0, month - 1).reduce((a, b) => a + b, day);
+  }
+  function nextCalendarDate(key) {
+    dateOrdinal(key);
+    let year = Number(key.slice(0, 4)), month = Number(key.slice(5, 7)), day = Number(key.slice(8)) + 1;
+    if (day > monthLengths(year)[month - 1]) {
+      day = 1;
+      if (++month > 12) {
+        month = 1;
+        year++;
+      }
+    }
+    if (year > 9999) throw new RangeError("日期超出公历存档范围");
+    return [String(year).padStart(4, "0"), String(month).padStart(2, "0"), String(day).padStart(2, "0")].join("-");
   }
   function makeDayBank(today) {
-    calendarOrdinal(today);
+    dateOrdinal(today);
     return { bankedDays: BANK_CAP, lastGrantDate: today, unlimitedDays: false };
   }
   function accrueDays(bank, today) {
-    const elapsed = calendarOrdinal(today) - calendarOrdinal(bank.lastGrantDate);
+    const elapsed = dateOrdinal(today) - dateOrdinal(bank.lastGrantDate);
     if (elapsed <= 0) return false;
     bank.bankedDays = Math.min(BANK_CAP, bank.bankedDays + elapsed);
     bank.lastGrantDate = today;
@@ -255,7 +281,8 @@ var LoopCore = (() => {
     "expression",
     "history",
     "nightId",
-    "worldId"
+    "worldId",
+    "lastActiveDate"
   ];
   var riverGuideKeys = ["record", "hints", "textOn"];
   var houseKeys = [
@@ -271,7 +298,9 @@ var LoopCore = (() => {
     "abandoned",
     "nightPlan",
     "receipts",
-    "nightReceipt"
+    "nightReceipt",
+    "absencePeriods",
+    "absenceReadThrough"
   ];
   var candidateAssets = [
     "name",
@@ -377,6 +406,8 @@ var LoopCore = (() => {
       receipts: object(h.receipts),
       pendingNightId: null
     };
+    if (Array.isArray(h.absencePeriods)) house.absencePeriods = h.absencePeriods;
+    if (typeof h.absenceReadThrough === "number") house.absenceReadThrough = count(h.absenceReadThrough);
     if (isObject(h.nightReceipt)) {
       const nightId = count(h.nightReceipt.nightId) || account.nightId || 1;
       house.receipts[nightId] = {
@@ -474,6 +505,10 @@ var LoopCore = (() => {
     addLifePortrait(g, portrait);
   }
   function leaveGuardianReward(g) {
+    if (g.estateSettled) {
+      depositCoins(g, g, g.purse);
+      return;
+    }
     if (g.guardianRewardStored) return;
     const receipt = Object.values(g.receipts).find((r) => r.lifeId === g.lifeId && r.guardian === true && r.won === true);
     if (receipt && depositCoins(g, g, Math.min(g.purse, count(receipt.earnedMoney)))) g.guardianRewardStored = true;
@@ -595,6 +630,367 @@ var LoopCore = (() => {
     game.nightPlan = null;
     game.phase = "dawn";
     return receipt;
+  }
+
+  // src/core/loop/night-config.ts
+  var DOORS = [
+    { name: "柴门", hp: 140, cost: 0 },
+    { name: "木门", hp: 220, cost: 40 },
+    { name: "铁皮门", hp: 340, cost: 100 },
+    { name: "朱漆铜钉门", hp: 500, cost: 200 },
+    { name: "机关大门", hp: 720, cost: 360 }
+  ];
+  var TRAPS = {
+    crossbow: { name: "弩机", cost: 45, max: 4, desc: "每隔一会儿自动射最近的鬼" },
+    lamp: { name: "灯笼串", cost: 30, max: 1, desc: "走到门口的隐身鬼会现形" },
+    talisman: { name: "镇宅符", cost: 40, max: 2, desc: "门口的鬼走得慢" }
+  };
+  var NIGHT = {
+    waves: 5,
+    spread: 3.5,
+    hpPerDay: 0.2,
+    hpPerWave: 0.06,
+    hitPerDay: 0.12,
+    tap: 10,
+    bowDmg: 12,
+    bowCd: 1.4,
+    allyDmg: 12,
+    step: 0.05,
+    waveDelay: 1.5,
+    offerCount: 3,
+    counts: {
+      firstNightEvil: [3, 4, 6, 7, 9],
+      evilBase: 3,
+      evilPerDay: 0.4,
+      extraEvery: 3,
+      flyWave: 1,
+      flyOffset: 1,
+      shadeDay: 2,
+      shadeWave: 3,
+      shadeOffset: 3,
+      armorLastWave: 4,
+      armorDay: 3,
+      armorWave: 2,
+      armorOffset: 5
+    },
+    spawn: {
+      lane: [-0.85, 0.85],
+      y: [96, 122],
+      gateXOffset: [-48, 48],
+      gateYOffset: [-6, 4],
+      speed: [0.85, 1.15],
+      bashDelay: [0.2, 0.8],
+      flyRise: 34,
+      phase: [0, 6.28]
+    },
+    lane: {
+      centerX: 180,
+      gateY: 424,
+      depthStart: 90,
+      depthBase: 0.55,
+      depthGain: 0.45,
+      farWidth: 40,
+      extraWidth: 114,
+      widenFrom: 152,
+      widenDistance: 262,
+      mergeFrom: 0.72,
+      mergeDistance: 0.28,
+      flySwing: 22,
+      flyFrequency: 2.2,
+      flySettleDistance: 80,
+      centerHeight: 44,
+      hitRadius: 36,
+      minHitScale: 0.8
+    },
+    reveal: { lamp: 150, wall: 330, eye: 240, flashTime: 0.25 },
+    gate: { slowFrom: 300, talismanFactor: 0.72, bashCd: 1 },
+    weapon: { hurt: 0.85, badlyHurt: 0.6, playerCoins: 2, lampX: 122, lampY: 466, lampRadius: 330 },
+    perk: {
+      heavy: 0.4,
+      qi: 1.3,
+      pierce: 0.6,
+      ear: 0.5,
+      critChance: 0.25,
+      critCap: 0.75,
+      critDamage: 3,
+      sweepRadius: 70,
+      sweepFactor: 0.5,
+      burnInterval: 0.5,
+      burnMinY: 150,
+      burnDamage: 2.5,
+      rainKills: 5,
+      rainDamage: 15,
+      soul: 3,
+      coins: 3,
+      fix: 0.4,
+      fixBelow: 0.8,
+      bolt: 0.7,
+      slow: 0.7
+    },
+    bows: {
+      x: [40, 320, 92, 268],
+      y: 410,
+      fromY: 150,
+      firstCd: 1,
+      stagger: 0.35,
+      giftCd: 0.5,
+      fastFactor: 0.5,
+      minCd: 0.35,
+      idleCd: 0.2
+    },
+    family: {
+      spouseDamage: 6,
+      spouseCd: 1,
+      spouseRate: 0.8,
+      maxKids: 2,
+      childBaseDamage: 4,
+      childRate: 1.2,
+      childCd: 1.2,
+      childStagger: 0.3,
+      idleCd: 0.2
+    },
+    ally: { duration: 18, firstCd: 0.4, rate: 0.45, idleCd: 0.15, friendship: 2, maxFriendship: 100 },
+    guardian: { power: 1.25, slow: 0.65 }
+  };
+  function waveCounts(d, w, swordOnly = false) {
+    const c = NIGHT.counts;
+    if (d === 1 && swordOnly) return { evil: c.firstNightEvil[w], fly: 0, shade: 0, armor: 0 };
+    return {
+      evil: c.evilBase + w + Math.floor(c.evilPerDay * (d - 1)),
+      fly: w >= c.flyWave ? 1 + Math.floor((d + w - c.flyOffset) / c.extraEvery) : 0,
+      shade: d >= c.shadeDay || w >= c.shadeWave ? 1 + Math.floor(Math.max(0, d + w - c.shadeOffset) / c.extraEvery) : 0,
+      armor: w === c.armorLastWave || d >= c.armorDay && w >= c.armorWave ? 1 + Math.floor(Math.max(0, d + w - c.armorOffset) / c.extraEvery) : 0
+    };
+  }
+
+  // src/core/loop/auto-defense.ts
+  var AUTO_DEFENSE = {
+    floor: 0.05,
+    ceiling: 0.95,
+    startingScore: -0.96,
+    door: 1.5,
+    crossbow: 0.85,
+    lamp: 0.24,
+    talisman: 0.48,
+    day: 0.17,
+    daySquared: 0.065,
+    lossFraction: 0.1,
+    lossCap: 20,
+    paperShare: 0.5,
+    heldKarma: 8,
+    brokenKarma: 4,
+    coinsPerKarma: 20,
+    estateKarmaCap: 20
+  };
+  var digits = ["零", "一", "二", "三", "四", "五", "六", "七", "八", "九", "十"];
+  function level(value, maximum) {
+    return Math.min(maximum, Math.max(0, Math.floor(value ?? 0)));
+  }
+  function defenseChance(day, door, traps) {
+    const c = AUTO_DEFENSE;
+    const elapsed = Math.max(0, day - 1);
+    const hp = DOORS[level(door, DOORS.length - 1)].hp;
+    const defense = c.startingScore + c.door * Math.log(hp / DOORS[0].hp) + c.crossbow * level(traps.crossbow, TRAPS.crossbow.max) + c.lamp * level(traps.lamp, TRAPS.lamp.max) + c.talisman * level(traps.talisman, TRAPS.talisman.max);
+    const threat = c.day * elapsed + c.daySquared * elapsed ** 2;
+    return c.floor + (c.ceiling - c.floor) / (1 + Math.exp(threat - defense));
+  }
+  function chanceLabel(probability) {
+    if (probability <= 0) return "零成";
+    if (probability >= 1) return "十成";
+    return digits[Math.max(1, Math.min(9, Math.round(probability * 10)))] + "成";
+  }
+  function autoLossLimit(chest, lifeNo) {
+    return lifeNo <= 1 ? 0 : Math.min(AUTO_DEFENSE.lossCap, Math.floor(Math.max(0, chest) * AUTO_DEFENSE.lossFraction));
+  }
+  function nightKarma(held, autoHeld = 0, broken = 0, earned = 0) {
+    const c = AUTO_DEFENSE;
+    const heldScore = (held - Math.min(held, autoHeld) / 2) * c.heldKarma;
+    return Math.min(c.estateKarmaCap, heldScore - broken * c.brokenKarma + Math.floor(earned / c.coinsPerKarma));
+  }
+  function isAutoReceipt(receipt) {
+    return "mode" in receipt && (receipt.mode === "delegated" || receipt.mode === "offline");
+  }
+  function paperReward(day, guided) {
+    let ghosts = 0;
+    for (let wave = 0; wave < NIGHT.waves; wave++) {
+      for (const count2 of Object.values(waveCounts(day, wave, guided))) ghosts += count2;
+    }
+    return Math.floor(ghosts * NIGHT.weapon.playerCoins * AUTO_DEFENSE.paperShare);
+  }
+  function settleAutoNight(game, options) {
+    const { mode, nightId, realDate, progress } = options;
+    const guardian = options.guardian ?? false;
+    if (options.houseId !== void 0 && options.houseId !== game.houseId || options.lifeId !== void 0 && options.lifeId !== game.lifeId) return null;
+    const prior = game.receipts[nightId];
+    if (prior) {
+      return isAutoReceipt(prior) && prior.houseId === game.houseId && prior.lifeId === game.lifeId && prior.guardian === guardian && prior.mode === mode && prior.realDate === realDate && (options.day === void 0 || prior.day === options.day) ? prior : null;
+    }
+    if (!Number.isSafeInteger(nightId) || options.day !== void 0 && options.day !== game.day) return null;
+    const plan = game.nightPlan;
+    const fightPhase = guardian ? "guard" : "night";
+    if (plan) {
+      if (!progress || game.phase !== fightPhase || game.nightId !== nightId || !sameNight(plan, { ...game, guardian, nightId })) return null;
+    } else if (nightId !== game.nightId + 1) return null;
+    if (progress && (game.nightReceipt || game.phase !== fightPhase && (guardian || game.phase !== "home"))) return null;
+    const day = guardian ? CFG.lifeDays : game.day;
+    const chance = defenseChance(day, game.door, game.traps);
+    const seed = (plan?.seed ?? options.seed) >>> 0;
+    const rng = new Rng(1);
+    rng.setState(seed);
+    const won = rng.chance(chance);
+    const chestLost = !won && options.allowLoss ? autoLossLimit(game.chest, game.lifeNo) : 0;
+    const earnedMoney = won ? paperReward(day, !guardian && !game.allFeatures) : 0;
+    const subject = mode === "offline" ? "你不在时，机关" : "机关";
+    let report;
+    if (won) report = `${subject}守住了家门，${earnedMoney} 文纸钱已放进钱袋。`;
+    else if (game.lifeNo <= 1) report = `${subject}没守住，好在新家有保护，没丢东西。`;
+    else if (chestLost > 0) report = `${subject}没守住，钱箱少了 ${chestLost} 文。`;
+    else report = `${subject}没守住，钱箱里的钱一文没少。`;
+    const receipt = {
+      houseId: game.houseId,
+      lifeId: game.lifeId,
+      nightId,
+      day: game.day,
+      guardian,
+      mode,
+      realDate,
+      seed,
+      chance,
+      won,
+      earnedMoney,
+      chestLost,
+      purseLost: 0,
+      lostTreasureIndex: null,
+      lostTreasure: null,
+      next: guardian ? "reborn" : game.day >= CFG.lifeDays ? "old" : "morning",
+      paragraphs: [report]
+    };
+    game.chest -= chestLost;
+    game.purse += earnedMoney;
+    if (won) {
+      game.held++;
+      game.autoHeld = (game.autoHeld ?? 0) + 1;
+    } else game.autoBroken = (game.autoBroken ?? 0) + 1;
+    game.nightId = nightId;
+    game.receipts[nightId] = receipt;
+    if (progress) {
+      if (guardian) game.afterlife = { kind: "guard", won, automatic: true };
+      game.nightPlan = null;
+      game.nightReceipt = receipt;
+      game.phase = "dawn";
+    }
+    return receipt;
+  }
+
+  // src/core/loop/absence.ts
+  function markActiveDate(account, today) {
+    dateOrdinal(today);
+    if (account.lastActiveDate && today <= account.lastActiveDate) return false;
+    account.lastActiveDate = today;
+    return true;
+  }
+  function returnFromField(game) {
+    game.goods = { ...game.goods };
+    game.personalTreasures = [...game.personalTreasures];
+    unpackBag(game);
+    if (game.river) {
+      const river = { ...game.river, fromWharf: false };
+      if (game.phase === "river") {
+        const hand = river.hand;
+        if (hand === "stone") {
+          river.stone = "yard";
+          river.yardSlot = 1;
+        } else if (typeof hand === "string" && /^wood\d+$/.test(hand) && Array.isArray(river.wood)) {
+          const wood = [...river.wood];
+          wood[Number(hand.slice(4))] = "firewood";
+          river.wood = wood;
+          splitFirewood(game);
+        }
+        river.hand = null;
+        river.helper = false;
+        river.focus = null;
+      }
+      game.river = river;
+    }
+    game.buddy = null;
+    game.at = "home";
+    game.target = null;
+    game.phase = "home";
+  }
+  function reconcileAbsence(game, today, seed) {
+    const end = dateOrdinal(today);
+    const start = game.lastActiveDate;
+    if (!start || game.phase === "intro") return { count: 0, changed: markActiveDate(game, today) };
+    const days = end - dateOrdinal(start);
+    if (days <= 0) return { count: 0, changed: false };
+    const next = { ...game, receipts: { ...game.receipts } };
+    if (next.phase === "map" || next.phase === "river") returnFromField(next);
+    const unfinished = !next.nightReceipt && ["home", "night", "guard"].includes(next.phase);
+    let date = start;
+    let allowLoss = true;
+    for (let i = 0; i < days; i++) {
+      const progress = i === 0 && unfinished;
+      const plan = progress ? next.nightPlan : null;
+      const nightId = plan?.nightId ?? next.nightId + 1;
+      const draw = plan?.seed ?? (typeof seed === "number" ? seed + i >>> 0 : seed(date, nightId));
+      const receipt = settleAutoNight(next, {
+        mode: "offline",
+        realDate: date,
+        nightId,
+        seed: draw,
+        progress,
+        guardian: progress && next.phase === "guard",
+        allowLoss
+      });
+      if (!receipt) throw new Error("离开期间的来袭与现有夜账不一致");
+      if (receipt.chestLost > 0) allowLoss = false;
+      date = nextCalendarDate(date);
+    }
+    next.lastActiveDate = today;
+    Object.assign(game, next);
+    return { count: days, changed: true };
+  }
+  function isOffline(receipt) {
+    return "mode" in receipt && receipt.mode === "offline";
+  }
+  function summarize(game, after, through) {
+    const events = Object.values(game.receipts).filter((r) => isOffline(r) && r.nightId > after && r.nightId <= through).sort((a, b) => a.nightId - b.nightId);
+    if (!events.length) return null;
+    const first = events[0], last = events[events.length - 1];
+    let won = 0, chestLost = 0, earnedMoney = 0;
+    for (const event of events) {
+      if (event.won) won++;
+      chestLost += event.chestLost;
+      earnedMoney += event.earnedMoney;
+    }
+    return {
+      firstNightId: first.nightId,
+      lastNightId: last.nightId,
+      fromDate: first.realDate,
+      toDate: last.realDate,
+      days: events.length,
+      raids: events.length,
+      won,
+      broken: events.length - won,
+      chestLost,
+      earnedMoney
+    };
+  }
+  function getAbsenceSummary(game, kind = "unread") {
+    const unread = summarize(game, game.absenceReadThrough ?? 0, Infinity);
+    if (unread || kind === "unread") return unread;
+    const history = game.absencePeriods;
+    const last = history?.[history.length - 1];
+    return last ? summarize(game, last.firstNightId - 1, last.lastNightId) : null;
+  }
+  function markAbsenceRead(game, lastNightId) {
+    const seen = game.absenceReadThrough ?? 0;
+    if (!Number.isSafeInteger(lastNightId) || lastNightId <= seen) return false;
+    const summary = summarize(game, seen, lastNightId);
+    if (!summary || summary.lastNightId !== lastNightId) return false;
+    (game.absencePeriods ?? (game.absencePeriods = [])).push({ firstNightId: summary.firstNightId, lastNightId });
+    game.absenceReadThrough = lastNightId;
+    return true;
   }
   return __toCommonJS(browser_exports);
 })();

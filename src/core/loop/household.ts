@@ -9,8 +9,10 @@ type Stock = Record<string, number>;
 
 interface Account extends Fields, DayBank {
   nightId: number;
+  lastActiveDate?: string;
   riverGuide?: Fields;
 }
+export interface AbsencePeriod { firstNightId: number; lastNightId: number }
 interface Resident extends Fields {
   houseId: string;
   lifeId: string;
@@ -29,6 +31,8 @@ interface Household extends House {
   nightPlan: NightEntry | null;
   receipts: Record<string, NightEntry>;
   pendingNightId: number | null;
+  absencePeriods?: AbsencePeriod[];
+  absenceReadThrough?: number;
 }
 export interface V4 {
   v: 4;
@@ -43,6 +47,9 @@ export interface HouseholdView extends Resident, House, DayBank {
   v: 4;
   fam: string;
   nightId: number;
+  lastActiveDate?: string;
+  absencePeriods?: AbsencePeriod[];
+  absenceReadThrough?: number;
   nightPlan: NightEntry | null;
   nightReceipt: NightEntry | null;
   receipts: Record<string, NightEntry>;
@@ -52,10 +59,10 @@ export interface HouseholdView extends Resident, House, DayBank {
 }
 
 const accountKeys = ['bankedDays', 'lastGrantDate', 'unlimitedDays', 'guideSeen', 'guideOff',
-  'allFeatures', 'look', 'expression', 'history', 'nightId', 'worldId'];
+  'allFeatures', 'look', 'expression', 'history', 'nightId', 'worldId', 'lastActiveDate'];
 const riverGuideKeys = ['record', 'hints', 'textOn'];
 const houseKeys = ['houseId', 'fam', 'money', 'chest', 'door', 'traps', 'store', 'treasures',
-  'ancestors', 'abandoned', 'nightPlan', 'receipts', 'nightReceipt'];
+  'ancestors', 'abandoned', 'nightPlan', 'receipts', 'nightReceipt', 'absencePeriods', 'absenceReadThrough'];
 const candidateAssets = ['name', 'money', 'chest', 'store', 'door', 'crossbow', 'lamp', 'talisman',
   'traps', 'treasures', 'ancestors', 'yard'];
 
@@ -127,6 +134,8 @@ export function fromView(raw: Fields, base?: V4 | null): V4 {
     abandoned: h.abandoned === true, nightPlan: isObject(h.nightPlan) ? h.nightPlan : null,
     receipts: object(h.receipts) as Household['receipts'], pendingNightId: null,
   };
+  if (Array.isArray(h.absencePeriods)) house.absencePeriods = h.absencePeriods;
+  if (typeof h.absenceReadThrough === 'number') house.absenceReadThrough = count(h.absenceReadThrough);
   if (isObject(h.nightReceipt)) {
     // v3 的旧回执已入账，只为原战报补编号。
     const nightId = count(h.nightReceipt.nightId) || account.nightId || 1;
@@ -210,6 +219,8 @@ export function finishLife(g: HouseholdView, portrait: Portrait): void {
 }
 
 export function leaveGuardianReward(g: HouseholdView): void {
+  // 遗产结清以后，钱袋里新增的是死后守门所得。奈何桥上也可能再收到离线纸钱。
+  if (g.estateSettled) { depositCoins(g, g, g.purse); return; }
   if (g.guardianRewardStored) return;
   const receipt = Object.values(g.receipts).find(r => r.lifeId === g.lifeId && r.guardian === true && r.won === true);
   if (receipt && depositCoins(g, g, Math.min(g.purse, count(receipt.earnedMoney)))) g.guardianRewardStored = true;
