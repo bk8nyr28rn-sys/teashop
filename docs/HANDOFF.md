@@ -15,7 +15,7 @@
 | 在哪 | `docs/proto/loop/index.html`（一日一夜样机）、`docs/art/creator/index.html`（武林捏人台），都是单文件页面 | `src/core`（规则）、`src/sim`（模拟器）、`src/web`（网页壳）、`test/` |
 | 状态 | 能玩、有浏览器测试和难度模拟；规则写在页面的脚本里，还没进 `src/core` | 94 个测试全过；红线、存档、确定性随机这些底子以后还要用 |
 
-**下一步的大活**就是把样机里的规则搬进 `src/core/loop/`。顺序按 `docs/SESSION_REVIEW.md` 最后的分阶段表。第一阶段（时间、野外、五波守夜）已经做完，见 `docs/STAGE1_REPORT.md`；页面还没改成调用核心。第一晚只来普通鬼的小任务也做完了（11-21）。第二阶段（家的存档、两个口袋、一晚只结算一次）也做完了（11-22），见 `docs/qa/stage2/README.md`。第三阶段（交给机关守、不在线的晚上、回来时的摘要）也做完了（11-23），见 `docs/qa/stage3/README.md`；把握的公式和全表在 `docs/qa/stage3/ODDS.md`。下一步是第四阶段：一门小生意。
+**下一步的大活**就是把样机里的规则搬进 `src/core/loop/`。顺序按 `docs/SESSION_REVIEW.md` 最后的分阶段表。第一阶段（时间、野外、五波守夜）已经做完，见 `docs/STAGE1_REPORT.md`；页面还没改成调用核心。第一晚只来普通鬼的小任务也做完了（11-21）。第二阶段（家的存档、两个口袋、一晚只结算一次）也做完了（11-22），见 `docs/qa/stage2/README.md`。第三阶段（交给机关守、不在线的晚上、回来时的摘要）也做完了（11-23），见 `docs/qa/stage3/README.md`；把握的公式和全表在 `docs/qa/stage3/ODDS.md`。第四阶段（灶台加工、邻居托付、每天的行情）也做完了（11-23，Claude 直接写的），见 `docs/qa/stage4/README.md`，规则在 `src/core/loop/trade.ts`。**接手的人注意：第四阶段的代码要用完整的项目压缩包交接。**
 
 玩法的两把尺子（产品负责人定的，每个改动都拿它验收）：**一，玩家觉得爽；二，自由度尽可能高**（目标定死，方法放开）。
 
@@ -36,6 +36,7 @@ npm run test:proto     # 捏人台和一日一夜样机的浏览器测试，截�
 npm run balance:night  # 守夜难度模拟：不同天数、门、弩机、手速下守不守得住
 npm run balance:haunt  # 当厉鬼的难度模拟
 npm run balance:loop   # 规则核心的守夜难度（亲手守 + 只靠机关两张表），--json 输出机器可读结果
+npm run sim:trade      # 几种玩法一辈子卖货和托付赚多少钱（只汇报）
 npm run balance:night -- --compare-core  # 样机和规则核心用同一副牌逐局对账
 npm run sync:draw      # 把捏人台的画人代码同步进样机（--check 只检查）
 ```

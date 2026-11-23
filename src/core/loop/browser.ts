@@ -4,3 +4,4 @@ export * from './economy';
 export * from './settlement';
 export * from './auto-defense';
 export * from './absence';
+export * from './trade';

@@ -26,12 +26,18 @@ var LoopCore = (() => {
     BANK_CAP: () => BANK_CAP,
     FIREWOOD_PER_LOG: () => FIREWOOD_PER_LOG,
     GOODS: () => GOODS,
+    TRADE: () => TRADE,
+    acceptRequest: () => acceptRequest,
     accrueDays: () => accrueDays,
     addLifePortrait: () => addLifePortrait,
     autoLossLimit: () => autoLossLimit,
     beginNightLedger: () => beginNightLedger,
+    canCook: () => canCook,
     chanceLabel: () => chanceLabel,
+    collectStove: () => collectStove,
+    dayPrices: () => dayPrices,
     defenseChance: () => defenseChance,
+    deliverRequest: () => deliverRequest,
     depositCoins: () => depositCoins,
     finishLife: () => finishLife,
     fromView: () => fromView,
@@ -46,11 +52,16 @@ var LoopCore = (() => {
     nextLifeView: () => nextLifeView,
     nightKarma: () => nightKarma,
     nightPayout: () => nightPayout,
+    offerFor: () => offerFor,
     payHome: () => payHome,
     payPersonal: () => payPersonal,
+    planDelivery: () => planDelivery,
     planNightLoot: () => planNightLoot,
+    priceTrend: () => priceTrend,
     quoteHome: () => quoteHome,
     reconcileAbsence: () => reconcileAbsence,
+    refreshRequest: () => refreshRequest,
+    requestBoard: () => requestBoard,
     sameNight: () => sameNight,
     sellAllOrdinary: () => sellAllOrdinary,
     sellOrdinary: () => sellOrdinary,
@@ -61,9 +72,12 @@ var LoopCore = (() => {
     shelveTreasure: () => shelveTreasure,
     spendDawn: () => spendDawn,
     splitFirewood: () => splitFirewood,
+    startStove: () => startStove,
     storeBelongings: () => storeBelongings,
+    stoveStatus: () => stoveStatus,
     toView: () => toView,
     unpackBag: () => unpackBag,
+    useHealing: () => useHealing,
     useHerb: () => useHerb
   });
 
@@ -162,7 +176,7 @@ var LoopCore = (() => {
   }
 
   // src/core/loop/economy.ts
-  var GOODS = { 柴: 3, 时蔬: 5, 草药: 6, 兽皮: 14, 铁矿: 18, 古物: 40 };
+  var GOODS = { 柴: 3, 时蔬: 5, 草药: 6, 兽皮: 14, 铁矿: 18, 古物: 40, 木炭: 14, 金疮药: 20 };
   var FIREWOOD_PER_LOG = 7;
   function positiveInt(n) {
     return Number.isSafeInteger(n) && n > 0;
@@ -185,25 +199,25 @@ var LoopCore = (() => {
     person.goods.柴 = (person.goods.柴 ?? 0) + FIREWOOD_PER_LOG;
     return FIREWOOD_PER_LOG;
   }
-  function goodsValue(stock) {
-    return Object.entries(stock).reduce((sum, [kind, count2]) => sum + (GOODS[kind] ?? 0) * count2, 0);
+  function goodsValue(stock, prices = GOODS) {
+    return Object.entries(stock).reduce((sum, [kind, count2]) => sum + (prices[kind] ?? 0) * count2, 0);
   }
   function creditSale(house, person, owner, value) {
     if (owner === "house") house.chest += value;
     else person.purse += value;
   }
-  function sellOrdinary(house, person, owner, kind, quantity) {
+  function sellOrdinary(house, person, owner, kind, quantity, prices = GOODS) {
     const stock = owner === "house" ? house.store : person.goods;
     const count2 = quantity === "all" ? stock[kind] ?? 0 : quantity;
-    const price = GOODS[kind];
+    const price = prices[kind];
     if (!price || !takeGoods(stock, kind, count2)) return 0;
     const value = price * count2;
     creditSale(house, person, owner, value);
     return value;
   }
-  function sellAllOrdinary(house, person, owner) {
+  function sellAllOrdinary(house, person, owner, prices = GOODS) {
     const stock = owner === "house" ? house.store : person.goods;
-    return Object.keys(stock).reduce((sum, kind) => sum + sellOrdinary(house, person, owner, kind, "all"), 0);
+    return Object.keys(stock).reduce((sum, kind) => sum + sellOrdinary(house, person, owner, kind, "all", prices), 0);
   }
   function sellTreasure(house, person, owner, index) {
     const treasures = owner === "house" ? house.treasures : person.personalTreasures;
@@ -300,7 +314,9 @@ var LoopCore = (() => {
     "receipts",
     "nightReceipt",
     "absencePeriods",
-    "absenceReadThrough"
+    "absenceReadThrough",
+    "stove",
+    "request"
   ];
   var candidateAssets = [
     "name",
@@ -408,6 +424,8 @@ var LoopCore = (() => {
     };
     if (Array.isArray(h.absencePeriods)) house.absencePeriods = h.absencePeriods;
     if (typeof h.absenceReadThrough === "number") house.absenceReadThrough = count(h.absenceReadThrough);
+    if (isObject(h.stove)) house.stove = h.stove;
+    if (isObject(h.request)) house.request = h.request;
     if (isObject(h.nightReceipt)) {
       const nightId = count(h.nightReceipt.nightId) || account.nightId || 1;
       house.receipts[nightId] = {
@@ -992,6 +1010,161 @@ var LoopCore = (() => {
     (game.absencePeriods ?? (game.absencePeriods = [])).push({ firstNightId: summary.firstNightId, lastNightId });
     game.absenceReadThrough = lastNightId;
     return true;
+  }
+
+  // src/core/loop/trade.ts
+  var TRADE = {
+    /** 当天价 = 基础价 × (1 ± swing)，第 1 天固定用基础价 */
+    priceSwing: 0.2,
+    /** 和基础价差到一成，集市里才标「今天贵 / 今天便宜」 */
+    badgeAt: 0.1,
+    recipes: {
+      charcoal: { name: "木炭", input: { 柴: 3 }, output: "木炭", count: 1 },
+      salve: { name: "金疮药", input: { 草药: 2 }, output: "金疮药", count: 1 }
+    },
+    /** 疗伤一次回几点体力 */
+    heal: { 草药: 1, 金疮药: 2 },
+    request: {
+      payRate: 1.5,
+      friendship: 5,
+      maxFriendship: 100,
+      /** 接单当天算第 1 天，一共几天内要交 */
+      days: 2,
+      /** 托付的东西和数量范围：都是一两天能凑齐的 */
+      wants: { 柴: [4, 6], 时蔬: [2, 3], 草药: [2, 3], 兽皮: [1, 1], 木炭: [1, 2], 金疮药: [1, 1] }
+    },
+    /** 带路下第几天开放（全部开放时不看天数） */
+    unlock: { prices: 2, stove: 3, requests: 4 }
+  };
+  function seedOf(text) {
+    let h = 2166136261;
+    for (const ch of text) {
+      h ^= ch.codePointAt(0);
+      h = Math.imul(h, 16777619);
+    }
+    return h >>> 0;
+  }
+  function stream(lifeId, day, topic) {
+    return new Rng(seedOf(lifeId + "#" + day + "#" + topic));
+  }
+  function positiveInt2(n) {
+    return Number.isSafeInteger(n) && n > 0;
+  }
+  function has(stock, input) {
+    return Object.entries(input).every(([kind, n]) => (stock[kind] ?? 0) >= n);
+  }
+  function take2(stock, kind, n) {
+    const left = (stock[kind] ?? 0) - n;
+    if (left > 0) stock[kind] = left;
+    else delete stock[kind];
+  }
+  function add(stock, kind, n) {
+    stock[kind] = (stock[kind] ?? 0) + n;
+  }
+  function dayPrices(lifeId, day) {
+    const prices = { ...GOODS };
+    if (day <= 1) return prices;
+    const rng = stream(lifeId, day, "prices");
+    for (const kind of Object.keys(GOODS)) {
+      const mult = 1 - TRADE.priceSwing + rng.next() * 2 * TRADE.priceSwing;
+      prices[kind] = Math.max(1, Math.round(GOODS[kind] * mult));
+    }
+    return prices;
+  }
+  function priceTrend(prices, kind) {
+    const base = GOODS[kind];
+    const price = prices[kind];
+    if (!base || !price) return null;
+    if (price >= base * (1 + TRADE.badgeAt)) return "up";
+    if (price <= base * (1 - TRADE.badgeAt)) return "down";
+    return null;
+  }
+  function stoveStatus(job, lifeId, day) {
+    if (!job) return "empty";
+    return job.lifeId !== lifeId || day > job.day ? "ready" : "cooking";
+  }
+  function canCook(house, person, recipe, owner) {
+    const r = TRADE.recipes[recipe];
+    if (!r || house.stove) return false;
+    return has(owner === "house" ? house.store : person.goods, r.input);
+  }
+  function startStove(house, person, recipe, owner, at) {
+    if (!canCook(house, person, recipe, owner)) return null;
+    const stock = owner === "house" ? house.store : person.goods;
+    for (const [kind, n] of Object.entries(TRADE.recipes[recipe].input)) take2(stock, kind, n);
+    const job = { jobId: at.lifeId + "/d" + at.day, recipe, owner, lifeId: at.lifeId, day: at.day };
+    house.stove = job;
+    return job;
+  }
+  function collectStove(house, person, at) {
+    const job = house.stove;
+    if (!job || stoveStatus(job, at.lifeId, at.day) !== "ready") return null;
+    const r = TRADE.recipes[job.recipe];
+    const owner = job.owner === "person" && job.lifeId === at.lifeId ? "person" : "house";
+    add(owner === "person" ? person.goods : house.store, r.output, r.count);
+    house.stove = null;
+    return { kind: r.output, count: r.count, owner };
+  }
+  function useHealing(house, person, kind) {
+    const amount = TRADE.heal[kind];
+    if (!amount) return null;
+    for (const [owner, stock] of [["person", person.goods], ["house", house.store]]) {
+      if ((stock[kind] ?? 0) > 0) {
+        take2(stock, kind, 1);
+        return { owner, amount };
+      }
+    }
+    return null;
+  }
+  function offerFor(lifeId, day, neighbors) {
+    if (!neighbors.length) return null;
+    const rng = stream(lifeId, day, "request");
+    const neighbor = rng.pick(neighbors);
+    const kind = rng.pick(Object.keys(TRADE.request.wants));
+    const [lo, hi] = TRADE.request.wants[kind];
+    const count2 = rng.int(lo, hi);
+    const pay = Math.round(GOODS[kind] * count2 * TRADE.request.payRate);
+    return { id: lifeId + "/r" + day, lifeId, day, neighbor, kind, count: count2, pay, status: "offered" };
+  }
+  function refreshRequest(house, lifeId, day) {
+    const r = house.request;
+    if (r?.status === "accepted" && (r.lifeId !== lifeId || day > r.dueDay)) r.status = "expired";
+  }
+  function requestBoard(house, lifeId, day, neighbors) {
+    refreshRequest(house, lifeId, day);
+    const r = house.request;
+    if (r?.status === "accepted") return { active: r, offer: null };
+    if (r && r.lifeId === lifeId && r.day === day) return { active: null, offer: null };
+    return { active: null, offer: offerFor(lifeId, day, neighbors) };
+  }
+  function acceptRequest(house, lifeId, day, neighbors) {
+    const { active, offer } = requestBoard(house, lifeId, day, neighbors);
+    if (active || !offer) return null;
+    house.request = { ...offer, status: "accepted", acceptedDay: day, dueDay: day + TRADE.request.days - 1 };
+    return house.request;
+  }
+  function planDelivery(house, person) {
+    const r = house.request;
+    if (!r || r.status !== "accepted") return null;
+    const mine = Math.min(person.goods[r.kind] ?? 0, r.count);
+    const home = Math.min(house.store[r.kind] ?? 0, r.count - mine);
+    return { person: mine, house: home, short: r.count - mine - home };
+  }
+  function deliverRequest(house, person, at) {
+    refreshRequest(house, at.lifeId, at.day);
+    const r = house.request;
+    const plan = planDelivery(house, person);
+    if (!r || !plan || plan.short > 0 || !positiveInt2(r.count)) return null;
+    take2(person.goods, r.kind, plan.person);
+    take2(house.store, r.kind, plan.house);
+    const purse = Math.floor(r.pay * plan.person / r.count);
+    const chest = r.pay - purse;
+    person.purse += purse;
+    house.chest += chest;
+    const T = TRADE.request;
+    person.friends[r.neighbor] = Math.min(T.maxFriendship, (person.friends[r.neighbor] ?? 0) + T.friendship);
+    r.status = "done";
+    return { purse, chest, friendship: T.friendship, neighbor: r.neighbor };
   }
   return __toCommonJS(browser_exports);
 })();

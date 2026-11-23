@@ -1,6 +1,7 @@
 import type { House, Person, Treasure } from './state';
 
-export const GOODS: Readonly<Record<string, number>> = { 柴: 3, 时蔬: 5, 草药: 6, 兽皮: 14, 铁矿: 18, 古物: 40 };
+// 木炭、金疮药由院里的灶烧出来（见 trade.ts），不在野外掉落。
+export const GOODS: Readonly<Record<string, number>> = { 柴: 3, 时蔬: 5, 草药: 6, 兽皮: 14, 铁矿: 18, 古物: 40, 木炭: 14, 金疮药: 20 };
 export const FIREWOOD_PER_LOG = 7;
 export type Owner = 'person' | 'house';
 type Home = Pick<House, 'chest' | 'store' | 'treasures'>;
@@ -32,8 +33,9 @@ export function splitFirewood(person: Pick<Personal, 'goods'>): number {
   return FIREWOOD_PER_LOG;
 }
 
-export function goodsValue(stock: Stock): number {
-  return Object.entries(stock).reduce((sum, [kind, count]) => sum + (GOODS[kind] ?? 0) * count, 0);
+/** prices 是当天价（见 trade.ts 的 dayPrices），不传就按基础价 */
+export function goodsValue(stock: Stock, prices: Readonly<Record<string, number>> = GOODS): number {
+  return Object.entries(stock).reduce((sum, [kind, count]) => sum + (prices[kind] ?? 0) * count, 0);
 }
 
 function creditSale(house: Home, person: Personal, owner: Owner, value: number) {
@@ -41,19 +43,22 @@ function creditSale(house: Home, person: Personal, owner: Owner, value: number) 
   else person.purse += value;
 }
 
-export function sellOrdinary(house: Home, person: Personal, owner: Owner, kind: string, quantity: number | 'all'): number {
+export function sellOrdinary(house: Home, person: Personal, owner: Owner, kind: string, quantity: number | 'all',
+  prices: Readonly<Record<string, number>> = GOODS): number {
   const stock = owner === 'house' ? house.store : person.goods;
   const count = quantity === 'all' ? stock[kind] ?? 0 : quantity;
-  const price = GOODS[kind];
+  // 一件件卖和一次全卖用同一个单价，拆开卖不会多赚
+  const price = prices[kind];
   if (!price || !takeGoods(stock, kind, count)) return 0;
   const value = price * count;
   creditSale(house, person, owner, value);
   return value;
 }
 
-export function sellAllOrdinary(house: Home, person: Personal, owner: Owner): number {
+export function sellAllOrdinary(house: Home, person: Personal, owner: Owner,
+  prices: Readonly<Record<string, number>> = GOODS): number {
   const stock = owner === 'house' ? house.store : person.goods;
-  return Object.keys(stock).reduce((sum, kind) => sum + sellOrdinary(house, person, owner, kind, 'all'), 0);
+  return Object.keys(stock).reduce((sum, kind) => sum + sellOrdinary(house, person, owner, kind, 'all', prices), 0);
 }
 
 export function sellTreasure(house: Home, person: Personal, owner: Owner, index: number): Treasure | null {

@@ -1,5 +1,6 @@
 import { depositCoins, settleEstate, unpackBag } from './economy';
 import { makeHouse, type House, type Loot, type Treasure } from './state';
+import type { Request, StoveJob } from './trade';
 import { BANK_CAP, makeDayBank, type DayBank } from './time';
 
 type Fields = Record<string, unknown>;
@@ -33,6 +34,10 @@ interface Household extends House {
   pendingNightId: number | null;
   absencePeriods?: AbsencePeriod[];
   absenceReadThrough?: number;
+  /** 院里的灶：正在烧的那一锅 */
+  stove?: StoveJob | null;
+  /** 邻居托付：接着的或最近一条 */
+  request?: Request | null;
 }
 export interface V4 {
   v: 4;
@@ -55,6 +60,8 @@ export interface HouseholdView extends Resident, House, DayBank {
   receipts: Record<string, NightEntry>;
   ancestors: Portrait[];
   river?: Fields;
+  stove?: StoveJob | null;
+  request?: Request | null;
   [otherHouses]?: V4['houses'];
 }
 
@@ -62,7 +69,8 @@ const accountKeys = ['bankedDays', 'lastGrantDate', 'unlimitedDays', 'guideSeen'
   'allFeatures', 'look', 'expression', 'history', 'nightId', 'worldId', 'lastActiveDate'];
 const riverGuideKeys = ['record', 'hints', 'textOn'];
 const houseKeys = ['houseId', 'fam', 'money', 'chest', 'door', 'traps', 'store', 'treasures',
-  'ancestors', 'abandoned', 'nightPlan', 'receipts', 'nightReceipt', 'absencePeriods', 'absenceReadThrough'];
+  'ancestors', 'abandoned', 'nightPlan', 'receipts', 'nightReceipt', 'absencePeriods', 'absenceReadThrough',
+  'stove', 'request'];
 const candidateAssets = ['name', 'money', 'chest', 'store', 'door', 'crossbow', 'lamp', 'talisman',
   'traps', 'treasures', 'ancestors', 'yard'];
 
@@ -136,6 +144,8 @@ export function fromView(raw: Fields, base?: V4 | null): V4 {
   };
   if (Array.isArray(h.absencePeriods)) house.absencePeriods = h.absencePeriods;
   if (typeof h.absenceReadThrough === 'number') house.absenceReadThrough = count(h.absenceReadThrough);
+  if (isObject(h.stove)) house.stove = h.stove as unknown as StoveJob;
+  if (isObject(h.request)) house.request = h.request as unknown as Request;
   if (isObject(h.nightReceipt)) {
     // v3 的旧回执已入账，只为原战报补编号。
     const nightId = count(h.nightReceipt.nightId) || account.nightId || 1;
