@@ -1356,8 +1356,8 @@ function renderHome() {
 function chooseNightWatch() {
   if (G.phase !== 'home') return;
   const chance = LoopCore.chanceLabel(LoopCore.defenseChance(G.day, G.door, G.traps));
-  const limit = LoopCore.autoLossLimit(G.chest, G.lifeNo);
-  const protection = G.lifeNo === 1 ? '第一世有保护，' : '';
+  const lossText = G.lifeNo === 1 ? '第一世有保护，门破了也不丢钱'
+    : `门破了钱箱最多丢 ${LoopCore.autoLossLimit(G.chest, G.lifeNo)} 文`;
   const commit = start => {
     if (G.phase !== 'home') return;
     G.time = Math.max(G.time, CFG.dusk);
@@ -1368,7 +1368,7 @@ function chooseNightWatch() {
     body: `<p>第 ${G.day} 晚 · ${DOORS[G.door].name}${trapSummary()}</p>`,
     buttons: [
       ['亲手守<small>亲自迎敌，波间能挑本事。守住得全份因果。</small>', () => commit(() => startNight(false)), 'night-choice'],
-      [`交给机关<small>守住的把握${chance} · ${protection}门破了钱箱最多丢 ${limit} 文。守住得半份因果。</small>`, () => commit(delegateNight), 'night-choice'],
+      [`交给机关<small>守住的把握${chance} · ${lossText}。守住得半份因果。</small>`, () => commit(delegateNight), 'night-choice'],
       ['回院子', null, 'choice-back'],
     ],
     bind: el => {

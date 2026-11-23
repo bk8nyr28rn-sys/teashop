@@ -38,8 +38,8 @@ describe('现实日来袭、游戏夜和攒天', () => {
     reconcileAbsence(g, '2026-11-30', draw);
     expect(g).toMatchObject({ phase: 'dawn', day: 3, hp: 2, bankedDays: 1, chest: 114,
       held: 5, autoHeld: 5, autoBroken: 5, broken: 0, nightReceipt: { nightId: 1, won: true } });
-    expect(getAbsenceSummary(g)).toMatchObject({ days: 10, won: 5, broken: 5, chestLost: 12, earnedMoney: g.purse - 31 });
-    expect(g.purse).toBeGreaterThan(31);
+    expect(getAbsenceSummary(g)).toMatchObject({ days: 10, won: 5, broken: 5, chestLost: 12, earnedMoney: 0 });
+    expect(g.purse).toBe(31);
     expect(nightKarma(1, 1, 0)).toBe(nightKarma(1, 0, 0) / 2);
     expect(nightKarma(5, 5, 0, 100)).toBe(20);
     expect(draw.mock.calls[0]).toEqual([start, 1]);
@@ -62,15 +62,16 @@ describe('现实日来袭、游戏夜和攒天', () => {
 
   it('同日保持战斗；隔日用原夜的夜号、种子交接一次，后续纯来袭不挤掉待看回执', () => {
     const g = game('home');
-    const plan = beginNightLedger(g, false, lose)!;
+    const plan = beginNightLedger(g, false, win)!;
     const snapshot = structuredClone(g);
     reconcileAbsence(g, start, () => win);
     expect(g).toEqual(snapshot);
-    const draw = vi.fn(() => win);
+    const draw = vi.fn(() => lose);
     reconcileAbsence(g, '2026-11-23', draw);
     expect(draw).toHaveBeenCalledTimes(2);
     expect(g).toMatchObject({ nightId: 3, nightPlan: null, day: 3, phase: 'dawn', bankedDays: 1,
-      nightReceipt: { nightId: plan.nightId, seed: plan.seed, realDate: start, mode: 'offline', won: false } });
+      purse: 31, held: 1, autoHeld: 1, autoBroken: 2,
+      nightReceipt: { nightId: plan.nightId, seed: plan.seed, realDate: start, mode: 'offline', won: true, earnedMoney: 0 } });
     const settled = structuredClone(g);
     reconcileAbsence(g, '2026-11-22', draw);
     reconcileAbsence(g, '2026-11-23', draw);

@@ -47,7 +47,8 @@ async function choice(browser, seed, firstLife) {
     assert.deepEqual(await p.locator('.night-choice').evaluateAll(els => els.map(el => el.dataset.a)), ['manual','delegate']);
     const label = await p.locator('[data-a=delegate]').innerText();
     assert.match(label, /三成/);
-    assert.ok(label.includes(firstLife ? '0 文' : '20 文'));
+    assert.ok(label.includes(firstLife ? '第一世有保护，门破了也不丢钱' : '门破了钱箱最多丢 20 文'));
+    if (firstLife) assert.doesNotMatch(label, /最多丢/);
     if (firstLife && seed === 4) await shot(p, 'stage3-choice');
     await act(p, 'delegate');
     await heading(p, seed === 7 ? '机关守住了' : '机关没守住');
@@ -125,6 +126,30 @@ async function away(browser) {
   } finally { await ctx.close(); }
 }
 
+async function offlineWins(browser) {
+  const p = await browser.newPage({ viewport: { width: 390, height: 844 }, timezoneId: 'Asia/Shanghai' });
+  try {
+    await open(p);
+    await p.evaluate(async () => { G.purse = 9; await save(); watchSeed = () => 7; });
+    await p.clock.setSystemTime(clock(25));
+    await p.evaluate(() => window.dispatchEvent(new Event('focus')));
+    await heading(p, '你不在的这段日子');
+    const summary = await p.locator('#sheet .sh-body').innerText();
+    assert.match(summary, /离开 3 天，鬼来砸了 3 次门。守住 3 次/);
+    assert.doesNotMatch(summary, /纸钱|钱袋/);
+    const state = await ledger(p);
+    assert.equal(state.held, 3);
+    assert.equal(state.purse, 9);
+    assert.equal(state.ids.length, 3);
+    await button(p, '知道了').click();
+    await heading(p, '机关守住了');
+    assert.equal(await p.locator('#sheet .sh-body').innerText(), '你不在时，机关守住了家门。');
+    await p.reload();
+    await heading(p, '机关守住了');
+    assert.deepEqual(await ledger(p), state);
+  } finally { await p.close(); }
+}
+
 async function resumeFight(browser) {
   const p = await browser.newPage({timezoneId:'Asia/Shanghai'});
   try {
@@ -155,7 +180,7 @@ async function resumeFight(browser) {
   const browser = await chromium.launch();
   try {
     await choice(browser,7,true); await choice(browser,4,true); await choice(browser,4,false);
-    await away(browser); await resumeFight(browser);
+    await away(browser); await offlineWins(browser); await resumeFight(browser);
     assert.deepEqual(errors,[]);
     console.log('PASS 机关守胜负、首世保护、修门预览、跨页回访、只读院子、同日战斗续打和隔日接管');
   } finally { await browser.close(); }

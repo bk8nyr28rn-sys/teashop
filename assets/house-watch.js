@@ -49,12 +49,12 @@ function openReturnSummary(unread = false) {
     if (!unread) sheet({ title: '回家看看', body: '<p>还没有离家期间的来袭记录。</p>', buttons: [['知道了', null]] });
     return false;
   }
-  const { days, raids, won, broken, chestLost, earnedMoney, lastNightId } = summary;
+  const { days, raids, won, broken, chestLost, lastNightId } = summary;
   const facts = [won && `守住 ${won} 次`, broken && `门破 ${broken} 次`].filter(Boolean).join('，');
-  const money = [chestLost && `钱箱少了 ${chestLost} 文`, earnedMoney && `纸钱 ${earnedMoney} 文进了钱袋`].filter(Boolean).join('，');
+  const loss = chestLost ? `钱箱少了 ${chestLost} 文。` : '';
   const houseId = G.houseId;
   sheet({ title: '你不在的这段日子', focusTitle: true,
-    body: `<p>离开 ${days} 天，鬼来砸了 ${raids} 次门。${facts}。${money ? money + '。' : ''}</p><p>攒着的天：${G.bankedDays} / ${BANK_CAP}</p>`,
+    body: `<p>离开 ${days} 天，鬼来砸了 ${raids} 次门。${facts}。${loss}</p><p>攒着的天：${G.bankedDays} / ${BANK_CAP}</p>`,
     buttons: [['知道了', async () => {
       await withGameLock(() => {
         const latest = storedGame();

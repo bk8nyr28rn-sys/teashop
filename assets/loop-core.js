@@ -839,10 +839,11 @@ var LoopCore = (() => {
     rng.setState(seed);
     const won = rng.chance(chance);
     const chestLost = !won && options.allowLoss ? autoLossLimit(game.chest, game.lifeNo) : 0;
-    const earnedMoney = won ? paperReward(day, !guardian && !game.allFeatures) : 0;
+    const earnedMoney = won && mode === "delegated" ? paperReward(day, !guardian && !game.allFeatures) : 0;
     const subject = mode === "offline" ? "你不在时，机关" : "机关";
     let report;
-    if (won) report = `${subject}守住了家门，${earnedMoney} 文纸钱已放进钱袋。`;
+    if (won && mode === "offline") report = "你不在时，机关守住了家门。";
+    else if (won) report = `${subject}守住了家门，${earnedMoney} 文纸钱已放进钱袋。`;
     else if (game.lifeNo <= 1) report = `${subject}没守住，好在新家有保护，没丢东西。`;
     else if (chestLost > 0) report = `${subject}没守住，钱箱少了 ${chestLost} 文。`;
     else report = `${subject}没守住，钱箱里的钱一文没少。`;

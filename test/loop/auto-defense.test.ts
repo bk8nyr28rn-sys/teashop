@@ -60,17 +60,25 @@ describe('家宅把握', () => {
 });
 
 describe('机关共用夜账', () => {
-  it.each([7, 4, 0])('相同家底、夜号和种子 %i，托守与离线的抽签和财产结算一致', seed => {
+  it.each([7, 4, 0])('相同家底、夜号和种子 %i，托守与离线的胜负和钱箱损失一致', seed => {
     const active = home(), away = home();
     const first = settleAutoNight(active, options({ seed }))!;
     const second = settleAutoNight(away, options({ seed, mode: 'offline', progress: false }))!;
-    expect(second).toMatchObject({ seed, won: first.won, chance: first.chance, earnedMoney: first.earnedMoney,
+    expect(second).toMatchObject({ seed, won: first.won, chance: first.chance, earnedMoney: 0,
       chestLost: first.chestLost, purseLost: first.purseLost, mode: 'offline', realDate: day });
     expect(away.chest).toBe(active.chest);
-    expect(away.purse).toBe(active.purse);
+    expect(away.purse).toBe(109);
     expect(away).toMatchObject({ phase: 'home', day: 3, bankedDays: 2, nightReceipt: null });
     expect(active).toMatchObject({ phase: 'dawn', day: 3, bankedDays: 2, nightReceipt: first });
     expect(second.paragraphs[0]).toContain('你不在时');
+  });
+
+  it('离线守住记一胜、给半份因果，钱袋维持原额，战报只报守住', () => {
+    const game = { ...home(), held: 0, autoHeld: 0, broken: 0 };
+    const receipt = settleAutoNight(game, options({ mode: 'offline', progress: false }))!;
+    expect(receipt).toMatchObject({ won: true, earnedMoney: 0, paragraphs: ['你不在时，机关守住了家门。'] });
+    expect(game).toMatchObject({ held: 1, autoHeld: 1, purse: 109 });
+    expect(nightKarma(game.held, game.autoHeld, game.broken)).toBe(nightKarma(1) / 2);
   });
 
   it.each(['delegated', 'offline'] as const)('%s 下第一世整世都保护钱箱，第二世损失向下取整且封顶', mode => {
@@ -97,7 +105,7 @@ describe('机关共用夜账', () => {
     expect(game).toMatchObject({ autoBroken: 1, broken: 1, chest: 83, purse: 109 });
   });
 
-  it('纸钱按当晚全部鬼的基础掉落折半进钱袋，无额外本事收入', () => {
+  it('主动交给机关守住，纸钱按当晚全部鬼的基础掉落折半进钱袋', () => {
     for (const d of [1, 3, 5]) {
       for (const allFeatures of [false, true]) {
         const game = { ...home(), day: d, allFeatures };
