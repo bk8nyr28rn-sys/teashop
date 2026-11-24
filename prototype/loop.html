@@ -131,6 +131,14 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .sh-btns button small { display: block; font-weight: 400; font-size: 12px; color: var(--muted); }
 .sh-btns .night-choice { text-align: left; min-height: 64px; padding: 9px 14px; }
 .sh-btns .night-choice small { margin-top: 2px; }
+/* 和人说话：头像 + 一句话；你的回话就是按钮 */
+.talk-head { display: flex; gap: 10px; align-items: flex-end; margin: -2px 0 2px; }
+.talk-head svg { width: 84px; height: 96px; flex: none; border-radius: 14px; background: #E8DCC2; }
+.talk-bubble { position: relative; flex: 1; margin: 0; background: var(--bg); border-radius: 14px 14px 14px 4px; padding: 9px 12px; font-size: 15px; line-height: 1.5; }
+.talk-bubble small { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.talk-bubble::before { content: ''; position: absolute; left: -7px; bottom: 10px; border: 7px solid transparent; border-right-color: var(--bg); border-left: 0; }
+.sh-btns button.reply { text-align: left; border-radius: 14px 14px 4px 14px; padding: 9px 14px; }
+.sh-btns button.reply.main small { color: inherit; opacity: 0.85; }
 .sh-btns .choice-back { min-height: 40px; background: transparent; border-style: dashed; }
 .trap-offers { display: grid; gap: 6px; }
 .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
@@ -1366,6 +1374,8 @@ function homeSvg() {
   s += River.yardStone(false);
   // 前墙和门
   s += `<rect x="0" y="252" width="360" height="48" fill="#CBBFA8"/><rect x="0" y="246" width="360" height="8" fill="#4A4F5C"/>${doorSvg(G.door, 180, 300, 62, 58)}`;
+  const knock = knockingNeighbor();
+  if (knock) s += person(lookOf(INSPIRE[nb(knock.neighbor).look][1]), 'happy', 'adult', 118, 256, 0.21);
   if (G.plaque) s += `<rect x="156" y="232" width="48" height="16" rx="2" fill="#3A2420" stroke="#E3B341"/><text x="180" y="244" text-anchor="middle" font-size="11" fill="#E3B341" font-family="var(--font-display)">${surnameOf(G.fam)}府</text>`;
   if (G.door >= 2) s += lanternSvg(136, 252) + lanternSvg(224, 252);
   if (G.door >= 3) s += lionSvg(120, 298) + lionSvg(240, 298, true);
@@ -1396,18 +1406,17 @@ function renderHome() {
   }
   const toWharf = !Guidance.open(2) || River.firstVisit();
   const heals = G.hp < CFG.hpMax ? ['金疮药', '草药'].filter(k => G.goods[k] > 0 || G.store[k] > 0) : [];
-  const req = requestNow(), reqNote = req.active ? ' · 托付 1 条在身上' : req.offer ? ' · 邻居托付 1 条' : '';
   $('panel').innerHTML = `${clockHtml()}
     <div class="acts">
       ${left > 0 ? `<button type="button" class="big" data-a="out">${toWharf ? '出门 · 去河埠' : '出门找东西'}<small>${toWharf ? '推开家门，沿河走走' : '越远东西越好，也越危险。天黑前要回来'}</small></button>` : ''}
-      <button type="button" class="big" data-a="market">去集市卖货<small>我的 ${storeCount(G.goods) + G.personalTreasures.length} 件 · 家里的 ${storeCount() + G.treasures.length} 件${reqNote}</small></button>
+      <button type="button" class="big" data-a="market">去集市卖货<small>我的 ${storeCount(G.goods) + G.personalTreasures.length} 件 · 家里的 ${storeCount() + G.treasures.length} 件</small></button>
       <button type="button" class="big" data-a="build">修院子<small>${DOORS[G.door].name}（门血 ${DOORS[G.door].hp}）${trapSummary()}</small></button>
     </div>
     ${yardMore(left, toWharf, heals)}
     <div class="acts">
       <button type="button" class="big ${left > 0 ? 'ghosty' : 'main'}" data-a="night">${left > 0 ? '在家歇到天黑' : '天黑了，去守夜'}<small>${left > 0 ? `还有 ${dur(left)} 天黑，鬼会来砸门` : '鬼要来砸门了'}</small></button>
     </div>`;
-  bindActs({ out: () => askBuddy(toWharf), river: () => askBuddy(true), place: () => openArrange(), market: openMarket, build: openBuild, friends: openFriends, family: openFamily, stove: openStove, night: chooseNightWatch });
+  bindActs({ out: () => askBuddy(toWharf), river: () => askBuddy(true), place: () => openArrange(), market: openMarket, build: openBuild, friends: () => openFriends(), family: openFamily, stove: openStove, night: chooseNightWatch });
   $('panel').querySelectorAll('[data-heal]').forEach(b => { b.onclick = () => heal(b.dataset.heal); });
 }
 // 不是天天要用的事：一排小按钮，第二行写一句状态（太长就省略）
@@ -1423,15 +1432,40 @@ function yardMore(left, toWharf, heals) {
   if (Guidance.open(3)) items.push(more('family', '家和祠堂', familySummary()));
   if (Guidance.open(4)) {
     const best = NEIGHBORS.slice().sort((a, b) => G.friends[b.id] - G.friends[a.id])[0];
-    items.push(more('friends', '邻居', `${best.who} 交情 ${G.friends[best.id]}`));
+    const { active, offer } = requestNow();
+    const note = offer ? `${nb(offer.neighbor).who}在门口` : active ? `${nb(active.neighbor).who}托的${active.kind}` : `${best.who} 交情 ${G.friends[best.id]}`;
+    items.push(more('friends', '邻居', note));
   }
   const placed = LoopCore.decorSlots(G).filter(Boolean).length + (G.river?.stone === 'yard' ? 1 : 0);
   if (placed) items.push(more('place', '摆设', `院里摆着 ${placed} 件`));
   return items.length ? `<div class="yard-more" role="group" aria-label="院里的其他事">${items.join('')}</div>` : '';
 }
+// ================= 和人说话 =================
+// 一个地方站一个人：说一句话，你用回话来选。台词看情况变；字要少，一句话，最多一行半
+const MERCHANT = { id: 'merchant', name: '钱掌柜', look: INSPIRE[3][1] };
+function talkHead(npc, line) {
+  const look = lookOf(npc.look);
+  // 头像只露头和上身：人按原尺寸画，鬼也按原尺寸画在同一个位置
+  const face = npc.ghost ? ghostSvg(look, 'calm', 'elder', 120, 392, 1) : personSvg(look, npc.expr || 'happy', npc.age || 'adult');
+  return `<div class="talk-head" data-npc="${npc.id}"><svg viewBox="30 -6 180 190" aria-hidden="true">${face}</svg><p class="talk-bubble"><small>${npc.name}</small>${line}</p></div>`;
+}
+function ancestorNpc() { const a = Guidance.ancestor(); return { id: 'ancestor', name: `${a.name} · 祖宗`, look: a.look, ghost: true }; }
+function neighborNpc(id) { const n = nb(id); return { id, name: `${n.fam} · ${n.who}`, look: INSPIRE[n.look][1] }; }
+// 昨夜的那张战报（这一世的），用来让人接着话头说
+function lastNight() {
+  return Object.values(G.receipts || {}).filter(r => r.lifeId === G.lifeId && r.day === G.day - 1 && !r.guardian).sort((a, b) => b.nightId - a.nightId)[0] || null;
+}
+function ancestorNightLine(chance) {
+  const last = lastNight();
+  if (last && !last.won) return '昨夜门破了，今晚可得当心。你自个儿守，还是交给机关？';
+  if (!Object.values(G.traps).some(Boolean)) return '天黑了。院墙上还空着，你自个儿守，还是交给机关？';
+  if (chance >= 0.7) return '天黑了。院墙上的家伙什儿够硬，交给机关也放心。你看呢？';
+  return '天黑了。今晚你自个儿守，还是交给院墙上的机关？';
+}
 function chooseNightWatch() {
   if (G.phase !== 'home') return;
-  const chance = LoopCore.chanceLabel(LoopCore.defenseChance(G.day, G.door, G.traps));
+  const odds = LoopCore.defenseChance(G.day, G.door, G.traps);
+  const chance = LoopCore.chanceLabel(odds);
   const lossText = G.lifeNo === 1 ? '第一世有保护，门破了也不丢钱'
     : `门破了钱箱最多丢 ${LoopCore.autoLossLimit(G.chest, G.lifeNo)} 文`;
   const commit = start => {
@@ -1440,12 +1474,12 @@ function chooseNightWatch() {
     return start();
   };
   sheet({
-    title: '今晚怎么守门？', dismiss: true, focusTitle: true,
-    body: `<p>第 ${G.day} 晚 · ${DOORS[G.door].name}${trapSummary()}</p>`,
+    title: '天黑了', dismiss: true, focusTitle: true,
+    body: talkHead(ancestorNpc(), ancestorNightLine(odds)) + `<p class="note">第 ${G.day} 晚 · ${DOORS[G.door].name}${trapSummary()}</p>`,
     buttons: [
-      ['亲手守<small>亲自迎敌，波间能挑本事。守住得全份因果。</small>', () => commit(() => startNight(false)), 'night-choice'],
-      [`交给机关<small>守住的把握${chance} · ${lossText}。守住得半份因果。</small>`, () => commit(delegateNight), 'night-choice'],
-      ['回院子', null, 'choice-back'],
+      ['我自己来<small>亲自迎敌，波间能挑本事。守住得全份因果。</small>', () => commit(() => startNight(false)), 'reply night-choice'],
+      [`交给机关吧<small>守住的把握${chance} · ${lossText}。守住得半份因果。</small>`, () => commit(delegateNight), 'reply night-choice'],
+      ['等等，我再看看院子', null, 'reply choice-back'],
     ],
     bind: el => {
       el.querySelector('[data-i="0"]').dataset.a = 'manual';
@@ -1484,7 +1518,21 @@ function marketSection(owner) {
     ${!rows && !valuableRows ? `<small class="note">${mine ? '手里还没有货。' : '仓库和宝物架都空着。'}</small>` : ''}</section>`;
 }
 
+// 钱掌柜看情况说话：头一回认识、同一天又来、今天你手上哪样贵哪样贱
+function merchantLine() {
+  const prices = todayPrices(), mine = Object.keys(G.goods).filter(k => G.goods[k] > 0);
+  if (!G.metMerchant) return '头回来吧？我姓钱，柴、药、皮子都收。一件件卖、一回全卖都成。';
+  if (G.merchantDay === G.day) return '又来啦？';
+  const up = mine.find(k => LoopCore.priceTrend(prices, k) === 'up');
+  if (up) return `今儿${up}金贵，来得正好！`;
+  const down = mine.find(k => LoopCore.priceTrend(prices, k) === 'down');
+  if (down) return `今儿${down}贱了，不急的话留着明天卖。`;
+  if (!mine.length && !storeCount()) return '空着手来的？看看也成。';
+  return G.day === 1 ? '价钱公道，带了啥来？' : '价钱跟昨儿差不多。带了啥来？';
+}
 function openMarket() {
+  const line = merchantLine();
+  if (!G.metMerchant || G.merchantDay !== G.day) { G.metMerchant = true; G.merchantDay = G.day; save(); }
   const hasThings = storeCount(G.goods) + G.personalTreasures.length > 0;
   const transfer = (hasThings || G.purse) ? `<details class="market-transfer"><summary>放进家里</summary>
     <small class="note">存进家里就归全家，钱箱只能花在家上。</small>
@@ -1492,7 +1540,7 @@ function openMarket() {
     ${G.purse ? `<label>存钱<input id="deposit-amount" type="number" inputmode="numeric" min="1" max="${G.purse}" step="1" value="${G.purse}">文</label><button type="button" class="mini" data-deposit>放进钱箱</button>` : ''}</details>` : '';
   sheet({
     title: '集市', dismiss: true,
-    body: River.marketGreeting() + requestSection() + marketSection('person') + marketSection('house') + transfer,
+    body: talkHead(MERCHANT, line) + River.marketGreeting() + marketSection('person') + marketSection('house') + transfer,
     buttons: [['回去', null]],
     bind: (el) => {
       for (const section of el.querySelectorAll('[data-owner]')) {
@@ -1531,7 +1579,6 @@ function openMarket() {
       };
     },
   });
-  Guidance.speak('货可以一件件卖，也能全卖。', true);
 }
 
 function refreshMarket(message) { save(); render(); openMarket(); toast(message); }
@@ -1579,8 +1626,13 @@ function canCookAny() {
 }
 function requestsOpen() { return Guidance.open(TRADE.unlock.requests); }
 function requestNow() {
-  return requestsOpen() ? LoopCore.requestBoard(G, G.lifeId, G.day, NEIGHBOR_IDS) : { active: null, offer: null };
+  if (!requestsOpen()) return { active: null, offer: null };
+  const board = LoopCore.requestBoard(G, G.lifeId, G.day, NEIGHBOR_IDS);
+  // 今天已经回绝了的那条，不再来敲门
+  return G.requestNoDay === G.day ? { active: board.active, offer: null } : board;
 }
+// 有邻居在门口等你回话
+function knockingNeighbor() { return G.phase === 'home' ? requestNow().offer : null; }
 function requestDeliverable() {
   const { active } = requestNow();
   return active && LoopCore.planDelivery(G, G).short === 0 ? active : null;
@@ -1639,31 +1691,43 @@ function collectStove() {
   save(); render(); openStove();
   toast('取出' + got.map(g => ` ${g.count} ${g.kind === '木炭' ? '件' : '份'}${g.kind}（${g.owner === 'person' ? '归你自己' : '进了家里的仓库'}）`).join('，'));
 }
-function requestSection() {
-  if (!requestsOpen()) return '';
-  const { active, offer } = requestNow();
-  const who = id => nb(id).who;
-  const unit = kind => (kind === '柴' || kind === '木炭' || kind === '兽皮') ? '件' : '份';
-  if (active) {
-    const plan = LoopCore.planDelivery(G, G);
-    const due = active.dueDay === G.day ? '今天要交' : '明天之前交';
-    const parts = [plan.person && `自己的 ${plan.person}`, plan.house && `家里的 ${plan.house}`].filter(Boolean).join(' + ') + ` ${unit(active.kind)}`;
-    return `<section class="request-card" data-request="active"><h3>邻居托付</h3>
-      <p>${who(active.neighbor)}托你带 <b>${active.count} ${unit(active.kind)}${active.kind}</b>，给 ${active.pay} 文，交情 +${TRADE.request.friendship}。${due}，没交也不罚。</p>
-      ${plan.short ? `<small class="note">还差 ${plan.short} ${unit(active.kind)}。</small>` : `<button type="button" class="mini" data-deliver>交货（${parts}）</button>`}</section>`;
-  }
+// 邻居上门：要么托你带东西，要么问你带来了没有。说一句话，你回一句
+const unitOf = kind => (kind === '柴' || kind === '木炭' || kind === '兽皮') ? '件' : '份';
+function neighborTalk() {
+  const { active, offer } = requestNow(), r = active || offer;
+  if (!r) return openFriends(true);
+  const want = `${r.count} ${unitOf(r.kind)}${r.kind}`, friends = ['看看交情', () => openFriends(true), 'reply'];
+  let line, replies;
   if (offer) {
-    return `<section class="request-card" data-request="offer"><h3>邻居托付</h3>
-      <p>${who(offer.neighbor)}：「想要 ${offer.count} ${unit(offer.kind)}${offer.kind}，给你 ${offer.pay} 文。」</p>
-      <small class="note">比卖给集市多给五成，交了交情 +${TRADE.request.friendship}。两天内交，没交也不罚。</small>
-      <button type="button" class="mini" data-accept>接下</button></section>`;
+    line = `${surnameOf(G.fam)}家的！帮我捎 ${want}呗？给你 ${r.pay} 文，比集市上划算。`;
+    replies = [[`好嘞，两天内给您送去<small>交了交情 +${TRADE.request.friendship} · 没送到也不怪你</small>`, acceptRequest, 'reply main'],
+      ['这回不行，下次吧', declineRequest, 'reply'], friends];
+  } else {
+    const plan = LoopCore.planDelivery(G, G);
+    const parts = [plan.person && `自己的 ${plan.person}`, plan.house && `家里的 ${plan.house}`].filter(Boolean).join(' + ');
+    if (plan.short) {
+      line = `${want}的事别忘了，${r.dueDay === G.day ? '今天就得要' : '明天之前要'}。`;
+      replies = [[`还差 ${plan.short} ${unitOf(r.kind)}，回头就送来`, null, 'reply'], friends];
+    } else {
+      line = `哟，${r.kind}带来了？`;
+      replies = [[`带来了，您收好<small>给 ${r.pay} 文 · 交情 +${TRADE.request.friendship} · 用${parts} ${unitOf(r.kind)}</small>`, deliverRequest, 'reply main'], friends];
+    }
   }
-  return '<section class="request-card" data-request="none"><h3>邻居托付</h3><small class="note">今天没有新的托付了。</small></section>';
+  sheet({ title: offer ? '有人敲门' : '邻居', dismiss: true, body: talkHead(neighborNpc(r.neighbor), line), buttons: replies });
 }
 function acceptRequest() {
   if (G.phase !== 'home') return;
   const r = LoopCore.acceptRequest(G, G.lifeId, G.day, NEIGHBOR_IDS);
-  if (r) refreshMarket(`接下了${nb(r.neighbor).who}的托付`);
+  if (!r) return;
+  Guidance.done('knock');
+  save(); render(); toast(`${nb(r.neighbor).who}：「那就拜托啦！」`);
+}
+function declineRequest() {
+  const r = requestNow().offer;
+  if (G.phase !== 'home' || !r) return;
+  G.requestNoDay = G.day;
+  Guidance.done('knock');
+  save(); render(); toast(`${nb(r.neighbor).who}：「不碍事，下回再说。」`);
 }
 function deliverRequest() {
   if (G.phase !== 'home') return;
@@ -1672,7 +1736,7 @@ function deliverRequest() {
   Guidance.done('deliver');
   G.earned += paid.purse + paid.chest;
   const money = [paid.purse && `钱袋 +${paid.purse}`, paid.chest && `钱箱 +${paid.chest}`].filter(Boolean).join('，');
-  refreshMarket(`交到了：${money} 文，和${nb(paid.neighbor).who}的交情 +${paid.friendship}`);
+  save(); render(); toast(`${nb(paid.neighbor).who}：「多谢多谢！」${money} 文，交情 +${paid.friendship}`);
 }
 
 function paymentText({chest, purse, shortfall}) {
@@ -1796,7 +1860,12 @@ function openArrange(pick = null) {
       if (LoopCore.moveDecor(G, pick, i)) { save(); render(); openArrange(); toast('挪好了'); }
     }]).filter(Boolean), ['回去', () => openArrange()]] });
 }
-function openFriends() {
+// 邻居：有人托事（上门、等你交货）时先说话，「看看交情」才是原来的交情页
+function openFriends(skipTalk = false) {
+  if (!skipTalk && G.phase === 'home') {
+    const { active, offer } = requestNow();
+    if (active || offer) return neighborTalk();
+  }
   const best = Object.entries(G.goods).filter(([, n]) => n > 0).sort((a, b) => GOODS[b[0]] - GOODS[a[0]])[0];
   const rows = NEIGHBORS.map((n) => {
     const v = G.friends[n.id];
@@ -1810,8 +1879,8 @@ function openFriends() {
     body: `<p class="note">交情靠做过的事攒：一起出门、帮着守门、送东西。交情 20 能<b>结伴</b>出门（更安全、多背 3 件、倒下有人扛你回家）；40 能<b>驰援</b>（夜里被砸门时能喊他来帮忙）。真游戏里邻居是真人玩家。</p>${rows}`,
     buttons: [['回去', null]],
     bind: (el) => {
-      el.querySelectorAll('[data-coin]').forEach((b) => { b.onclick = () => { if (!LoopCore.payPersonal(G, 10)) return; addFriend(b.dataset.coin, 5); save(); render(); openFriends(); }; });
-      el.querySelectorAll('[data-good]').forEach((b) => { b.onclick = () => { if (!best || !LoopCore.givePersonalGood(G, best[0])) return; addFriend(b.dataset.good, 8); save(); render(); openFriends(); }; });
+      el.querySelectorAll('[data-coin]').forEach((b) => { b.onclick = () => { if (!LoopCore.payPersonal(G, 10)) return; addFriend(b.dataset.coin, 5); save(); render(); openFriends(true); }; });
+      el.querySelectorAll('[data-good]').forEach((b) => { b.onclick = () => { if (!best || !LoopCore.givePersonalGood(G, best[0])) return; addFriend(b.dataset.good, 8); save(); render(); openFriends(true); }; });
     },
   });
 }

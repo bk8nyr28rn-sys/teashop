@@ -70,6 +70,8 @@ const ok = (n, c, extra = '') => console.log((c ? 'PASS ' : 'FAIL ') + n + (extr
     await sheetBtn('回去');
     ok('upgrades bought', await p.evaluate(() => G.door === 1 && G.traps.crossbow === 1 && G.traps.lamp === 1));
     await p.click('[data-a="friends"]');
+    // 有邻居上门时先说话，点「看看交情」才是交情页
+    if (await p.locator('#sheet [data-npc]').count()) await p.locator('#sheet .sh-btns button', { hasText: '看看交情' }).click();
     await p.click('[data-coin="wang"]');
     ok('gift raises 交情', (await p.evaluate(() => G.friends.wang)) > st.wang);
     await p.evaluate(() => { G.friends.wang = 45; save(); });

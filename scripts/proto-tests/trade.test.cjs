@@ -75,24 +75,40 @@ async function run(browser, width, height, entry) {
       G.store = { [offer.kind]: offer.count };
       G.guideSoldDay = G.day; await save(); render();
     });
-    assert.match(await page.locator('[data-a=market]').innerText(), /邻居托付 1 条/);
+    // 邻居上门：院里站着人、念头提醒、「邻居」小按钮写着谁在门口
+    const offer = await page.evaluate(() => LoopCore.offerFor(G.lifeId, G.day, NEIGHBOR_IDS));
+    const who = await page.evaluate(id => nb(id).who, offer.neighbor);
+    assert.match(await page.locator('[data-a=friends]').innerText(), new RegExp(`${who}在门口`));
+    assert.equal(await page.locator('#thought').getAttribute('data-thought'), 'knock');
     // 院里大按钮只留四个天天要用的，其余收成一排小按钮
     assert.deepEqual(await page.locator('#panel .big').evaluateAll(els => els.map(e => e.dataset.a)), ['out', 'market', 'build', 'night']);
     assert.deepEqual(await page.locator('#panel .more').evaluateAll(els => els.map(e => e.dataset.a)), ['river', 'stove', 'family', 'friends']);
     await noOverflow();
-    await page.locator('[data-a=market]').click();
-    const card = sheet().locator('[data-request=offer]');
-    assert.match(await card.innerText(), /想要 \d+ (件|份)/);
-    const offer = await page.evaluate(() => LoopCore.offerFor(G.lifeId, G.day, NEIGHBOR_IDS));
-    await card.locator('[data-accept]').click();
-    assert.equal(await page.evaluate(() => G.request.status), 'accepted');
-    const before = await page.evaluate(id => [G.purse, G.chest, G.friends[id]], offer.neighbor);
+    await page.locator('[data-a=friends]').click();
+    assert.equal(await sheet().locator(`[data-npc=${offer.neighbor}]`).count(), 1);
+    assert.match(await sheet().innerText(), new RegExp(`帮我捎 ${offer.count} (件|份)`));
     await noOverflow();
-    await page.screenshot({ path: path.join(OUT, `trade-market-${width}.png`), animations: 'disabled' });
-    await sheet().locator('[data-deliver]').click();
+    await page.screenshot({ path: path.join(OUT, `trade-knock-${width}.png`), animations: 'disabled' });
+    await button('好嘞').click();
+    assert.equal(await page.evaluate(() => G.request.status), 'accepted');
+    // 货在家里仓库，已经够了：念头改成交货，再找邻居说话就能交
+    assert.equal(await page.locator('#thought').getAttribute('data-thought'), 'deliver');
+    const before = await page.evaluate(id => [G.purse, G.chest, G.friends[id]], offer.neighbor);
+    await page.locator('[data-a=friends]').click();
+    assert.match(await sheet().innerText(), /带来了？/);
+    await button('带来了').click();
     const after = await page.evaluate(id => [G.purse, G.chest, G.friends[id], G.request.status], offer.neighbor);
     assert.deepEqual(after, [before[0], before[1] + offer.pay, Math.min(100, before[2] + 5), 'done']);
-    assert.equal(await sheet().locator('[data-request=none]').count(), 1);
+    // 交完了，邻居不再站在门口，「邻居」点进去是交情页
+    await page.locator('[data-a=friends]').click();
+    assert.equal(await sheet().locator('h2').innerText(), '邻居和交情');
+    await button('回去').click();
+
+    // 集市：钱掌柜看情况说话
+    await page.locator('[data-a=market]').click();
+    assert.equal(await sheet().locator('[data-npc=merchant]').count(), 1);
+    await noOverflow();
+    await page.screenshot({ path: path.join(OUT, `trade-market-${width}.png`), animations: 'disabled' });
 
     // 一件件卖和全卖同价；当天的价和集市上写的一致
     const prices = await page.evaluate(() => todayPrices());
@@ -120,7 +136,7 @@ async function run(browser, width, height, entry) {
     // 第 3 天晚上等明天：预告第 4 天邻居上门
     await page.evaluate(async () => { G.day = 3; await save(); render(); });
     assert.match(await page.locator('.next-day').innerText(), /第 4 天.*邻居/);
-    console.log(`PASS ${width}×${height} 第 1 天固定价、第 3 天生火、过一夜取木炭、刷新不重复、第 4 天接托付交货、全卖同价、院里四个大按钮、没有攒天只能看、预告明天`);
+    console.log(`PASS ${width}×${height} 第 1 天固定价、第 3 天生火、过一夜取木炭、刷新不重复、第 4 天邻居上门托付、找邻居交货、钱掌柜说话、全卖同价、院里四个大按钮、没有攒天只能看、预告明天`);
   } finally { await page.close(); }
 }
 

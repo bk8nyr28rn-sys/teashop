@@ -12,7 +12,8 @@ const Guidance = (() => {
     heal: ['用草药敷一下伤', '一份草药能回一点体力，先用自己的，再用仓库的。', '伤轻了一些。', 'heal'],
     kiln: ['灶台能生火了', '3 件柴能烧成 1 件木炭，2 份草药能熬成 1 份金疮药。睡前放进去，明早就好，比直接卖值钱。', '灶里生上火了。', 'stove'],
     stove: ['灶上的东西烧好了，去取吧', '过了一夜，灶里那锅已经好了，取出来能卖，也能留着用。', '取出来了。', 'stove'],
-    deliver: ['邻居托的东西凑够了', '去集市的「邻居托付」交货，给的钱比集市多，交情也会涨。', '交到了。', 'market'],
+    deliver: ['邻居托的东西凑够了', '点院里的「邻居」去交货，给的钱比集市多，交情也会涨。', '交到了。', 'friends'],
+    knock: ['邻居在门口，像是有事找你', '点院里的「邻居」，听听是什么事。答不答应都行。', '话说完了。', 'friends'],
     field: ['挑个想去的地方，看看线索', '点地图上的地名，就能先看今天会碰到什么。', '这条路心里有数了。', 'out'],
     trail: ['照着眼前的线索找一次', '到了地方可以稳稳找，也可以照线索多冒一点险。', '在这里找过一回了。'],
     family: ['钱存进钱箱更安全，只能花在家上', '今天可以进「家和祠堂」，认一认守过这个家的祖宗。', '这张脸记住了。', 'family'],
@@ -43,6 +44,7 @@ const Guidance = (() => {
     if (G.door === 0 && !LoopCore.quoteHome(G, G, DOORS[1].cost).shortfall) return 'door';
     if (stoveOpen() && stoveState() === 'ready') return 'stove';
     if (requestDeliverable()) return 'deliver';
+    if (knockingNeighbor()) return 'knock';
     if (open(LoopCore.TRADE.unlock.stove) && !G.guideStove && !stoveJobsNow().some(Boolean) && canCookAny()) return 'kiln';
     const remaining = storeCount(G.goods) + storeCount() + G.personalTreasures.length + G.treasures.length;
     if (remaining && (!soldToday() || (G.day === 1 && G.door === 0))) return 'sell';
@@ -69,7 +71,11 @@ const Guidance = (() => {
       return ['灶上的' + stoveProduct() + '烧好了，去取吧', thoughts.stove[1], thoughts.stove[2], 'stove'];
     if (id === 'deliver') {
       const r = requestDeliverable();
-      if (r) return [nb(r.neighbor).who + '要的' + r.kind + '，你手上已经够了', thoughts.deliver[1], thoughts.deliver[2], 'market'];
+      if (r) return [nb(r.neighbor).who + '要的' + r.kind + '，你手上已经够了', thoughts.deliver[1], thoughts.deliver[2], 'friends'];
+    }
+    if (id === 'knock') {
+      const r = knockingNeighbor();
+      if (r) return [nb(r.neighbor).who + '在门口，像是有事找你', thoughts.knock[1], thoughts.knock[2], 'friends'];
     }
     if (id === 'trail' && G.target != null)
       return ['去看看线索指的地方', '选「走过去」才会动身，到地方后可以选一种找法。', thoughts.trail[2], 'go'];

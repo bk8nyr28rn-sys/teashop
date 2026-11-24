@@ -58,12 +58,15 @@ const { OUT, wrap } = require('./lib.cjs');
     assert.deepEqual(await inventory(), [{ 柴: 2 }, {}, ['夜明珠'], []]);
 
     await page.click('[data-a="friends"]');
+    // 有邻居上门时先说话，点「看看交情」才是交情页
+    if (await page.locator('#sheet [data-npc]').count()) await page.locator('#sheet .sh-btns button', { hasText: '看看交情' }).click();
     assert.ok(await page.locator('[data-good="wang"]').isDisabled(), '仓里的柴不能送人');
     await page.locator('[data-coin="wang"]').click();
     assert.deepEqual(await balances(), [194, 59, 211]);
     await back();
     await page.evaluate(() => { G.goods = { 草药: 2 }; G.store.草药 = 1; G.hp = 1; save(); render(); });
     await page.click('[data-a="friends"]');
+    if (await page.locator('#sheet [data-npc]').count()) await page.locator('#sheet .sh-btns button', { hasText: '看看交情' }).click();
     await page.locator('[data-good="wang"]').click();
     await back();
     await page.click('[data-a="heal"]');
