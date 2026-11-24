@@ -57,7 +57,10 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .bank-toggle { display: flex; align-items: center; gap: 10px; padding: 12px; border-radius: 12px; background: var(--bg); cursor: pointer; }
 .bank-toggle input { width: 18px; height: 18px; accent-color: var(--accent); }
 .hud-r { display: flex; align-items: center; gap: 10px; font-size: 13px; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.wallets { display: grid; gap: 1px; font-size: 12px; line-height: 1.3; }
+.money { font-variant-numeric: tabular-nums; }
+.money-split { display: grid; gap: 8px; margin: 0; }
+.money-split p { margin: 0; padding: 10px 12px; border-radius: 12px; background: var(--bg); }
+.money-split b { display: block; font-size: 15px; }
 .hp { display: inline-flex; gap: 3px; }
 .hp i { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--seal); }
 .hp i.on { background: var(--seal); }
@@ -1230,7 +1233,7 @@ function renderHud() {
   const ghostly = ['death', 'haunt', 'reborn', 'guard'].includes(G.phase);
   const age = ageOf(G.day);
   $('hud').innerHTML = `<div class="hud-l"><b>${G.phase === 'guard' ? '护家神' : G.phase === 'haunt' ? '厉鬼' : ghostly ? '阴间' : `第 ${G.day} 天`}</b><span>${ghostly ? `第 ${G.lifeNo} 世走完了` : `${G.name} · ${AGE_NAME[age]} · 第 ${G.lifeNo} 世`}</span><span class="day-bank">攒着的天：${G.bankedDays} / ${BANK_CAP}</span></div>
-    <div class="hud-r">${ghostly ? '' : `<span class="hp" role="img" aria-label="体力 ${G.hp} / ${CFG.hpMax}">${'<i class="on"></i>'.repeat(Math.max(0, G.hp))}${'<i></i>'.repeat(Math.max(0, CFG.hpMax - G.hp))}</span><span class="wallets"><span>钱箱 ${G.chest} 文</span><span>钱袋 ${G.purse} 文</span></span>`}<button type="button" class="icon" id="menu">设置</button></div>`;
+    <div class="hud-r">${ghostly ? '' : `<span class="hp" role="img" aria-label="体力 ${G.hp} / ${CFG.hpMax}">${'<i class="on"></i>'.repeat(Math.max(0, G.hp))}${'<i></i>'.repeat(Math.max(0, CFG.hpMax - G.hp))}</span><button type="button" class="icon money" id="money" aria-label="钱 ${G.chest + G.purse} 文，点开看钱箱和钱袋各多少">钱 ${G.chest + G.purse} 文</button>`}<button type="button" class="icon" id="menu">设置</button></div>`;
   if (Guidance.open(4)) {
     const expressions = document.createElement('button');
     expressions.type = 'button'; expressions.className = 'icon'; expressions.id = 'show-expressions';
@@ -1238,6 +1241,15 @@ function renderHud() {
     expressions.onclick = openExpressions; $('menu').before(expressions);
   }
   $('menu').onclick = openMenu;
+  if ($('money')) $('money').onclick = openMoney;
+}
+// 顶上只写一共多少钱；点开才分钱箱、钱袋
+function openMoney() {
+  sheet({ title: '钱箱和钱袋', dismiss: true,
+    body: `<div class="money-split"><p><b>钱箱 ${G.chest} 文</b>全家的，锁在家里，门破了鬼抢得少。只能花在家上：修门、机关、院子、装饰。</p>
+      <p><b>钱袋 ${G.purse} 文</b>你自己白天挣的，门破了鬼抢得多。什么都能买，送礼物只能用它。</p></div>
+      <p class="note">在集市点「放进家里」，能把钱袋的钱存进钱箱。人老了，钱袋剩下的也会进钱箱。</p>`,
+    buttons: [['知道了', null, 'main']] });
 }
 function clockHtml() {
   const left = CFG.dusk - G.time;
@@ -1559,10 +1571,13 @@ function marketSection(owner) {
 }
 
 // 钱掌柜看情况说话：头一回认识、同一天又来、今天你手上哪样贵哪样贱
+const CHEST_TIP = '钱多了就存进家里的钱箱，门破了鬼抢得少。就是那钱只能花在家上。';
 function merchantLine() {
   const prices = todayPrices(), mine = Object.keys(G.goods).filter(k => G.goods[k] > 0);
   if (!G.metMerchant) return '头回来吧？我姓钱，柴、药、皮子都收。一件件卖、一回全卖都成。';
   if (G.merchantDay === G.day) return '又来啦？';
+  // 长大了才提钱箱，只提一回
+  if (Guidance.open(3) && !G.heardChestTip) return CHEST_TIP;
   const up = mine.find(k => LoopCore.priceTrend(prices, k) === 'up');
   if (up) return `今儿${up}金贵，来得正好！`;
   const down = mine.find(k => LoopCore.priceTrend(prices, k) === 'down');
@@ -1572,7 +1587,7 @@ function merchantLine() {
 }
 function openMarket() {
   const line = merchantLine();
-  if (!G.metMerchant || G.merchantDay !== G.day) { G.metMerchant = true; G.merchantDay = G.day; save(); }
+  if (!G.metMerchant || G.merchantDay !== G.day) { G.metMerchant = true; G.merchantDay = G.day; if (line === CHEST_TIP) G.heardChestTip = true; save(); }
   const hasThings = storeCount(G.goods) + G.personalTreasures.length > 0;
   const transfer = (hasThings || G.purse) ? `<details class="market-transfer"><summary>放进家里</summary>
     <small class="note">存进家里就归全家，钱箱只能花在家上。</small>
@@ -1938,7 +1953,6 @@ function askBuddy(riverside = false) {
       </div>${ok.length ? '' : `<p class="note">还没有能结伴的人。交情到 ${CFG.buddyAt} 才能约人，可以在「邻居和交情」里送点东西。</p>`}`,
     buttons: [...ok.map((n) => [`和${n.who}一起去`, () => goOut(n.id, riverside), 'main']), ['一个人去', () => goOut(null, riverside), ok.length ? '' : 'main']],
   });
-  Guidance.speak('喊位熟人同行，路上能替你多背几件东西。', true);
 }
 function goOut(b, riverside = false) { G.buddy = b; if (riverside) return River.enter(); G.phase = 'map'; G.at = 'home'; G.target = null; save(); render(); }
 // 只在第一次看当日地图时抽线索。同一游戏日往返、刷新都沿用已经看到的线索。
@@ -2342,7 +2356,6 @@ function showPerkChoice() {
     buttons: N.offer.map((id, i) => [`${i + 1} · ${PERKS[id].n}<small>${PERKS[id].d}</small>`, () => choosePerk(id), 'perk']),
   });
   $('sheet').dataset.num = '1';
-  Guidance.speak('挑一门今晚想用的本事，下一波就能试。', true);
 }
 function choosePerk(id) {
   closeSheet();

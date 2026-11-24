@@ -160,7 +160,7 @@ const {wrap} = require('./lib.cjs');
     await button('天亮了').click();
     await page.waitForFunction(() => G.day === 3 && G.phase === 'home');
     assert.equal(await thought(), 'family');
-    assert.match(await one('#thought-title').innerText(), /钱箱.*只能花在家上/);
+    assert.match(await one('#thought-title').innerText(), /去祠堂认认祖宗/);
     assert.match(await one('#hud').innerText(), /成年/);
     await act('family');
     assert.ok(await button('找有缘人').isVisible());

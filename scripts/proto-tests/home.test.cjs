@@ -28,6 +28,13 @@ async function run(browser, width, height, entry) {
       await save(); render();
     });
 
+    // 顶上只写一共多少钱，点开才分钱箱、钱袋
+    assert.equal(await page.locator('#money').innerText(), '钱 300 文');
+    await page.locator('#money').click();
+    assert.match(await sheet().innerText(), /钱箱 200 文[\s\S]*只能花在家上[\s\S]*钱袋 100 文/);
+    await noOverflow();
+    await sheetButton('知道了').click();
+
     // 修院子：买一盆盆栽、一棵桂花树（钱箱先付）
     await page.locator('[data-a=build]').click();
     // 修院子是鲁师傅在说话；头一回认识，第二回同一天只说「还要添点啥？」

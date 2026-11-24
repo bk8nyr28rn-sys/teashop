@@ -107,6 +107,9 @@ async function run(browser, width, height, entry) {
     // 集市：钱掌柜看情况说话
     await page.locator('[data-a=market]').click();
     assert.equal(await sheet().locator('[data-npc=merchant]').count(), 1);
+    // 长大以后钱掌柜提一回钱箱（原来是第三天的念头，跟要做的事对不上）
+    assert.match(await sheet().locator('[data-npc=merchant]').innerText(), /存进家里的钱箱/);
+    assert.equal(await page.evaluate(() => G.heardChestTip), true);
     await noOverflow();
     await page.screenshot({ path: path.join(OUT, `trade-market-${width}.png`), animations: 'disabled' });
 
