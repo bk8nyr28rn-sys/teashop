@@ -76,6 +76,10 @@ async function run(browser, width, height, entry) {
       G.guideSoldDay = G.day; await save(); render();
     });
     assert.match(await page.locator('[data-a=market]').innerText(), /邻居托付 1 条/);
+    // 院里大按钮只留四个天天要用的，其余收成一排小按钮
+    assert.deepEqual(await page.locator('#panel .big').evaluateAll(els => els.map(e => e.dataset.a)), ['out', 'market', 'build', 'night']);
+    assert.deepEqual(await page.locator('#panel .more').evaluateAll(els => els.map(e => e.dataset.a)), ['river', 'stove', 'family', 'friends']);
+    await noOverflow();
     await page.locator('[data-a=market]').click();
     const card = sheet().locator('[data-request=offer]');
     assert.match(await card.innerText(), /想要 \d+ (件|份)/);
@@ -105,13 +109,18 @@ async function run(browser, width, height, entry) {
       G.phase = 'dawn'; G.bankedDays = 0; G.lastGrantDate = localDateKey(); G.nightReceipt = null; await save(); render();
     });
     assert.equal(await page.locator('[data-a=stove][disabled]').count(), 1);
+    // 等明天的时候，告诉玩家明天有什么
+    assert.match(await page.locator('.next-day').innerText(), /第 5 天.*最后一天/);
     assert.equal(await page.locator('[data-a=request][disabled]').count(), 1);
     await page.locator('[data-a=yard]').click();
     assert.match(await sheet().innerText(), /灶台：在烧金疮药/);
     await noOverflow();
     await page.screenshot({ path: path.join(OUT, `trade-waiting-${width}.png`), animations: 'disabled' });
     assert.deepEqual(errors, []);
-    console.log(`PASS ${width}×${height} 第 1 天固定价、第 3 天生火、过一夜取木炭、刷新不重复、第 4 天接托付交货、全卖同价、没有攒天只能看`);
+    // 第 3 天晚上等明天：预告第 4 天邻居上门
+    await page.evaluate(async () => { G.day = 3; await save(); render(); });
+    assert.match(await page.locator('.next-day').innerText(), /第 4 天.*邻居/);
+    console.log(`PASS ${width}×${height} 第 1 天固定价、第 3 天生火、过一夜取木炭、刷新不重复、第 4 天接托付交货、全卖同价、院里四个大按钮、没有攒天只能看、预告明天`);
   } finally { await page.close(); }
 }
 

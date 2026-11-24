@@ -17,7 +17,7 @@ body[data-phase='river'] #guide-anchor > #ancestor { top:calc(100% + 45px); }
 #ancestor div { background:#283e42f5; border:1px solid #8ba89c; border-radius:3px 14px 14px 14px; padding:6px 11px 8px; }
 #ancestor small { display:block; font-size:10px; color:#c6d8bc; letter-spacing:.1em; }
 #ancestor span { font-size:13px; }
-#panel .big.suggested { border:1.5px solid var(--accent); box-shadow:inset 3px 0 var(--accent); }
+#panel .big.suggested, #panel .more.suggested { border:1.5px solid var(--accent); box-shadow:inset 3px 0 var(--accent); }
 #panel .acts .big { padding-block:8px; }
 #panel .items:has(.item:only-child) { grid-template-columns:1fr; }
 #panel .item:only-child { min-height:42px; flex-direction:row; gap:8px; }

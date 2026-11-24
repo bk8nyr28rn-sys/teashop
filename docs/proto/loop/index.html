@@ -74,6 +74,11 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .big.main { background: var(--seal); border-color: var(--seal); color: var(--on-seal); }
 .big.main small { color: inherit; opacity: 0.85; }
 .big.ghosty { border-style: dashed; }
+/* 院里不是天天要用的事收成一排小按钮，免得第 4 天起一屏放不下 */
+.yard-more { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; margin: 8px 0; }
+.yard-more .more { min-width: 0; min-height: 46px; padding: 5px 10px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); text-align: left; display: flex; flex-direction: column; gap: 1px; font-weight: 500; }
+.next-day { margin: 0; padding: 8px 10px; border-radius: 10px; background: var(--bg); border-left: 3px solid var(--gold); }
+.yard-more .more small { max-width: 100%; font-weight: 400; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .note { font-size: 12px; color: var(--muted); margin: 0; }
 .warn { color: var(--seal); font-weight: 700; }
 
@@ -1249,6 +1254,7 @@ function renderWaiting(now = new Date()) {
   }
   $('panel').innerHTML = `<div class="where"><b>${ready ? '可以天亮了' : '今天的日子过完了'}</b></div>
     <div class="plan">${ready ? `准备好了，就开始第 ${first ? 1 : G.day + 1} 天。` : `下一个现实日的 0 点再领 1 天，还有 ${Math.floor(mins / 60)} 小时 ${mins % 60} 分。`}<br>攒着的天：${G.bankedDays} / ${BANK_CAP}</div>
+    ${first ? '' : tomorrowNote()}
     <button type="button" class="big main" data-a="dawn"${ready ? '' : ' disabled'}>${first ? '开始新一世的第一天' : '开始下一天'}</button>
     <div class="waiting-actions">
       <button type="button" class="mini" data-a="reports">家宅战报</button>
@@ -1266,6 +1272,18 @@ function renderWaiting(now = new Date()) {
       ${G.river?.stone === 'yard' ? '<button type="button" class="mini" disabled data-a="place">明天才能摆放院石</button>' : ''}
     </div>`}`;
   bindActs({ dawn: first ? firstMorning : nextMorning, reports: () => showHouseReports(), summary: () => openReturnSummary(), yard: openWaitingYard, family: openFamily });
+}
+// 下一天会多出什么。攒天用完、要等明天的时候，这是让人明天回来的理由
+const NEXT_DAY = {
+  2: '近郊和山林的路通了，院墙上也能装机关。',
+  3: '你长大了，能去祠堂认祖宗，院里的灶也能生火了。',
+  4: '邻居会上门串门，托你带东西，给的钱比集市多。',
+};
+function tomorrowNote() {
+  const next = G.day + 1;
+  const text = next === CFG.lifeDays ? '这是这一世的最后一天，想想给后人留下什么。'
+    : G.allFeatures ? '' : NEXT_DAY[next];
+  return text ? `<p class="next-day" data-next-day="${next}"><b>第 ${next} 天：</b>${text}</p>` : '';
 }
 function openWaitingYard() {
   sheet({
@@ -1363,18 +1381,33 @@ function renderHome() {
   $('panel').innerHTML = `${clockHtml()}
     <div class="acts">
       ${left > 0 ? `<button type="button" class="big" data-a="out">${toWharf ? '出门 · 去河埠' : '出门找东西'}<small>${toWharf ? '推开家门，沿河走走' : '越远东西越好，也越危险。天黑前要回来'}</small></button>` : ''}
-      ${left > 0 && !toWharf ? '<button type="button" class="big" data-a="river">到河埠走走</button>' : ''}
-      ${G.river?.stone === 'yard' ? '<button type="button" class="big" data-a="place">摆放院石</button>' : ''}
       <button type="button" class="big" data-a="market">去集市卖货<small>我的 ${storeCount(G.goods) + G.personalTreasures.length} 件 · 家里的 ${storeCount() + G.treasures.length} 件${reqNote}</small></button>
       <button type="button" class="big" data-a="build">修院子<small>${DOORS[G.door].name}（门血 ${DOORS[G.door].hp}）${trapSummary()}</small></button>
-      ${Guidance.open(3) ? `<button type="button" class="big" data-a="family">家和祠堂<small>${familySummary()}</small></button>` : ''}
-      ${Guidance.open(4) ? `<button type="button" class="big" data-a="friends">邻居和交情<small>${NEIGHBORS.map((n) => `${n.who} ${G.friends[n.id]}`).join(' · ')}</small></button>` : ''}
-      ${stoveOpen() ? `<button type="button" class="big" data-a="stove">灶台<small>${stoveSummary()}</small></button>` : ''}
-      ${heals.map(k => `<button type="button" class="big" data-a="heal" data-heal="${k}">用${k}疗伤<small>体力 +${TRADE.heal[k]} · 用${G.goods[k] ? '自己的' : '仓库的'}${k}</small></button>`).join('')}
+    </div>
+    ${yardMore(left, toWharf, heals)}
+    <div class="acts">
       <button type="button" class="big ${left > 0 ? 'ghosty' : 'main'}" data-a="night">${left > 0 ? '在家歇到天黑' : '天黑了，去守夜'}<small>${left > 0 ? `还有 ${dur(left)} 天黑，鬼会来砸门` : '鬼要来砸门了'}</small></button>
     </div>`;
   bindActs({ out: () => askBuddy(toWharf), river: () => askBuddy(true), place: River.placeStone, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, stove: openStove, night: chooseNightWatch });
   $('panel').querySelectorAll('[data-heal]').forEach(b => { b.onclick = () => heal(b.dataset.heal); });
+}
+// 不是天天要用的事：一排小按钮，第二行写一句状态（太长就省略）
+function yardMore(left, toWharf, heals) {
+  const more = (a, label, note, extra = '') => `<button type="button" class="more" data-a="${a}"${extra}><span>${label}</span><small>${note}</small></button>`;
+  const items = [];
+  if (left > 0 && !toWharf) items.push(more('river', '河埠', '沿河走走'));
+  if (stoveOpen()) {
+    const st = stoveState(), name = stoveProduct();
+    items.push(more('stove', '灶台', st === 'ready' ? `${name}好了` : st === 'cooking' ? `在烧${name}` : '空着'));
+  }
+  for (const k of heals) items.push(more('heal', `${k}疗伤`, `体力 +${TRADE.heal[k]}`, ` data-heal="${k}"`));
+  if (Guidance.open(3)) items.push(more('family', '家和祠堂', familySummary()));
+  if (Guidance.open(4)) {
+    const best = NEIGHBORS.slice().sort((a, b) => G.friends[b.id] - G.friends[a.id])[0];
+    items.push(more('friends', '邻居', `${best.who} 交情 ${G.friends[best.id]}`));
+  }
+  if (G.river?.stone === 'yard') items.push(more('place', '院石', '换个摆法'));
+  return items.length ? `<div class="yard-more" role="group" aria-label="院里的其他事">${items.join('')}</div>` : '';
 }
 function chooseNightWatch() {
   if (G.phase !== 'home') return;
