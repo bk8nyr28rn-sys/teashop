@@ -13,6 +13,8 @@
     "balance:night": "node scripts/proto-tests/night-balance.cjs",
     "balance:loop": "tsx scripts/loop-night-balance.ts",
     "sim:trade": "tsx scripts/loop-trade-sim.ts",
+    "sim:life": "tsx scripts/loop-life-sim.ts",
+    "terms": "node scripts/terms.mjs",
     "balance:haunt": "node scripts/proto-tests/haunt-balance.cjs"
   },
   "repository": {

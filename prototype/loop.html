@@ -982,14 +982,17 @@ const GIVEN = ['太爷爷', '老祖宗', '大娘', '三叔', '二姑奶奶', '�
 const ghostName = () => `${pick(SURNAMES)}家的${pick(GIVEN)}`;
 const AGE_NAME = { child: '童年', adult: '成年', elder: '老年' };
 const AGE_FX = { child: { dmg: 0.8, fight: -0.1, walk: 1 }, adult: { dmg: 1, fight: 0, walk: 1 }, elder: { dmg: 0.85, fight: -0.05, walk: 1.2 } };
-const THREADS = [['相识', '知己'], ['知己', '倾心'], ['倾心', '挚爱']];
+const THREADS = LoopCore.REBIRTH.threads;
 // 红线等级（一辈子内最多到挚爱）和孩子品级。品级主要给面子，强弱最多差三成：孩子是别人投胎来的新玩家，不能让陌生人的感情决定他弱好几倍
-const THREAD_LV = [[0, '相识'], [20, '知己'], [45, '倾心'], [70, '挚爱']];
-const threadName = (v) => THREAD_LV.filter(([m]) => v >= m).pop()[1];
-const GRADES = { 相识: ['寻常', 1], 知己: ['良才', 1.05], 倾心: ['上等', 1.1], 挚爱: ['奇才', 1.2] };
+// 红线、品级、因果分、当厉鬼的规则都在 src/core/loop（family.ts、rebirth.ts、haunt.ts）
+const threadName = LoopCore.threadName;
+const GRADES = LoopCore.FAMILY.grades;
 const GIVEN_ME = ['小石', '阿青', '明月', '长风', '书安', '云舟', '念慈', '怀瑾', '星河', '如意', '晚晴', '子衿'];
 const surnameOf = (fam) => (fam === '你家' ? '林' : fam[0]);
-const TIER_NAME = ['寻常人家', '殷实人家', '名门望族'];
+const TIER_NAME = LoopCore.REBIRTH.tierNames;
+// 给规则核心的随机数。外观（名字、长相）仍用 Math.random；以后上服务器由服务器给种子
+const coreRng = () => new LoopCore.Rng((Math.random() * 2 ** 32) >>> 0);
+const afterlifeOn = () => LoopCore.AFTERLIFE.night && !G.skipAfterlife;
 function ageOf(day) { return day < 3 && !G?.allFeatures ? 'child' : balanceAge(day); }
 function balanceAge(day) { const f = (day - 1) / Math.max(1, CFG.lifeDays - 1); return f < 0.2 ? 'child' : f < 0.7 ? 'adult' : 'elder'; }
 
@@ -2003,11 +2006,8 @@ function familySummary() {
   return parts.join(' · ') || (ageOf(G.day) === 'child' ? '长大以后可以结缘、收徒' : '还没有成家，也没有徒弟');
 }
 function maybeBirth() {
-  const kids = G.kids.filter((k) => k.kind !== '徒');
-  if (!G.spouse || G.love < 20 || kids.length >= 2 || G.day < 3 || G.bornToday === G.day) return null;
-  const [grade, power] = GRADES[threadName(G.love)];
-  const kid = { name: surnameOf(G.fam) + pick(GIVEN_ME), look: randomLook(), grade, power, kind: Math.random() < 0.5 ? '子' : '女' };
-  G.kids.push(kid); G.bornToday = G.day;
+  const kid = LoopCore.birth(G, coreRng());
+  if (kid) Object.assign(kid, { name: surnameOf(G.fam) + pick(GIVEN_ME), look: randomLook() });
   return kid;
 }
 function candidates() {
@@ -2019,22 +2019,20 @@ function offerMatch() {
   sheet({
     title: '你长大了',
     body: `<p>可以找个有缘人牵红线，以后生孩子；也可以收个徒弟。两条路都能有后人，以后都能投胎回自己家。</p><p class="note">真游戏里，有缘人和徒弟都是真人玩家；好友点你的分享链接，就能生在你家或者拜你为师。</p>`,
-    buttons: [...c.map((p) => [`和${p.name}牵红线`, () => { G.spouse = p; G.love = 10; save(); render(); toast(`和${p.name}牵上了红线`); }, 'main']), discipleButton(), ['先不急', null]],
+    buttons: [...c.map((p) => [`和${p.name}牵红线`, () => { if (!LoopCore.match(G, p)) return; save(); render(); toast(`和${p.name}牵上了红线`); }, 'main']), discipleButton(), ['先不急', null]],
   });
 }
 function discipleButton() {
-  const quote = LoopCore.quoteHome(G, G, 30);
+  const cost = LoopCore.FAMILY.disciple.cost, quote = LoopCore.quoteHome(G, G, cost);
   const waiting = G.phase !== 'home';
-  return [`收个徒弟（30 文）<small>${waiting ? '明天才能收徒' : paymentText(quote)}</small>`, takeDisciple, '', waiting || !!quote.shortfall];
+  return [`收个徒弟（${cost} 文）<small>${waiting ? '明天才能收徒' : paymentText(quote)}</small>`, takeDisciple, '', waiting || !!quote.shortfall];
 }
 function takeDisciple() {
-  const payment = LoopCore.payHome(G, G, 30);
-  if (!payment) return toast('钱不够');
-  const [grade, power] = G.held >= 3 ? ['上等', 1.1] : G.held >= 1 ? ['良才', 1.05] : ['寻常', 1];
-  const d = { name: pick(SURNAMES) + pick(GIVEN_ME), look: randomLook(), grade, power, kind: '徒' };
-  G.kids.push(d);
+  const taken = LoopCore.takeDisciple(G);
+  if (!taken) return toast('钱不够');
+  const d = Object.assign(taken.kin, { name: pick(SURNAMES) + pick(GIVEN_ME), look: randomLook() });
   save(); render();
-  toast(`${d.name}拜你为师，品级${grade}。已付${paymentText(payment)}`);
+  toast(`${d.name}拜你为师，品级${d.grade}。已付${paymentText(taken.payment)}`);
 }
 function openFamily() {
   const adult = Guidance.open(3);
@@ -2047,13 +2045,18 @@ function openFamily() {
       ${G.spouse ? `<div class="fr"><div class="fr-top"><b>${G.spouse.name}</b><span class="note">红线 ${threadName(G.love)}（${G.love}）</span></div><div class="fbar" role="img" aria-label="红线 ${G.love}"><i style="width:${G.love}%"></i><s style="left:20%"></s><s style="left:45%"></s><s style="left:70%"></s></div><p class="note">红线到知己以后会生孩子；越浓，孩子品级越好（最多差三成）。一辈子里最多到挚爱。</p></div>` : `<p class="note">${adult ? '还没牵红线。' : '长大以后可以结缘、收徒。'}</p>`}
       ${fam ? `<div class="sub">后人</div><ul class="list">${fam}</ul><p class="note">夜里，一家人会帮着守门。</p>` : ''}`,
     buttons: [
-      ...(G.spouse ? [[`陪伴（花 1 个时辰，红线 +12）${waiting ? '<small>明天才能陪伴家人</small>' : ''}`, () => { if (G.time + 120 > CFG.dusk) return toast('天快黑了，没时间了'); G.time += 120; G.love = Math.min(100, G.love + 12); save(); render(); toast('陪了一个时辰，红线 +12'); openFamily(); }, 'main', waiting || CFG.dusk - G.time < 120]] : []),
+      ...(G.spouse ? [[`陪伴（花 1 个时辰，红线 +${LoopCore.FAMILY.accompany.love}）${waiting ? '<small>明天才能陪伴家人</small>' : ''}`, accompanyFamily, 'main', waiting || !LoopCore.canAccompany(G)]] : []),
       ...(adult && !G.spouse ? [[waiting ? '明天才能找有缘人' : '找有缘人', offerMatch, 'main', waiting]] : []),
-      ...(adult && G.kids.filter((k) => k.kind === '徒').length < 2 ? [discipleButton()] : []),
+      ...(adult && G.kids.filter((k) => k.kind === '徒').length < LoopCore.FAMILY.disciple.max ? [discipleButton()] : []),
       ['去祠堂', openHall],
       ['回去', null],
     ],
   });
+}
+function accompanyFamily() {
+  if (G.phase !== 'home') return;
+  if (!LoopCore.accompany(G)) return toast('天快黑了，没时间了');
+  save(); render(); toast(`陪了一个时辰，红线 +${LoopCore.FAMILY.accompany.love}`); openFamily();
 }
 // 祠堂：一代代的祖宗画像。回自家投胎的话，前几世的你也挂在这里
 function portrait(a) {
@@ -2079,7 +2082,7 @@ function familyHelpers() {
 }
 function N_guard() { return G.phase === 'guard'; }
 function ownFamily(heir) {
-  const t = threadName(ri([20, 60]));
+  const t = LoopCore.ownThread(coreRng());
   return {
     own: true, houseId: G.houseId, name: G.fam, door: G.door, money: G.chest, store: { ...G.store }, crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
     treasures: G.treasures.slice(), thread: t,
@@ -2602,7 +2605,7 @@ function nextMorning() {
   if (dawnAlreadyStarted(false)) return;
   if (!spendDawn()) { G.phase = 'dawn'; save(); render(); return; }
   Guidance.done('dawn'); G.day++; G.time = CFG.dayStart; G.hp = Math.min(CFG.hpMax, G.hp + 1); G.phase = 'home';
-  if (G.spouse) G.love = Math.min(100, G.love + 8);
+  LoopCore.dawnLove(G);
   const born = maybeBirth();
   save(); render();
   toast(`第 ${G.day} 天，${AGE_NAME[ageOf(G.day)]}。` + (ageOf(G.day) !== ageOf(G.day - 1) ? '你长大了一些。' : ''));
@@ -2619,8 +2622,18 @@ function die(kind, msg) {
   save(); render();
 }
 function renderDeath() {
-  $('scene').innerHTML = `<svg viewBox="0 0 360 300" class="stage" role="img" aria-label="你变成了鬼"><rect width="360" height="300" fill="url(#hsky)"/><circle cx="60" cy="60" r="18" fill="#F4F1E3" opacity="0.8"/>
-    <path d="M0 250 Q90 230 180 246 Q270 262 360 240 V300 H0 Z" fill="#20142E"/><g class="float">${ghostSvg(ME, G.deathKind === 'early' ? 'sad' : 'calm', 'elder', 180, 262, 0.5)}</g></svg>`;
+  const ghost = afterlifeOn();
+  $('scene').innerHTML = `<svg viewBox="0 0 360 300" class="stage" role="img" aria-label="${ghost ? '你变成了鬼' : '这一辈子走完了'}"><rect width="360" height="300" fill="url(#hsky)"/><circle cx="60" cy="60" r="18" fill="#F4F1E3" opacity="0.8"/>
+    <path d="M0 250 Q90 230 180 246 Q270 262 360 240 V300 H0 Z" fill="#20142E"/>${ghost ? `<g class="float">${ghostSvg(ME, G.deathKind === 'early' ? 'sad' : 'calm', 'elder', 180, 262, 0.5)}</g>` : person(ME, 'calm', 'elder', 180, 262, 0.5)}</svg>`;
+  if (!ghost) {
+    // 产品开关（LoopCore.AFTERLIFE）或试玩开关关掉了「当一晚鬼」：直接去下一世
+    $('panel').innerHTML = `<div class="where"><b>${G.deathKind === 'early' ? '英年早逝' : '寿终正寝'}</b><span>${G.fam} · 第 ${G.lifeNo} 世</span></div>
+    <p>${G.deathMsg}这一辈子活了 ${G.day} 天，守住 ${G.held} 夜，门被砸破 ${G.broken} 次，赚了 ${G.earned} 文。</p>
+    <p class="note">你的样子画进了家里的祠堂。</p>
+    <div class="acts"><button type="button" class="big main" data-a="skip">去下一世<small>按这一世的因果分挑人家</small></button></div>`;
+    bindActs({ skip: () => { G.afterlife = null; goReborn(); } });
+    return;
+  }
   $('panel').innerHTML = `<div class="where"><b>${G.deathKind === 'early' ? '英年早逝' : '寿终正寝'}</b><span>${G.fam} · 第 ${G.lifeNo} 世</span></div>
     <p>${G.deathMsg}这一辈子活了 ${G.day} 天，守住 ${G.held} 夜，门被砸破 ${G.broken} 次，赚了 ${G.earned} 文。</p>
     <p class="note">鬼的样子就是你捏的那张脸。投胎之前，可以先当一晚鬼：</p>
@@ -2634,15 +2647,14 @@ function renderDeath() {
 
 // ---------------- 当厉鬼：去砸别人家的门 ----------------
 // 弩机：等 wait 秒 → 亮红光 charge 秒 → 射。躲一次 dodge 秒，躲的时候砸不了门
-const HAUNT = { time: 25, door: 220, doorPerTier: 80, bash: 8, dodge: 0.75, charge: 0.65, wait: [1.6, 2.8] };
+const HAUNT = LoopCore.HAUNT;
 let H = null;
 function startHaunt() {
   cancelAnimationFrame(raf);
   closeSheet();
   G.phase = 'haunt'; Guidance.update(); save();
-  const tier = ri([1, 3]);
-  const max = HAUNT.door + tier * HAUNT.doorPerTier;
-  H = { fam: pick(SURNAMES) + '家', tier, door: max, max, souls: 3, t: HAUNT.time, dodge: 0, over: false, bows: [{ x: 108, s: 'wait', c: rnd(1.4, 2) }, { x: 252, s: 'wait', c: rnd(2.6, 3.4) }] };
+  H = LoopCore.startHaunt((Math.random() * 2 ** 32) >>> 0);
+  H.fam = pick(SURNAMES) + '家';
   document.body.dataset.phase = 'haunt';
   renderHud();
   $('scene').innerHTML = `<div class="doorbar"><span>${H.fam}的门</span><div class="bar" id="hd-bar"><i></i></div><b id="hd-num"></b></div>
@@ -2675,15 +2687,14 @@ function updateHaunt() {
   $('hs-bar').querySelector('i').style.width = ((H.souls / 3) * 100).toFixed(1) + '%';
   $('hs-num').textContent = `${H.souls} 团 · ${Math.max(0, Math.ceil(H.t))} 秒`;
 }
-function dodge() { if (!H || H.over) return; H.dodge = HAUNT.dodge; $('hme').style.transform = 'translate(62px, 492px)'; }
+function dodge() { if (!H || !LoopCore.hauntDodge(H)) return; $('hme').style.transform = 'translate(62px, 492px)'; }
 function bash() {
   if (!H || H.over) return;
-  if (H.dodge > 0) { floatText(62, 380, '躲着呢', 'miss'); return; }
-  H.door -= HAUNT.bash;
+  if (!LoopCore.hauntBash(H)) { floatText(62, 380, '躲着呢', 'miss'); return; }
   floatText(180 + rnd(-40, 40), 320 + rnd(-20, 20), '-' + HAUNT.bash, 'door');
   shake($('hdoor'));
   updateHaunt();
-  if (H.door <= 0) endHaunt('win');
+  if (H.over) endHaunt(H.result);
 }
 function hauntLoop(now) {
   if (!H || H.over) return;
@@ -2693,40 +2704,33 @@ function hauntLoop(now) {
   if (!H.over) raf = requestAnimationFrame(hauntLoop);
 }
 function hauntStep(dt) {
-  H.t -= dt;
-  if (H.dodge > 0) { H.dodge -= dt; if (H.dodge <= 0) $('hme').style.transform = 'translate(180px, 492px)'; }
-  H.bows.forEach((b, i) => {
-    b.c -= dt;
-    const el = $('hb' + i);
-    if (b.s === 'wait' && b.c <= 0) { b.s = 'charge'; b.c = HAUNT.charge; el.querySelector('.chg').setAttribute('opacity', '1'); el.querySelector('.bang').setAttribute('opacity', '1'); }
-    else if (b.s === 'charge' && b.c <= 0) {
-      b.s = 'wait'; b.c = rnd(...HAUNT.wait);
-      el.querySelector('.chg').setAttribute('opacity', '0'); el.querySelector('.bang').setAttribute('opacity', '0');
-      const mx = H.dodge > 0 ? 62 : 180;
-      line(b.x, 240, mx, 440, '#FF6B6B', 3);
-      if (H.dodge <= 0) { H.souls--; floatText(mx, 400, '魂火 −1', 'door'); shake($('hsvg'), 'hurt'); }
-      else floatText(mx, 400, '躲开了', 'good');
-    }
-  });
+  for (const e of LoopCore.hauntStep(H, dt)) {
+    if (e.kind === 'dodged-end') { $('hme').style.transform = 'translate(180px, 492px)'; continue; }
+    const el = $('hb' + e.bow);
+    const on = e.kind === 'charge' ? '1' : '0';
+    el.querySelector('.chg').setAttribute('opacity', on); el.querySelector('.bang').setAttribute('opacity', on);
+    if (e.kind !== 'shot') continue;
+    const mx = e.hit ? 180 : 62;
+    line(H.bows[e.bow].x, 240, mx, 440, '#FF6B6B', 3);
+    if (e.hit) { floatText(mx, 400, '魂火 −1', 'door'); shake($('hsvg'), 'hurt'); }
+    else floatText(mx, 400, '躲开了', 'good');
+  }
   updateHaunt();
-  if (H.souls <= 0) return endHaunt('caught');
-  if (H.t <= 0) return endHaunt('timeout');
+  if (H.over) endHaunt(H.result);
 }
 function endHaunt(r) {
   H.over = true;
   cancelAnimationFrame(raf);
   let title, body;
+  G.afterlife = LoopCore.hauntOutcome(H);
   if (r === 'win') {
-    const [n, v] = pick(TREASURES);
-    G.afterlife = { kind: 'haunt', won: true, loot: { n, v, tre: true } };
+    const { n } = G.afterlife.loot;
     title = '砸开了！';
-    body = `<p>你砸开了${H.fam}的门，抢走了<b>${n}</b>和 30 文。这些会带进下一世。</p><p class="note">第二批会加「仇家簿」：${H.fam}会记住你，你投胎以后，他们死了也能来找你报仇。</p>`;
+    body = `<p>你砸开了${H.fam}的门，抢走了<b>${n}</b>和 ${HAUNT.lootCoins} 文。这些会带进下一世。</p><p class="note">第二批会加「仇家簿」：${H.fam}会记住你，你投胎以后，他们死了也能来找你报仇。</p>`;
   } else if (r === 'caught') {
-    G.afterlife = { kind: 'haunt', caught: true };
     title = '被收进了葫芦';
     body = `<p>${H.fam}的弩机把你的魂火全射灭了。你被收进葫芦关了一阵，因果分 −10。</p>`;
   } else {
-    G.afterlife = { kind: 'haunt' };
     title = '天亮了';
     body = `<p>没砸开${H.fam}的门，鬼见了光，只能散了。</p>`;
   }
@@ -2735,35 +2739,16 @@ function endHaunt(r) {
 }
 
 // ================= 投胎 =================
-function karmaRows() {
-  const fr = NEIGHBORS.reduce((a, n) => a + G.friends[n.id], 0);
-  const rows = [
-    ['家业', `亲守 ${G.held - (G.autoHeld || 0)} 夜，机关守住 ${G.autoHeld || 0} 夜，亲守破门 ${G.broken} 次，赚 ${G.earned} 文`, LoopCore.nightKarma(G.held, G.autoHeld || 0, G.broken, G.earned)],
-    ['交情', `合计 ${fr}`, Math.floor(fr / 10)],
-    ['养育', `${G.kids.length} 个孩子或徒弟`, Math.min(40, G.kids.length * 10)],
-    ['红线', G.spouse ? threadName(G.love) : '没有', G.spouse ? { 相识: 0, 知己: 5, 倾心: 15, 挚爱: 25 }[threadName(G.love)] : 0],
-  ];
-  const A = G.afterlife;
-  if (A && A.kind === 'guard' && !A.automatic) rows.push(['当护家神', A.won ? '守住了' : '没守住', A.won ? 20 : 5]);
-  if (A && A.kind === 'haunt') rows.push(['当厉鬼', A.won ? '得手了' : A.caught ? '被收进葫芦' : '没砸开', A.won ? 5 : A.caught ? -10 : 0]);
-  if (G.deathKind === 'early') rows.push(['英年早逝', '', -5]);
-  return rows;
-}
-function newFamily(tier) {
-  const R = [{ door: [0, 1], money: [10, 40], cb: [0, 0], lamp: 0, tal: 0, tre: [0, 0] }, { door: [1, 2], money: [50, 110], cb: [1, 1], lamp: 0, tal: 0, tre: [0, 1] }, { door: [2, 4], money: [120, 240], cb: [2, 3], lamp: 1, tal: 1, tre: [1, 2] }][tier];
-  return {
-    name: pick(SURNAMES) + '家', door: ri(R.door), money: ri(R.money), crossbow: ri(R.cb), lamp: R.lamp, talisman: R.tal, thread: pick(THREADS[tier]),
-    treasures: Array.from({ length: ri(R.tre) }, () => { const [n, v] = pick(TREASURES); return { n, v, tre: true }; }),
-  };
-}
+function karmaRows() { return LoopCore.karmaRows(G, NEIGHBOR_IDS); }
+// 家底由规则核心按档次随，名字是外观
+function newFamily(tier) { return { name: pick(SURNAMES) + '家', ...LoopCore.newFamily(tier, coreRng()) }; }
 function goReborn() {
   cancelAnimationFrame(raf);
   LoopCore.leaveGuardianReward(G);
-  const rows = karmaRows(), total = rows.reduce((a, r) => a + r[2], 0);
-  const tier = total < 30 ? 0 : total < 70 ? 1 : 2;
+  const rows = karmaRows(), total = LoopCore.karmaTotal(rows);
+  const tier = LoopCore.tierOf(total);
   const heirs = G.kids.slice(0, 3);
-  const fams = heirs.length ? heirs.map(ownFamily) : [newFamily(tier)];
-  fams.push(newFamily(tier), newFamily(Math.max(0, tier - 1)));
+  const fams = [...heirs.map(ownFamily), ...LoopCore.strangerTiers(tier, heirs.length).map(newFamily)];
   G.reborn = { rows, total, tier, fams };
   G.phase = 'reborn';
   save(); render();
@@ -2787,15 +2772,14 @@ function renderReborn() {
   const keep = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt);
   $('panel').innerHTML = `<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>
     <table class="kt"><tbody>${R.rows.map(([a, b, c]) => `<tr><td>${a}</td><td>${b}</td><td>${c > 0 ? '+' : ''}${c}</td></tr>`).join('')}<tr class="total"><td>合计</td><td></td><td>${R.total}</td></tr></tbody></table>
-    <p class="note">${G.kids.length ? '回自己家可以挑一位后人，也可以去按因果分选出的另外两户人家。' : '你没有留下孩子或徒弟，这一世的院子会荒掉。按因果分，系统给你三户人家挑。'}${loot ? `前世抢来的${loot.n}和 30 文会跟着你。` : ''}${keep.length ? `${keep.map((n) => n.who).join('、')}和你交情深，下一世还记得你（交情留一半）。` : ''}</p>
+    <p class="note">${G.kids.length ? '回自己家可以挑一位后人，也可以去按因果分选出的另外两户人家。' : '你没有留下孩子或徒弟。这一世的宅子还在，只是没人住，院子会长草，东西和画像都留着。按因果分，系统给你三户人家挑。'}${loot ? `前世抢来的${loot.n}和 ${HAUNT.lootCoins} 文会跟着你。` : ''}${keep.length ? `${keep.map((n) => n.who).join('、')}和你交情深，下一世还记得你（交情留一半）。` : ''}</p>
     <div class="fams">${R.fams.map(famCard).join('')}</div>`;
   $('panel').querySelectorAll('[data-fam]').forEach((b) => { b.onclick = () => reborn(R.fams[+b.dataset.fam]); });
 }
 function reborn(f) {
   Guidance.done('after');
   const prev = G;
-  const fam = { ...f, treasures: [...f.treasures], friends: {} };
-  for (const n of NEIGHBORS) fam.friends[n.id] = prev.friends[n.id] >= CFG.helpAt ? Math.floor(prev.friends[n.id] / 2) : ri([0, 15]);
+  const fam = { ...f, treasures: [...f.treasures], friends: LoopCore.carryFriends(prev.friends, NEIGHBOR_IDS, coreRng()) };
   const A = prev.afterlife;
   if (!fam.own) fam.ancestors = Array.from({ length: 2 }, (_, i) => ({ name: surnameOf(fam.name) + ['老太公', '太奶奶'][i], look: randomLook(), note: '祖上' }));
   G = freshLife(fam, prev);
@@ -2879,6 +2863,7 @@ function openMenu() {
       <label class="bank-toggle"><input type="checkbox" id="all-features"${G.allFeatures ? ' checked' : ''}>全部开放（试玩用）</label>
       <button type="button" class="big" id="copy-river-log">复制试玩记录</button><div id="river-copy-status" role="status"></div>
       <label class="bank-toggle"><input type="checkbox" id="unlimited-days"${G.unlimitedDays ? ' checked' : ''}>不限天数（试玩用）</label>
+      <label class="bank-toggle"><input type="checkbox" id="skip-afterlife"${G.skipAfterlife ? ' checked' : ''}${LoopCore.AFTERLIFE.night ? '' : ' disabled checked'}>老死后直接下一世，不当鬼（试玩用）</label>
       <button type="button" class="big" id="ff"${playing && G.day < CFG.lifeDays ? '' : ' disabled'}>快进到最后一天<small>${waiting && !G.bankedDays && !G.unlimitedDays ? '明天才能快进' : '直接试老死、当鬼和投胎'}</small></button>
       <button type="button" class="big" id="restart">从头再来<small>清掉这一局，回到第一世</small></button>
       <p class="note">这是样机：邻居、来砸门的鬼、被你砸门的人家都用电脑代替；所有数字都是占位。</p>`,
@@ -2899,6 +2884,7 @@ function openMenu() {
       el.querySelector('#river-text').onchange = e => River.setText(e.target.checked);
       el.querySelector('#copy-river-log').onclick = River.copyLog;
       el.querySelector('#unlimited-days').onchange = event => { G.unlimitedDays = event.target.checked; save(); render(); };
+      el.querySelector('#skip-afterlife').onchange = event => { G.skipAfterlife = event.target.checked; save(); render(); };
       el.querySelector('#edit-look').onclick = () => openEditor(openMenu);
       const expressions = el.querySelector('#settings-expressions');
       if (expressions) expressions.onclick = openExpressions;

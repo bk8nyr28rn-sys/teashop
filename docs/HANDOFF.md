@@ -37,6 +37,8 @@ npm run balance:night  # 守夜难度模拟：不同天数、门、弩机、手�
 npm run balance:haunt  # 当厉鬼的难度模拟
 npm run balance:loop   # 规则核心的守夜难度（亲手守 + 只靠机关两张表），--json 输出机器可读结果
 npm run sim:trade      # 几种玩法一辈子卖货和托付赚多少钱（只汇报）
+npm run sim:life       # 整辈子模拟：四类玩家各 200 世，守夜、赚钱、后人、因果分（只汇报）
+npm run terms          # 敏感说法在哪些文件里出现几次；换词见 docs/TERMS.md
 npm run balance:night -- --compare-core  # 样机和规则核心用同一副牌逐局对账
 npm run sync:draw      # 把捏人台的画人代码同步进样机（--check 只检查）
 ```
@@ -74,10 +76,10 @@ design/                   11 月 14 日的旧设计稿画布（有已删掉的�
 | 设定 | `CFG`、`RINGS`、`DOORS`、`TRAPS`、`GHOSTS`、`NIGHT`、`PERKS`、`HAUNT`、`GRADES` | 所有数字都在这里 |
 | 院子（白天） | `renderHome`、`openMarket`、`openBuild`、`openFriends` | 卖货、修院子、交情 |
 | 野外（白天） | `renderMap`、`walkTo`、`gather`、`danger`、`knocked`、`dusk`、`goHome` | 三圈地图、天黑前回家 |
-| 家 | `offerMatch`、`takeDisciple`、`maybeBirth`、`openFamily`、`openHall`、`ownFamily` | 结缘、孩子、徒弟、祠堂 |
+| 家 | `offerMatch`、`takeDisciple`、`maybeBirth`、`openFamily`、`openHall`、`ownFamily` | 结缘、孩子、徒弟、祠堂。规则在 `src/core/loop/family.ts`，页面只起名字、画长相 |
 | 夜里守门 | `startNight`、`startWave`、`offerPerks`、`choosePerk`、`nightStep`、`hitAt`、`endNight` | 5 波，每波挑本事 |
-| 死后 | `die`、`renderDeath`、`startHaunt`、`hauntStep`、`endHaunt` | 护家神 / 厉鬼 |
-| 投胎 | `karmaRows`、`goReborn`、`newFamily`、`reborn` | 因果分、三户人家、回自己家 |
+| 死后 | `die`、`renderDeath`、`startHaunt`、`hauntStep`、`endHaunt` | 护家神 / 厉鬼。当厉鬼的规则在 `src/core/loop/haunt.ts`；开关 `AFTERLIFE.night`（`rebirth.ts`）和设置里的试玩开关能关掉当鬼那一晚 |
+| 投胎 | `karmaRows`、`goReborn`、`newFamily`、`reborn` | 因果分、三户人家、回自己家。规则在 `src/core/loop/rebirth.ts` |
 
 状态都在全局 `G`；存进 localStorage 的 `wulin-loop`，现在是 `v: 4`，分成 `account`（账号：攒天、带路、捏的脸）、`person`（这一世的人：钱袋、自己的货、背包）、`houses[houseId]`（每户人家：钱箱、仓库、宝物架、院子、门、机关、画像、守夜回执），字段见 `docs/qa/stage2/README.md`。存档、迁移、两个口袋和夜里结算的规则在 `src/core/loop/`（`economy.ts`、`household.ts`、`settlement.ts`），用 `npm run build:loop` 打包成 `assets/loop-core.js`，**改规则改核心，不要改打包出来的文件**；跨标签写存档用 `assets/loop-storage.js` 的锁。夜里的临时状态在 `N`，当厉鬼时在 `H`。`SPEED` 可以让测试加速。
 
@@ -103,6 +105,7 @@ design/                   11 月 14 日的旧设计稿画布（有已删掉的�
 | 人会老死，家会留下来：院子、祠堂、做过的东西跨世保留 | 产品负责人 11-20 |
 | 鬼头上**只写特点（飞、隐、甲），不写该用什么**；每个特点至少有三种解法 | 自由度：方法放开 |
 | 鬼跟着工具一起来：手里只有剑的晚上只来普通鬼 | 新玩家第一晚要守得住（产品负责人 11-21） |
+| 老死后「当一晚鬼」做成开关（`AFTERLIFE.night`），敏感的词集中在 `docs/TERMS.md`，能一键换（`scripts/terms.mjs`）。加新文字时尽量用表里已有的说法 | 万一审核不让写阴间，改开关、换词就行，不用改玩法（产品负责人 11-24） |
 | 没有职业。打法看手里的东西（随时换）和当晚挑的本事 | 自由度 |
 | 出生品级之间的**强弱最多差三成**（×1 到 ×1.3），品级主要给面子 | 孩子是别人投胎来的新玩家，不能让陌生人的感情决定他弱好几倍 |
 | 有后人有两条路：牵红线生孩子，或者收徒弟 | 不想谈恋爱也能有后人；任何性别组合都行 |
@@ -148,7 +151,7 @@ design/                   11 月 14 日的旧设计稿画布（有已删掉的�
 
 | 项目 | 说明 |
 | --- | --- |
-| 页面只接了一半规则核心 | 存档、两个口袋、夜里结算已经由页面调用核心（`assets/loop-core.js`）。但时间、野外、守夜的打斗，页面还在用自己脚本里的那一份；这几块改规则要两边一起改，改完跑 `npm run balance:night -- --compare-core` |
+| 页面还有三块没接规则核心 | 存档、两个口袋、夜里结算、经营、家、投胎、当厉鬼都由页面调用核心（`assets/loop-core.js`）。只剩时间、野外和守夜的打斗过程还在页面脚本里；核心里有一模一样的一份，改这三块要两边一起改，改完跑 `npm run balance:night -- --compare-core` |
 | 河边浮木变成 7 件柴 | 第二阶段为了让第一天能换上木门，搬回家的一根浮木从 1 件柴改成 7 件（21 文）。每一世河边只有 3 根浮木，所以不会让钱涨得没边；第四阶段做经营时再一起看 |
 | 只靠机关守不住 | 零操作只靠机关，几乎每晚都破门（`docs/STAGE1_REPORT.md` 表二）。第三阶段的机关代守要专门设计结算 |
 | 院子里按钮多（11-24 已改） | 现在只有 4 个大按钮（出门、集市、修院子、歇到天黑），河埠、灶台、疗伤、家和祠堂、邻居、院石收成一排小按钮（`yardMore`）。以后加新入口，先想清楚是不是天天要用，不是就放进小按钮 |

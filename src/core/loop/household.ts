@@ -1,6 +1,7 @@
 import { depositCoins, settleEstate, unpackBag } from './economy';
 import { makeHouse, type House, type Loot, type Treasure } from './state';
 import type { Request, StoveJob } from './trade';
+import { HAUNT } from './haunt';
 import { BANK_CAP, makeDayBank, type DayBank } from './time';
 
 type Fields = Record<string, unknown>;
@@ -66,7 +67,7 @@ export interface HouseholdView extends Resident, House, DayBank {
 }
 
 const accountKeys = ['bankedDays', 'lastGrantDate', 'unlimitedDays', 'guideSeen', 'guideOff',
-  'allFeatures', 'look', 'expression', 'history', 'nightId', 'worldId', 'lastActiveDate'];
+  'allFeatures', 'look', 'expression', 'history', 'nightId', 'worldId', 'lastActiveDate', 'skipAfterlife'];
 const riverGuideKeys = ['record', 'hints', 'textOn'];
 const houseKeys = ['houseId', 'fam', 'money', 'chest', 'door', 'traps', 'store', 'treasures',
   'ancestors', 'abandoned', 'nightPlan', 'receipts', 'nightReceipt', 'absencePeriods', 'absenceReadThrough',
@@ -250,7 +251,7 @@ export function nextLifeView(newFlat: Fields, previous: HouseholdView, own: bool
     do { houseId = prefix + 'house-' + serial++; } while (prior.houses[houseId]);
   }
   const fresh = fromView({ ...newFlat, lastGrantDate: prior.account.lastGrantDate, lifeNo, houseId, lifeId: prefix + 'life-' + lifeNo,
-    own, purse: loot ? 30 : 0, personalTreasures: loot ? [loot] : [], goods: {} });
+    own, purse: loot ? HAUNT.lootCoins : 0, personalTreasures: loot ? [loot] : [], goods: {} });
   // 河埠在换世前初始化下一世的场景，可能顺带补上前世已经看过的进门提示。
   const riverGuide = { ...prior.account.riverGuide, ...fresh.account.riverGuide };
   fresh.account = prior.account;

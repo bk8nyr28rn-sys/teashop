@@ -95,7 +95,7 @@ function isAutoReceipt(receipt: NightReceipt): receipt is AutoNightReceipt {
 }
 
 /** 只查当晚五波的数量表。每只鬼按亲手打散的基础纸钱折半，不模拟战斗或本事。 */
-function paperReward(day: number, guided: boolean): number {
+export function paperReward(day: number, guided: boolean): number {
   let ghosts = 0;
   for (let wave = 0; wave < NIGHT.waves; wave++) {
     for (const count of Object.values(waveCounts(day, wave, guided))) ghosts += count;
