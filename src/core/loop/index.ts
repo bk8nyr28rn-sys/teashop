@@ -25,3 +25,4 @@ export * from './trade';
 export * from './family';
 export * from './rebirth';
 export * from './haunt';
+export * from './home';

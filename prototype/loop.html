@@ -1332,23 +1332,29 @@ function homeSvg() {
     <rect x="70" y="64" width="220" height="86" fill="#F1E8D8"/><path d="M52 70 L84 36 H276 L308 70 Z" fill="#4A4F5C"/>
     <rect x="160" y="100" width="40" height="50" fill="#6B4A3A"/><rect x="98" y="92" width="38" height="28" fill="#C9B48C"/><rect x="224" y="92" width="38" height="28" fill="#C9B48C"/>
     <path d="M180 150 L170 248 M180 150 L190 248" stroke="#D2C2A4" stroke-width="2"/>`;
+  // 院子等级：中院院墙加长，大宅加一进厢房
+  const level = LoopCore.yardLevel(G);
+  if (level >= 2) s += `<rect x="298" y="98" width="56" height="52" fill="#EDE3D1"/><path d="M290 102 L304 80 H350 L360 102 Z" fill="#4A4F5C"/><rect x="314" y="112" width="24" height="18" fill="#C9B48C"/>`;
+  if (level >= 1) s += `<rect x="0" y="124" width="70" height="26" fill="#D8CDB6"/><rect x="0" y="119" width="70" height="6" fill="#4A4F5C"/>${level < 2 ? '<rect x="290" y="124" width="70" height="26" fill="#D8CDB6"/><rect x="290" y="119" width="70" height="6" fill="#4A4F5C"/>' : ''}`;
   // 宝物架
   if (Guidance.open(3) || G.treasures.length) {
     s += `<rect x="12" y="156" width="102" height="64" rx="3" fill="#8A6A4C"/><rect x="16" y="160" width="94" height="26" fill="#6B4A3A"/><rect x="16" y="190" width="94" height="26" fill="#6B4A3A"/>`;
     G.treasures.slice(0, 8).forEach((t, i) => { const cx = 28 + (i % 4) * 23, cy = 176 + Math.floor(i / 4) * 30; s += `<circle cx="${cx}" cy="${cy}" r="7" fill="${TREASURE_COLOR[t.n] || '#E3B341'}" stroke="#FFF3C4" stroke-width="1.5"/>`; });
     s += `<text x="63" y="234" text-anchor="middle" font-size="11" fill="#5B4A3A">宝物架</text>`;
   }
-  // 灶台：在烧时冒火和烟，烧好了锅上冒白气
-  if (stoveOpen()) {
-    const st = stoveState();
-    s += `<rect x="22" y="128" width="36" height="24" rx="3" fill="#8C5A44"/><rect x="31" y="137" width="18" height="11" rx="5" fill="${st === 'cooking' ? '#F2A65A' : '#3A2C26'}"/><ellipse cx="40" cy="127" rx="13" ry="4" fill="#4A4F5C"/>`;
-    if (st === 'cooking') s += `<path d="M36 120 q-4 -8 2 -14 M44 120 q4 -8 -2 -14" stroke="#9AA3A8" stroke-width="2" fill="none" opacity="0.7"/>`;
-    if (st === 'ready') s += `<circle cx="40" cy="115" r="6" fill="#FFF7E8" opacity="0.9"/><circle cx="48" cy="109" r="4" fill="#FFF7E8" opacity="0.8"/>`;
-  }
+  // 灶台：每口灶各自画。在烧时冒火和烟，烧好了锅上冒白气
+  if (stoveOpen()) stoveJobsNow().forEach((job, i) => {
+    const st = jobState(job), x = 22 + i * 40, c = x + 18;
+    s += `<rect x="${x}" y="128" width="36" height="24" rx="3" fill="#8C5A44"/><rect x="${x + 9}" y="137" width="18" height="11" rx="5" fill="${st === 'cooking' ? '#F2A65A' : '#3A2C26'}"/><ellipse cx="${c}" cy="127" rx="13" ry="4" fill="#4A4F5C"/>`;
+    if (st === 'cooking') s += `<path d="M${c - 4} 120 q-4 -8 2 -14 M${c + 4} 120 q4 -8 -2 -14" stroke="#9AA3A8" stroke-width="2" fill="none" opacity="0.7"/>`;
+    if (st === 'ready') s += `<circle cx="${c}" cy="115" r="6" fill="#FFF7E8" opacity="0.9"/><circle cx="${c + 8}" cy="109" r="4" fill="#FFF7E8" opacity="0.8"/>`;
+  });
   // 仓库
   const n = Math.min(10, storeCount());
   for (let i = 0; i < n; i++) s += `<rect x="${256 + (i % 5) * 17}" y="${206 - Math.floor(i / 5) * 15}" width="16" height="14" rx="5" fill="${i % 2 ? '#C9A066' : '#B48A55'}" stroke="#7A5A3A"/>`;
   s += `<text x="298" y="234" text-anchor="middle" font-size="11" fill="#5B4A3A">仓库</text>`;
+  // 装饰：摆在各自的位置上
+  LoopCore.decorSlots(G).forEach((kind, i) => { if (kind) s += decorSvg(kind, ...DECOR_SLOTS[i]); });
   // 大阵
   if (G.door >= 4) s += `<ellipse cx="180" cy="200" rx="86" ry="18" fill="none" stroke="#7FD6C2" stroke-width="2.5" class="glow"/>`;
   // 人
@@ -1360,6 +1366,7 @@ function homeSvg() {
   s += River.yardStone(false);
   // 前墙和门
   s += `<rect x="0" y="252" width="360" height="48" fill="#CBBFA8"/><rect x="0" y="246" width="360" height="8" fill="#4A4F5C"/>${doorSvg(G.door, 180, 300, 62, 58)}`;
+  if (G.plaque) s += `<rect x="156" y="232" width="48" height="16" rx="2" fill="#3A2420" stroke="#E3B341"/><text x="180" y="244" text-anchor="middle" font-size="11" fill="#E3B341" font-family="var(--font-display)">${surnameOf(G.fam)}府</text>`;
   if (G.door >= 2) s += lanternSvg(136, 252) + lanternSvg(224, 252);
   if (G.door >= 3) s += lionSvg(120, 298) + lionSvg(240, 298, true);
   if (G.held) s += `<rect x="146" y="222" width="68" height="16" rx="2" fill="#2B2233"/><text x="180" y="234" text-anchor="middle" font-size="10" fill="#E3B341">守住 ${G.held} 夜</text>`;
@@ -1368,6 +1375,15 @@ function homeSvg() {
   for (let i = 0; i < G.traps.talisman; i++) s += talismanSvg(166 + i * 28, 272);
   if (f > 0.75) s += `<rect width="360" height="300" fill="#1B2340" opacity="${(((f - 0.75) / 0.25) * 0.38).toFixed(2)}"/>`;
   return s;
+}
+// 摆东西的位置（底边中点），按小院 3 个、中院 5 个、大宅 7 个依次用。避开宝物架、仓库、灶、院石和人站的地方
+const DECOR_SLOTS = [[122, 178], [240, 178], [150, 162], [330, 178], [302, 160], [338, 246], [22, 246]];
+function decorSvg(kind, x, y) {
+  if (kind === 'pot') return `<path d="M${x - 8} ${y - 10} H${x + 8} L${x + 6} ${y} H${x - 6} Z" fill="#9A5B3C"/><path d="M${x} ${y - 30} L${x - 9} ${y - 16} H${x + 9} Z M${x} ${y - 24} L${x - 11} ${y - 10} H${x + 11} Z" fill="#3F6B4A"/>`;
+  if (kind === 'vat') return `<ellipse cx="${x}" cy="${y - 9}" rx="13" ry="10" fill="#6F7F8C"/><ellipse cx="${x}" cy="${y - 17}" rx="12" ry="3.5" fill="#9CC9F0"/><circle cx="${x - 4}" cy="${y - 17}" r="1.6" fill="#F2A65A"/><circle cx="${x + 4}" cy="${y - 16}" r="1.6" fill="#E0654F"/>`;
+  if (kind === 'table') return `<rect x="${x - 3}" y="${y - 12}" width="6" height="12" fill="#8D8A82"/><ellipse cx="${x}" cy="${y - 13}" rx="14" ry="4" fill="#B8B4AA"/><ellipse cx="${x - 18}" cy="${y - 4}" rx="4" ry="3" fill="#A9A59B"/><ellipse cx="${x + 18}" cy="${y - 4}" rx="4" ry="3" fill="#A9A59B"/>`;
+  if (kind === 'tree') return `<rect x="${x - 3}" y="${y - 18}" width="6" height="18" fill="#6B4A3A"/><circle cx="${x}" cy="${y - 30}" r="14" fill="#5E8C55"/><circle cx="${x - 9}" cy="${y - 24}" r="8" fill="#6E9E63"/><circle cx="${x + 9}" cy="${y - 25}" r="8" fill="#6E9E63"/>${[[-5, -33], [4, -28], [-8, -24], [8, -34], [1, -38]].map(([dx, dy]) => `<circle cx="${x + dx}" cy="${y + dy}" r="1.6" fill="#F2C94C"/>`).join('')}`;
+  return '';
 }
 function trapSummary() { return Object.entries(TRAPS).filter(([k]) => G.traps[k]).map(([k, t]) => ` · ${t.name} ${G.traps[k]}`).join(''); }
 function renderHome() {
@@ -1391,7 +1407,7 @@ function renderHome() {
     <div class="acts">
       <button type="button" class="big ${left > 0 ? 'ghosty' : 'main'}" data-a="night">${left > 0 ? '在家歇到天黑' : '天黑了，去守夜'}<small>${left > 0 ? `还有 ${dur(left)} 天黑，鬼会来砸门` : '鬼要来砸门了'}</small></button>
     </div>`;
-  bindActs({ out: () => askBuddy(toWharf), river: () => askBuddy(true), place: River.placeStone, market: openMarket, build: openBuild, friends: openFriends, family: openFamily, stove: openStove, night: chooseNightWatch });
+  bindActs({ out: () => askBuddy(toWharf), river: () => askBuddy(true), place: () => openArrange(), market: openMarket, build: openBuild, friends: openFriends, family: openFamily, stove: openStove, night: chooseNightWatch });
   $('panel').querySelectorAll('[data-heal]').forEach(b => { b.onclick = () => heal(b.dataset.heal); });
 }
 // 不是天天要用的事：一排小按钮，第二行写一句状态（太长就省略）
@@ -1409,7 +1425,8 @@ function yardMore(left, toWharf, heals) {
     const best = NEIGHBORS.slice().sort((a, b) => G.friends[b.id] - G.friends[a.id])[0];
     items.push(more('friends', '邻居', `${best.who} 交情 ${G.friends[best.id]}`));
   }
-  if (G.river?.stone === 'yard') items.push(more('place', '院石', '换个摆法'));
+  const placed = LoopCore.decorSlots(G).filter(Boolean).length + (G.river?.stone === 'yard' ? 1 : 0);
+  if (placed) items.push(more('place', '摆设', `院里摆着 ${placed} 件`));
   return items.length ? `<div class="yard-more" role="group" aria-label="院里的其他事">${items.join('')}</div>` : '';
 }
 function chooseNightWatch() {
@@ -1544,9 +1561,19 @@ function trendTag(prices, kind) {
   const t = LoopCore.priceTrend(prices, kind);
   return t ? `<em class="trend ${t}">${t === 'up' ? '今天贵' : '今天便宜'}</em>` : '';
 }
-function stoveOpen() { return Guidance.open(TRADE.unlock.stove) || !!G.stove; }
-function stoveState() { return LoopCore.stoveStatus(G.stove, G.lifeId, G.day); }
-function stoveProduct() { return G.stove ? TRADE.recipes[G.stove.recipe].name : ''; }
+// 小院 1 口灶，中院 2 口，大宅 3 口（规则见 src/core/loop/home.ts、trade.ts）
+function stoveJobsNow() { return LoopCore.stoveJobs(G); }
+function jobState(job) { return LoopCore.stoveStatus(job, G.lifeId, G.day); }
+function stoveOpen() { return Guidance.open(TRADE.unlock.stove) || stoveJobsNow().some(Boolean); }
+// 几口灶合起来看：有好了的算好了；没有好的、但有在烧的算在烧；否则空着
+function stoveState() {
+  const states = stoveJobsNow().map(jobState);
+  return states.includes('ready') ? 'ready' : states.includes('cooking') ? 'cooking' : 'empty';
+}
+function stoveProduct() {
+  const want = stoveState(), job = stoveJobsNow().find(j => jobState(j) === want);
+  return job ? TRADE.recipes[job.recipe].name : '';
+}
 function canCookAny() {
   return Object.keys(TRADE.recipes).some(r => LoopCore.canCook(G, G, r, 'person') || LoopCore.canCook(G, G, r, 'house'));
 }
@@ -1559,19 +1586,23 @@ function requestDeliverable() {
   return active && LoopCore.planDelivery(G, G).short === 0 ? active : null;
 }
 function stoveSummary() {
-  const state = stoveState();
+  const jobs = stoveJobsNow(), free = jobs.filter(j => !j).length, state = stoveState();
   if (state === 'ready') return `${stoveProduct()}烧好了`;
-  if (state === 'cooking') return `在烧${stoveProduct()}，过完今晚就好`;
-  return '空着：睡前放进去，明早就好';
+  if (state === 'cooking') return `在烧${stoveProduct()}，过完今晚就好${free ? `；还有 ${free} 口空灶` : ''}`;
+  return jobs.length > 1 ? `${jobs.length} 口灶都空着：睡前放进去，明早就好` : '空着：睡前放进去，明早就好';
 }
 function openStove() {
-  const state = stoveState();
-  let body;
-  if (state === 'ready') {
-    const mine = G.stove.owner === 'person' && G.stove.lifeId === G.lifeId;
-    body = `<p>灶里的<b>${stoveProduct()}</b>烧好了，取出来${mine ? '归你自己' : '进家里的仓库'}。</p>`;
-  } else if (state === 'cooking') {
-    body = `<p>灶里在烧<b>${stoveProduct()}</b>。过完今晚，明早就能取。</p>`;
+  const jobs = stoveJobsNow();
+  const status = jobs.map((job, i) => {
+    const st = jobState(job), name = job ? TRADE.recipes[job.recipe].name : '';
+    const mine = job && job.owner === 'person' && job.lifeId === G.lifeId;
+    const text = st === 'ready' ? `${name}烧好了，取出来${mine ? '归你自己' : '进家里的仓库'}` : st === 'cooking' ? `在烧${name}，过完今晚，明早就能取` : '空着';
+    return `<li data-stove="${i}"><div><b>${jobs.length > 1 ? `灶 ${i + 1}` : '灶'}</b><small>${text}</small></div></li>`;
+  }).join('');
+  const ready = jobs.some(j => jobState(j) === 'ready');
+  let body = `<ul class="list stove-list">${status}</ul>`;
+  if (LoopCore.freeStove(G) < 0) {
+    body += `<p class="note">灶都在烧。${LoopCore.nextYard(G) ? '扩院子能多一口灶。' : ''}</p>`;
   } else {
     const rows = Object.entries(TRADE.recipes).map(([id, r]) => {
       const input = Object.entries(r.input).map(([k, n]) => `${n} ${k === '柴' ? '件' : '份'}${k}`).join('、');
@@ -1580,11 +1611,11 @@ function openStove() {
         <button type="button" class="mini" data-cook="${id}" data-owner-cook="person"${use('person') ? '' : ' disabled'}>用自己的</button>
         <button type="button" class="mini" data-cook="${id}" data-owner-cook="house"${use('house') ? '' : ' disabled'}>用家里的</button></li>`;
     }).join('');
-    body = `<p class="note">一次烧一锅。用谁的料，烧好的就是谁的。</p><ul class="list stove-list">${rows}</ul>`;
+    body += `<p class="note">放一锅进空着的灶。用谁的料，烧好的就是谁的。</p><ul class="list stove-list">${rows}</ul>`;
   }
   sheet({
     title: '灶台', dismiss: true, body,
-    buttons: [...(state === 'ready' ? [['取出来', collectStove, 'main']] : []), ['回去', null]],
+    buttons: [...(ready ? [['取出来', collectStove, 'main']] : []), ['回去', null]],
     bind: el => el.querySelectorAll('[data-cook]').forEach(b => {
       b.onclick = () => startStove(b.dataset.cook, b.dataset.ownerCook);
     }),
@@ -1595,16 +1626,18 @@ function startStove(recipe, owner) {
   const job = LoopCore.startStove(G, G, recipe, owner, { lifeId: G.lifeId, day: G.day });
   if (!job) return toast('料不够');
   Guidance.done('kiln'); G.guideStove = true;
-  save(); render();
+  save(); render(); openStove();
   toast(`${TRADE.recipes[recipe].name}下锅了，明早就好`);
 }
+// 好了的几口灶一起取
 function collectStove() {
   if (G.phase !== 'home') return;
-  const got = LoopCore.collectStove(G, G, { lifeId: G.lifeId, day: G.day });
-  if (!got) return;
+  const got = [];
+  for (let r; (r = LoopCore.collectStove(G, G, { lifeId: G.lifeId, day: G.day }));) got.push(r);
+  if (!got.length) return;
   Guidance.done('stove');
-  save(); render();
-  toast(`取出 ${got.count} ${got.kind === '木炭' ? '件' : '份'}${got.kind}，${got.owner === 'person' ? '归你自己' : '进了家里的仓库'}`);
+  save(); render(); openStove();
+  toast('取出' + got.map(g => ` ${g.count} ${g.kind === '木炭' ? '件' : '份'}${g.kind}（${g.owner === 'person' ? '归你自己' : '进了家里的仓库'}）`).join('，'));
 }
 function requestSection() {
   if (!requestsOpen()) return '';
@@ -1668,7 +1701,7 @@ function openBuild() {
     title: '修院子', dismiss: true,
     body: `<p>现在是<b>${DOORS[G.door].name}</b>，门血 ${DOORS[G.door].hp}。</p>
       ${next ? `<button type="button" class="big${doorQuote.shortfall ? '' : ' main'}" id="up-door"${doorQuote.shortfall ? ' disabled' : ''}>换成${next.name}（${next.cost} 文）<small>门血 ${next.hp} · ${paymentText(doorQuote)}</small><small>${preview(G.door + 1, G.traps)}</small></button>` : '<p class="note">已经是最气派的门了。</p>'}
-      ${Guidance.open(2) ? `<div class="sub">机关</div><div class="trap-offers">${trapRows}</div>` : ''}`,
+      ${Guidance.open(2) ? `<div class="sub">机关</div><div class="trap-offers">${trapRows}</div>${yardOffers()}` : ''}`,
     buttons: [['回去', null]],
     bind: (el) => {
       const up = el.querySelector('#up-door');
@@ -1678,6 +1711,29 @@ function openBuild() {
         if (!payment) return;
         Guidance.done('door'); G.door++;
         save(); render(); openBuild(); toast(`换成了${next.name}，${paymentText(payment)}`);
+      };
+      const yard = el.querySelector('#up-yard');
+      if (yard) yard.onclick = () => {
+        const before = LoopCore.yardInfo(G), payment = LoopCore.expandYard(G, G);
+        if (!payment) return;
+        const now = LoopCore.yardInfo(G);
+        save(); render(); openBuild();
+        toast(`${before.name}扩成了${now.name}：多了一口灶，摆东西的位置 ${before.slots} → ${now.slots}。${paymentText(payment)}`);
+      };
+      el.querySelectorAll('[data-decor]').forEach(b => {
+        b.onclick = () => {
+          const kind = b.dataset.decor, got = LoopCore.buyDecor(G, G, kind);
+          if (!got) return;
+          save(); render(); openBuild();
+          toast(`${LoopCore.YARD.decor[kind].name}摆在了位置 ${got.slot + 1}，「摆设」里能挪。${paymentText(got.payment)}`);
+        };
+      });
+      const plaque = el.querySelector('#buy-plaque');
+      if (plaque) plaque.onclick = () => {
+        const payment = LoopCore.buyPlaque(G, G);
+        if (!payment) return;
+        save(); render(); openBuild();
+        toast(`门楣上挂起了「${surnameOf(G.fam)}府」。${paymentText(payment)}`);
       };
       el.querySelectorAll('[data-buy]').forEach(b => {
         b.onclick = () => {
@@ -1694,6 +1750,52 @@ function openBuild() {
   Guidance.speak(Guidance.open(2) ? '院墙上能装机关了，装好就能夜夜替你守门。' : '攒够四十文，这道柴门就能换成木门。', true);
 }
 
+// 修院子里的「扩院子」和「装饰」两块（第 2 天起，和机关一起出现）
+function yardOffers() {
+  const Y = LoopCore.YARD, now = LoopCore.yardInfo(G), next = LoopCore.nextYard(G);
+  const slots = LoopCore.decorSlots(G), free = slots.filter(k => !k).length;
+  let html = `<div class="sub">扩院子</div><p class="note">现在是${now.name}：${now.stoves} 口灶，${now.slots} 个摆东西的位置。</p>`;
+  if (next) {
+    const q = LoopCore.quoteYard(G, G);
+    html += `<button type="button" class="big" id="up-yard"${q.shortfall ? ' disabled' : ''}>扩成${next.name}（${next.cost} 文）<small>${next.stoves} 口灶，摆东西的位置 ${now.slots} → ${next.slots}</small><small>${paymentText(q)}</small></button>`;
+  } else html += '<p class="note">已经是大宅了。</p>';
+  html += `<div class="sub">装饰<span class="note"> · 位置 ${slots.length - free} / ${slots.length}</span></div><p class="note">只给面子，不加战力；跟着家走，下一世回来还在。</p><div class="trap-offers">`;
+  for (const [kind, d] of Object.entries(Y.decor)) {
+    const q = LoopCore.quoteHome(G, G, d.cost);
+    html += `<button type="button" class="big" data-decor="${kind}"${!free || q.shortfall ? ' disabled' : ''}>${d.name} · ${d.cost} 文<small>${d.note}</small><small>${free ? paymentText(q) : '位置满了，扩院子能多几个位置'}</small></button>`;
+  }
+  const pq = LoopCore.quoteHome(G, G, Y.plaque.cost);
+  html += G.plaque ? `<p class="note">门楣上已经挂着「${surnameOf(G.fam)}府」。</p>`
+    : `<button type="button" class="big" id="buy-plaque"${pq.shortfall ? ' disabled' : ''}>${Y.plaque.name} · ${Y.plaque.cost} 文<small>门楣上挂着「${surnameOf(G.fam)}府」，不占院里的位置</small><small>${paymentText(pq)}</small></button>`;
+  return html + '</div>';
+}
+// 摆设：院里每件装饰都能挪、能拿掉；院石沿用河埠那一套
+function openArrange(pick = null) {
+  const Y = LoopCore.YARD, slots = LoopCore.decorSlots(G);
+  const marks = slots.map((k, i) => { const [x, y] = DECOR_SLOTS[i]; return `<circle cx="${x}" cy="${y - 44}" r="9" fill="${pick === i ? '#B8402F' : '#1E2A2C'}" opacity="0.85"/><text x="${x}" y="${y - 40}" text-anchor="middle" font-size="11" fill="#fff">${i + 1}</text>`; }).join('');
+  const picture = `<svg viewBox="0 0 360 300" class="stage" role="img" aria-label="院子里摆东西的位置">${homeSvg()}${marks}</svg>`;
+  if (pick === null) {
+    const rows = slots.map((k, i) => k ? `<li><div><b>${Y.decor[k].name}</b><small>位置 ${i + 1}</small></div><button type="button" class="mini" data-move="${i}">挪</button><button type="button" class="mini" data-remove="${i}">拿掉</button></li>` : '').join('')
+      + (G.river?.stone === 'yard' ? '<li><div><b>院石</b><small>河埠搬回来的青纹石</small></div><button type="button" class="mini" data-stone>挪</button></li>' : '');
+    sheet({ title: '摆设', dismiss: true,
+      body: picture + (rows ? `<ul class="list stove-list">${rows}</ul><p class="note">拿掉不退钱。</p>` : '<p class="note">院里还没摆东西。去「修院子」买装饰。</p>'),
+      buttons: [['回去', null]],
+      bind: el => {
+        el.querySelectorAll('[data-move]').forEach(b => { b.onclick = () => openArrange(Number(b.dataset.move)); });
+        el.querySelectorAll('[data-remove]').forEach(b => { b.onclick = () => {
+          const kind = LoopCore.removeDecor(G, Number(b.dataset.remove));
+          if (kind) { save(); render(); openArrange(); toast(`拿掉了${Y.decor[kind].name}`); }
+        }; });
+        const stone = el.querySelector('[data-stone]');
+        if (stone) stone.onclick = River.placeStone;
+      } });
+    return;
+  }
+  sheet({ title: `把${Y.decor[slots[pick]].name}挪到哪？`, dismiss: true, body: picture,
+    buttons: [...slots.map((k, i) => i === pick ? null : [`位置 ${i + 1}${k ? `（和${Y.decor[k].name}对调）` : '（空）'}`, () => {
+      if (LoopCore.moveDecor(G, pick, i)) { save(); render(); openArrange(); toast('挪好了'); }
+    }]).filter(Boolean), ['回去', () => openArrange()]] });
+}
 function openFriends() {
   const best = Object.entries(G.goods).filter(([, n]) => n > 0).sort((a, b) => GOODS[b[0]] - GOODS[a[0]])[0];
   const rows = NEIGHBORS.map((n) => {
@@ -2046,6 +2148,7 @@ function openFamily() {
       ${fam ? `<div class="sub">后人</div><ul class="list">${fam}</ul><p class="note">夜里，一家人会帮着守门。</p>` : ''}`,
     buttons: [
       ...(G.spouse ? [[`陪伴（花 1 个时辰，红线 +${LoopCore.FAMILY.accompany.love}）${waiting ? '<small>明天才能陪伴家人</small>' : ''}`, accompanyFamily, 'main', waiting || !LoopCore.canAccompany(G)]] : []),
+      ...(G.spouse ? [[`送礼物（${LoopCore.FAMILY.gift.cost} 文，红线 +${LoopCore.FAMILY.gift.love}）<small>${waiting ? '明天才能送礼物' : G.giftDay === G.day ? '今天送过了' : '花钱不花时辰 · 只能用钱袋 · 一天一次'}</small>`, giftFamily, '', waiting || !LoopCore.canGift(G)]] : []),
       ...(adult && !G.spouse ? [[waiting ? '明天才能找有缘人' : '找有缘人', offerMatch, 'main', waiting]] : []),
       ...(adult && G.kids.filter((k) => k.kind === '徒').length < LoopCore.FAMILY.disciple.max ? [discipleButton()] : []),
       ['去祠堂', openHall],
@@ -2057,6 +2160,10 @@ function accompanyFamily() {
   if (G.phase !== 'home') return;
   if (!LoopCore.accompany(G)) return toast('天快黑了，没时间了');
   save(); render(); toast(`陪了一个时辰，红线 +${LoopCore.FAMILY.accompany.love}`); openFamily();
+}
+function giftFamily() {
+  if (G.phase !== 'home' || !LoopCore.giveGift(G)) return;
+  save(); render(); toast(`给${G.spouse.name}买了礼物，红线 +${LoopCore.FAMILY.gift.love}（钱袋 −${LoopCore.FAMILY.gift.cost} 文）`); openFamily();
 }
 // 祠堂：一代代的祖宗画像。回自家投胎的话，前几世的你也挂在这里
 function portrait(a) {
@@ -2085,7 +2192,7 @@ function ownFamily(heir) {
   const t = LoopCore.ownThread(coreRng());
   return {
     own: true, houseId: G.houseId, name: G.fam, door: G.door, money: G.chest, store: { ...G.store }, crossbow: G.traps.crossbow, lamp: G.traps.lamp, talisman: G.traps.talisman,
-    treasures: G.treasures.slice(), thread: t,
+    treasures: G.treasures.slice(), thread: t, yardLevel: LoopCore.yardLevel(G), decorCount: LoopCore.decorCount(G),
     parents: [{ name: heir.name, look: heir.look, rel: heir.kind === '女' ? '娘（上一世你的女儿）' : heir.kind === '徒' ? '师父（上一世你的徒弟）' : '爹（上一世你的儿子）' }, { name: pick(SURNAMES) + '氏', look: randomLook(), rel: heir.kind === '女' ? '爹' : '娘' }],
     ancestors: G.ancestors,
   };
@@ -2767,7 +2874,7 @@ function renderReborn() {
     ${[70, 120, 180, 240, 290].map((x) => `<line x1="${x}" y1="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 - 12}" x2="${x}" y2="${168 - Math.sin(((x - 30) / 300) * Math.PI) * 96 + 4}" stroke="#B49AB8" stroke-width="2"/>`).join('')}
     <text x="180" y="40" text-anchor="middle" font-size="18" fill="#E3B341" font-family="var(--font-display)">奈何桥</text>
     <g class="float">${ghostSvg(ME, 'calm', 'elder', 180, 112, 0.18)}</g></svg>`;
-  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? '院子、机关、宝物都还在；祠堂里挂着你的画像 · ' : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · 钱箱 ${f.money} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
+  const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? `${LoopCore.YARD.levels[f.yardLevel || 0].name}${f.decorCount ? `（摆着 ${f.decorCount} 件东西）` : ''}、机关、宝物都还在；祠堂里挂着你的画像 · ` : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · 钱箱 ${f.money} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
   const loot = G.afterlife && G.afterlife.won && G.afterlife.loot;
   const keep = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt);
   $('panel').innerHTML = `<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>

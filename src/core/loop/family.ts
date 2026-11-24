@@ -1,6 +1,6 @@
 import { Rng } from '../rng';
 import { CFG } from './base';
-import { payHome, quoteHome } from './economy';
+import { payHome, payPersonal, quoteHome } from './economy';
 
 // 家：牵红线、陪伴、生孩子、收徒弟。名字和长相是外观，由页面给；这里只管规则。
 export const FAMILY = {
@@ -19,6 +19,8 @@ export const FAMILY = {
   birth: { minLove: 20, maxKids: 2, fromDay: 3 },
   /** 收徒：家里的事，先用钱箱。品级看这一世守住了几夜 */
   disciple: { cost: 30, max: 2, grades: [[3, '上等', 1.1], [1, '良才', 1.05], [0, '寻常', 1]] as const },
+  /** 给伴侣买礼物：东西到了某个人手里，只能用钱袋；一天一次。陪伴花时间，礼物花钱 */
+  gift: { cost: 20, love: 8 },
 } as const;
 
 export type ThreadName = '相识' | '知己' | '倾心' | '挚爱';
@@ -59,6 +61,17 @@ export function accompany(s: FamilyState): boolean {
   if (!canAccompany(s)) return false;
   s.time += FAMILY.accompany.minutes;
   s.love = Math.min(FAMILY.maxLove, s.love + FAMILY.accompany.love);
+  return true;
+}
+
+export function canGift(s: FamilyState & { purse: number; giftDay?: number | null }): boolean {
+  return !!s.spouse && s.giftDay !== s.day && s.purse >= FAMILY.gift.cost;
+}
+/** 给伴侣买礼物：只用钱袋，一天一次，红线 +8 */
+export function giveGift(s: FamilyState & { purse: number; giftDay?: number | null }): boolean {
+  if (!canGift(s) || !payPersonal(s, FAMILY.gift.cost)) return false;
+  s.love = Math.min(FAMILY.maxLove, s.love + FAMILY.gift.love);
+  s.giftDay = s.day;
   return true;
 }
 

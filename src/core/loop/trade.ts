@@ -1,6 +1,7 @@
 import { Rng } from '../rng';
 import { GOODS, type Owner } from './economy';
 import type { House, Person } from './state';
+import { stoveCount } from './home';
 
 // 第四阶段的一小块经营：院里的灶、每天的行情、邻居托付。
 // 只用游戏里的天和这一世的编号定结果，不读现实的钟；同一天重算永远相同。
@@ -58,8 +59,12 @@ export interface Request {
 }
 
 export interface TradeHouse extends Home {
+  /** 每口灶上的那一锅（见 stoveJobs） */
+  stoves?: (StoveJob | null)[];
+  /** 第四阶段的旧存档：只有一口灶 */
   stove?: StoveJob | null;
   request?: Request | null;
+  yardLevel?: number;
 }
 
 function seedOf(text: string): number {
@@ -110,39 +115,61 @@ export function priceTrend(prices: Prices, kind: string): 'up' | 'down' | null {
 }
 
 // ---------------- 灶台 ----------------
+// 小院 1 口灶，中院 2 口，大宅 3 口（见 home.ts）。每口灶一次烧一锅。
+
+/** 每口灶上正在烧的那一锅，长度等于灶的口数。第四阶段的旧存档只有 stove 一项 */
+export function stoveJobs(house: TradeHouse): (StoveJob | null)[] {
+  const jobs: (StoveJob | null)[] = (house.stoves ?? (house.stove ? [house.stove] : [])).map(j => j ?? null);
+  while (jobs.length < stoveCount(house)) jobs.push(null);
+  return jobs;
+}
+function saveJobs(house: TradeHouse, jobs: (StoveJob | null)[]) {
+  house.stoves = jobs;
+  delete house.stove;
+}
 
 export function stoveStatus(job: StoveJob | null | undefined, lifeId: string, day: number): 'empty' | 'cooking' | 'ready' {
   if (!job) return 'empty';
   return job.lifeId !== lifeId || day > job.day ? 'ready' : 'cooking';
 }
 
-/** 自己的或家里的料够不够烧这一锅 */
-export function canCook(house: TradeHouse, person: Pick<Person, 'goods'>, recipe: RecipeId, owner: Owner): boolean {
+/** 第一口空着的灶；都在烧就是 -1 */
+export function freeStove(house: TradeHouse): number {
+  return stoveJobs(house).indexOf(null);
+}
+
+/** 自己的或家里的料够不够再烧一锅（有空灶才算） */
+export function canCook(house: TradeHouse, person: Pick<Person, 'goods'>, recipe: RecipeId, owner: Owner, index = freeStove(house)): boolean {
   const r = TRADE.recipes[recipe];
-  if (!r || house.stove) return false;
+  if (!r || index < 0 || stoveJobs(house)[index] !== null) return false;
   return has(owner === 'house' ? house.store : person.goods, r.input);
 }
 
-/** 放料进灶。用谁的料，成品就是谁的。一次只能烧一锅 */
+/** 放料进灶。用谁的料，成品就是谁的。不指定哪口灶就用第一口空的 */
 export function startStove(house: TradeHouse, person: Pick<Person, 'goods'>, recipe: RecipeId, owner: Owner,
-  at: { lifeId: string; day: number }): StoveJob | null {
-  if (!canCook(house, person, recipe, owner)) return null;
+  at: { lifeId: string; day: number }, index = freeStove(house)): StoveJob | null {
+  if (!canCook(house, person, recipe, owner, index)) return null;
   const stock = owner === 'house' ? house.store : person.goods;
   for (const [kind, n] of Object.entries(TRADE.recipes[recipe].input)) take(stock, kind, n);
-  const job: StoveJob = { jobId: at.lifeId + '/d' + at.day, recipe, owner, lifeId: at.lifeId, day: at.day };
-  house.stove = job;
+  const job: StoveJob = { jobId: at.lifeId + '/d' + at.day + '/s' + index, recipe, owner, lifeId: at.lifeId, day: at.day };
+  const jobs = stoveJobs(house);
+  jobs[index] = job;
+  saveJobs(house, jobs);
   return job;
 }
 
-/** 过完一晚才能取。放料的人还在，成品归他；人走了，归家里的仓库 */
-export function collectStove(house: TradeHouse, person: Pick<Person, 'goods'>, at: { lifeId: string; day: number }) {
-  const job = house.stove;
+/** 过完一晚才能取。放料的人还在，成品归他；人走了，归家里的仓库。不指定哪口灶就取第一口好了的 */
+export function collectStove(house: TradeHouse, person: Pick<Person, 'goods'>, at: { lifeId: string; day: number }, index?: number) {
+  const jobs = stoveJobs(house);
+  const i = index ?? jobs.findIndex(j => stoveStatus(j, at.lifeId, at.day) === 'ready');
+  const job = jobs[i];
   if (!job || stoveStatus(job, at.lifeId, at.day) !== 'ready') return null;
   const r = TRADE.recipes[job.recipe];
   const owner: Owner = job.owner === 'person' && job.lifeId === at.lifeId ? 'person' : 'house';
   add(owner === 'person' ? person.goods : house.store, r.output, r.count);
-  house.stove = null;
-  return { kind: r.output, count: r.count, owner };
+  jobs[i] = null;
+  saveJobs(house, jobs);
+  return { kind: r.output, count: r.count, owner, index: i };
 }
 
 /** 疗伤：先用自己的，再用仓库的。返回用了谁的和回了几点 */

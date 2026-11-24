@@ -32,6 +32,7 @@ var LoopCore = (() => {
     REBIRTH: () => REBIRTH,
     Rng: () => Rng,
     TRADE: () => TRADE,
+    YARD: () => YARD,
     acceptRequest: () => acceptRequest,
     accompany: () => accompany,
     accrueDays: () => accrueDays,
@@ -39,22 +40,30 @@ var LoopCore = (() => {
     autoLossLimit: () => autoLossLimit,
     beginNightLedger: () => beginNightLedger,
     birth: () => birth,
+    buyDecor: () => buyDecor,
+    buyPlaque: () => buyPlaque,
     canAccompany: () => canAccompany,
     canBirth: () => canBirth,
     canCook: () => canCook,
+    canGift: () => canGift,
     canTakeDisciple: () => canTakeDisciple,
     carryFriends: () => carryFriends,
     chanceLabel: () => chanceLabel,
     collectStove: () => collectStove,
     dawnLove: () => dawnLove,
     dayPrices: () => dayPrices,
+    decorCount: () => decorCount,
+    decorSlots: () => decorSlots,
     defenseChance: () => defenseChance,
     deliverRequest: () => deliverRequest,
     depositCoins: () => depositCoins,
     discipleGrade: () => discipleGrade,
+    expandYard: () => expandYard,
     finishLife: () => finishLife,
+    freeStove: () => freeStove,
     fromView: () => fromView,
     getAbsenceSummary: () => getAbsenceSummary,
+    giveGift: () => giveGift,
     givePersonalGood: () => givePersonalGood,
     goodsValue: () => goodsValue,
     gradeFor: () => gradeFor,
@@ -70,8 +79,10 @@ var LoopCore = (() => {
     markActiveDate: () => markActiveDate,
     match: () => match,
     migrateSave: () => migrateSave,
+    moveDecor: () => moveDecor,
     newFamily: () => newFamily,
     nextLifeView: () => nextLifeView,
+    nextYard: () => nextYard,
     nightKarma: () => nightKarma,
     nightPayout: () => nightPayout,
     offerFor: () => offerFor,
@@ -83,8 +94,10 @@ var LoopCore = (() => {
     planNightLoot: () => planNightLoot,
     priceTrend: () => priceTrend,
     quoteHome: () => quoteHome,
+    quoteYard: () => quoteYard,
     reconcileAbsence: () => reconcileAbsence,
     refreshRequest: () => refreshRequest,
+    removeDecor: () => removeDecor,
     requestBoard: () => requestBoard,
     sameNight: () => sameNight,
     sellAllOrdinary: () => sellAllOrdinary,
@@ -99,6 +112,8 @@ var LoopCore = (() => {
     startHaunt: () => startHaunt,
     startStove: () => startStove,
     storeBelongings: () => storeBelongings,
+    stoveCount: () => stoveCount,
+    stoveJobs: () => stoveJobs,
     stoveStatus: () => stoveStatus,
     strangerTiers: () => strangerTiers,
     takeDisciple: () => takeDisciple,
@@ -107,7 +122,9 @@ var LoopCore = (() => {
     toView: () => toView,
     unpackBag: () => unpackBag,
     useHealing: () => useHealing,
-    useHerb: () => useHerb
+    useHerb: () => useHerb,
+    yardInfo: () => yardInfo,
+    yardLevel: () => yardLevel
   });
 
   // src/core/rng.ts
@@ -491,7 +508,11 @@ var LoopCore = (() => {
     "absencePeriods",
     "absenceReadThrough",
     "stove",
-    "request"
+    "stoves",
+    "request",
+    "yardLevel",
+    "decor",
+    "plaque"
   ];
   var candidateAssets = [
     "name",
@@ -505,7 +526,9 @@ var LoopCore = (() => {
     "traps",
     "treasures",
     "ancestors",
-    "yard"
+    "yard",
+    "yardLevel",
+    "decorCount"
   ];
   function isObject(value) {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -551,7 +574,9 @@ var LoopCore = (() => {
       door: house.door,
       ...house.traps,
       treasures: [...house.treasures],
-      ancestors: [...house.ancestors]
+      ancestors: [...house.ancestors],
+      yardLevel: house.yardLevel ?? 0,
+      decorCount: (house.decor ?? []).filter(Boolean).length + (house.plaque ? 1 : 0)
     });
   }
   function fromView(raw, base) {
@@ -599,7 +624,11 @@ var LoopCore = (() => {
     };
     if (Array.isArray(h.absencePeriods)) house.absencePeriods = h.absencePeriods;
     if (typeof h.absenceReadThrough === "number") house.absenceReadThrough = count(h.absenceReadThrough);
-    if (isObject(h.stove)) house.stove = h.stove;
+    if (Array.isArray(h.stoves)) house.stoves = h.stoves.map((j) => isObject(j) ? j : null);
+    else if (isObject(h.stove)) house.stoves = [h.stove];
+    if (typeof h.yardLevel === "number") house.yardLevel = count(h.yardLevel);
+    if (Array.isArray(h.decor)) house.decor = h.decor.map((k) => typeof k === "string" ? k : null);
+    if (h.plaque === true) house.plaque = true;
     if (isObject(h.request)) house.request = h.request;
     if (isObject(h.nightReceipt)) {
       const nightId = count(h.nightReceipt.nightId) || account.nightId || 1;
@@ -1187,6 +1216,92 @@ var LoopCore = (() => {
     return true;
   }
 
+  // src/core/loop/home.ts
+  var YARD = {
+    levels: [
+      { name: "小院", cost: 0, stoves: 1, slots: 3 },
+      { name: "中院", cost: 120, stoves: 2, slots: 5 },
+      { name: "大宅", cost: 300, stoves: 3, slots: 7 }
+    ],
+    decor: {
+      pot: { name: "盆栽", cost: 10, note: "一盆小松" },
+      vat: { name: "水缸", cost: 15, note: "养着两尾鱼" },
+      table: { name: "石桌石凳", cost: 25, note: "夏天能在院里吃饭" },
+      tree: { name: "桂花树", cost: 40, note: "会开花，满院香" }
+    },
+    /** 匾额挂在门楣上，写着家名，不占院里的位置 */
+    plaque: { name: "匾额", cost: 60, note: "门楣上挂着家名" }
+  };
+  function yardLevel(h) {
+    const level2 = h.yardLevel ?? 0;
+    return Number.isInteger(level2) && level2 >= 0 && level2 < YARD.levels.length ? level2 : 0;
+  }
+  function yardInfo(h) {
+    return YARD.levels[yardLevel(h)];
+  }
+  function stoveCount(h) {
+    return yardInfo(h).stoves;
+  }
+  function decorSlots(h) {
+    const n = yardInfo(h).slots;
+    const slots = (h.decor ?? []).slice(0, n).map((k) => k && k in YARD.decor ? k : null);
+    while (slots.length < n) slots.push(null);
+    return slots;
+  }
+  function decorCount(h) {
+    return decorSlots(h).filter(Boolean).length + (h.plaque ? 1 : 0);
+  }
+  function nextYard(h) {
+    return YARD.levels[yardLevel(h) + 1] ?? null;
+  }
+  function quoteYard(h, person) {
+    const next = nextYard(h);
+    return next ? quoteHome(h, person, next.cost) : null;
+  }
+  function expandYard(h, person) {
+    const next = nextYard(h);
+    if (!next) return null;
+    const payment = payHome(h, person, next.cost);
+    if (!payment) return null;
+    h.yardLevel = yardLevel(h) + 1;
+    h.decor = decorSlots(h);
+    return payment;
+  }
+  function buyDecor(h, person, kind, slot) {
+    const item = YARD.decor[kind];
+    if (!item) return null;
+    const slots = decorSlots(h);
+    const at = slot ?? slots.indexOf(null);
+    if (!Number.isInteger(at) || at < 0 || at >= slots.length || slots[at] !== null) return null;
+    const payment = payHome(h, person, item.cost);
+    if (!payment) return null;
+    slots[at] = kind;
+    h.decor = slots;
+    return { payment, slot: at };
+  }
+  function moveDecor(h, from, to) {
+    const slots = decorSlots(h);
+    if (from === to || !slots[from] || to < 0 || to >= slots.length) return false;
+    [slots[from], slots[to]] = [slots[to], slots[from]];
+    h.decor = slots;
+    return true;
+  }
+  function removeDecor(h, slot) {
+    const slots = decorSlots(h);
+    const kind = slots[slot] ?? null;
+    if (!kind) return null;
+    slots[slot] = null;
+    h.decor = slots;
+    return kind;
+  }
+  function buyPlaque(h, person) {
+    if (h.plaque) return null;
+    const payment = payHome(h, person, YARD.plaque.cost);
+    if (!payment) return null;
+    h.plaque = true;
+    return payment;
+  }
+
   // src/core/loop/trade.ts
   var TRADE = {
     /** 当天价 = 基础价 × (1 ± swing)，第 1 天固定用基础价 */
@@ -1254,31 +1369,48 @@ var LoopCore = (() => {
     if (price <= base * (1 - TRADE.badgeAt)) return "down";
     return null;
   }
+  function stoveJobs(house) {
+    const jobs = (house.stoves ?? (house.stove ? [house.stove] : [])).map((j) => j ?? null);
+    while (jobs.length < stoveCount(house)) jobs.push(null);
+    return jobs;
+  }
+  function saveJobs(house, jobs) {
+    house.stoves = jobs;
+    delete house.stove;
+  }
   function stoveStatus(job, lifeId, day) {
     if (!job) return "empty";
     return job.lifeId !== lifeId || day > job.day ? "ready" : "cooking";
   }
-  function canCook(house, person, recipe, owner) {
+  function freeStove(house) {
+    return stoveJobs(house).indexOf(null);
+  }
+  function canCook(house, person, recipe, owner, index = freeStove(house)) {
     const r = TRADE.recipes[recipe];
-    if (!r || house.stove) return false;
+    if (!r || index < 0 || stoveJobs(house)[index] !== null) return false;
     return has(owner === "house" ? house.store : person.goods, r.input);
   }
-  function startStove(house, person, recipe, owner, at) {
-    if (!canCook(house, person, recipe, owner)) return null;
+  function startStove(house, person, recipe, owner, at, index = freeStove(house)) {
+    if (!canCook(house, person, recipe, owner, index)) return null;
     const stock = owner === "house" ? house.store : person.goods;
     for (const [kind, n] of Object.entries(TRADE.recipes[recipe].input)) take2(stock, kind, n);
-    const job = { jobId: at.lifeId + "/d" + at.day, recipe, owner, lifeId: at.lifeId, day: at.day };
-    house.stove = job;
+    const job = { jobId: at.lifeId + "/d" + at.day + "/s" + index, recipe, owner, lifeId: at.lifeId, day: at.day };
+    const jobs = stoveJobs(house);
+    jobs[index] = job;
+    saveJobs(house, jobs);
     return job;
   }
-  function collectStove(house, person, at) {
-    const job = house.stove;
+  function collectStove(house, person, at, index) {
+    const jobs = stoveJobs(house);
+    const i = index ?? jobs.findIndex((j) => stoveStatus(j, at.lifeId, at.day) === "ready");
+    const job = jobs[i];
     if (!job || stoveStatus(job, at.lifeId, at.day) !== "ready") return null;
     const r = TRADE.recipes[job.recipe];
     const owner = job.owner === "person" && job.lifeId === at.lifeId ? "person" : "house";
     add(owner === "person" ? person.goods : house.store, r.output, r.count);
-    house.stove = null;
-    return { kind: r.output, count: r.count, owner };
+    jobs[i] = null;
+    saveJobs(house, jobs);
+    return { kind: r.output, count: r.count, owner, index: i };
   }
   function useHealing(house, person, kind) {
     const amount = TRADE.heal[kind];
@@ -1358,7 +1490,9 @@ var LoopCore = (() => {
     /** 红线到知己、第 3 天起，一天最多生一个，最多两个孩子 */
     birth: { minLove: 20, maxKids: 2, fromDay: 3 },
     /** 收徒：家里的事，先用钱箱。品级看这一世守住了几夜 */
-    disciple: { cost: 30, max: 2, grades: [[3, "上等", 1.1], [1, "良才", 1.05], [0, "寻常", 1]] }
+    disciple: { cost: 30, max: 2, grades: [[3, "上等", 1.1], [1, "良才", 1.05], [0, "寻常", 1]] },
+    /** 给伴侣买礼物：东西到了某个人手里，只能用钱袋；一天一次。陪伴花时间，礼物花钱 */
+    gift: { cost: 20, love: 8 }
   };
   function threadName(love) {
     let name = "相识";
@@ -1381,6 +1515,15 @@ var LoopCore = (() => {
     if (!canAccompany(s)) return false;
     s.time += FAMILY.accompany.minutes;
     s.love = Math.min(FAMILY.maxLove, s.love + FAMILY.accompany.love);
+    return true;
+  }
+  function canGift(s) {
+    return !!s.spouse && s.giftDay !== s.day && s.purse >= FAMILY.gift.cost;
+  }
+  function giveGift(s) {
+    if (!canGift(s) || !payPersonal(s, FAMILY.gift.cost)) return false;
+    s.love = Math.min(FAMILY.maxLove, s.love + FAMILY.gift.love);
+    s.giftDay = s.day;
     return true;
   }
   function dawnLove(s) {

@@ -43,7 +43,7 @@ const Guidance = (() => {
     if (G.door === 0 && !LoopCore.quoteHome(G, G, DOORS[1].cost).shortfall) return 'door';
     if (stoveOpen() && stoveState() === 'ready') return 'stove';
     if (requestDeliverable()) return 'deliver';
-    if (open(LoopCore.TRADE.unlock.stove) && !G.guideStove && !G.stove && canCookAny()) return 'kiln';
+    if (open(LoopCore.TRADE.unlock.stove) && !G.guideStove && !stoveJobsNow().some(Boolean) && canCookAny()) return 'kiln';
     const remaining = storeCount(G.goods) + storeCount() + G.personalTreasures.length + G.treasures.length;
     if (remaining && (!soldToday() || (G.day === 1 && G.door === 0))) return 'sell';
     if (CFG.dusk - G.time < 120) return 'rest';
@@ -65,8 +65,8 @@ const Guidance = (() => {
       return ['天黑了，赶紧回家', G.phase === 'river' ? '低处已经淹了，从家门口走高岸还能回去。' : '人在野外，先想法脱身，再回院子守门。', thoughts.late[2]];
     if (id === 'heal' && !(G.goods.草药 > 0 || G.store.草药 > 0))
       return ['用金疮药敷一下伤', '一份金疮药能回两点体力，先用自己的，再用仓库的。', thoughts.heal[2], 'heal'];
-    if (id === 'stove' && G.stove)
-      return ['灶上的' + LoopCore.TRADE.recipes[G.stove.recipe].name + '烧好了，去取吧', thoughts.stove[1], thoughts.stove[2], 'stove'];
+    if (id === 'stove' && stoveProduct())
+      return ['灶上的' + stoveProduct() + '烧好了，去取吧', thoughts.stove[1], thoughts.stove[2], 'stove'];
     if (id === 'deliver') {
       const r = requestDeliverable();
       if (r) return [nb(r.neighbor).who + '要的' + r.kind + '，你手上已经够了', thoughts.deliver[1], thoughts.deliver[2], 'market'];

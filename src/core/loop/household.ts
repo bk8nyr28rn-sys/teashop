@@ -1,6 +1,7 @@
 import { depositCoins, settleEstate, unpackBag } from './economy';
 import { makeHouse, type House, type Loot, type Treasure } from './state';
 import type { Request, StoveJob } from './trade';
+import type { DecorKind } from './home';
 import { HAUNT } from './haunt';
 import { BANK_CAP, makeDayBank, type DayBank } from './time';
 
@@ -35,10 +36,16 @@ interface Household extends House {
   pendingNightId: number | null;
   absencePeriods?: AbsencePeriod[];
   absenceReadThrough?: number;
-  /** 院里的灶：正在烧的那一锅 */
-  stove?: StoveJob | null;
+  /** 院里每口灶上正在烧的那一锅 */
+  stoves?: (StoveJob | null)[];
   /** 邻居托付：接着的或最近一条 */
   request?: Request | null;
+  /** 小院 0、中院 1、大宅 2 */
+  yardLevel?: number;
+  /** 院里摆东西的位置 */
+  decor?: (DecorKind | null)[];
+  /** 门楣上的匾额 */
+  plaque?: boolean;
 }
 export interface V4 {
   v: 4;
@@ -62,7 +69,11 @@ export interface HouseholdView extends Resident, House, DayBank {
   ancestors: Portrait[];
   river?: Fields;
   stove?: StoveJob | null;
+  stoves?: (StoveJob | null)[];
   request?: Request | null;
+  yardLevel?: number;
+  decor?: (DecorKind | null)[];
+  plaque?: boolean;
   [otherHouses]?: V4['houses'];
 }
 
@@ -71,9 +82,9 @@ const accountKeys = ['bankedDays', 'lastGrantDate', 'unlimitedDays', 'guideSeen'
 const riverGuideKeys = ['record', 'hints', 'textOn'];
 const houseKeys = ['houseId', 'fam', 'money', 'chest', 'door', 'traps', 'store', 'treasures',
   'ancestors', 'abandoned', 'nightPlan', 'receipts', 'nightReceipt', 'absencePeriods', 'absenceReadThrough',
-  'stove', 'request'];
+  'stove', 'stoves', 'request', 'yardLevel', 'decor', 'plaque'];
 const candidateAssets = ['name', 'money', 'chest', 'store', 'door', 'crossbow', 'lamp', 'talisman',
-  'traps', 'treasures', 'ancestors', 'yard'];
+  'traps', 'treasures', 'ancestors', 'yard', 'yardLevel', 'decorCount'];
 
 function isObject(value: unknown): value is Fields {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -105,6 +116,8 @@ function candidateView(f: Fields, house: Household) {
   Object.assign(f, {
     name: house.name, houseId: house.houseId, money: house.chest, store: { ...house.store }, door: house.door,
     ...house.traps, treasures: [...house.treasures], ancestors: [...house.ancestors],
+    yardLevel: house.yardLevel ?? 0,
+    decorCount: (house.decor ?? []).filter(Boolean).length + (house.plaque ? 1 : 0),
   });
 }
 
@@ -145,7 +158,12 @@ export function fromView(raw: Fields, base?: V4 | null): V4 {
   };
   if (Array.isArray(h.absencePeriods)) house.absencePeriods = h.absencePeriods;
   if (typeof h.absenceReadThrough === 'number') house.absenceReadThrough = count(h.absenceReadThrough);
-  if (isObject(h.stove)) house.stove = h.stove as unknown as StoveJob;
+  // 第四阶段的旧存档只有一口灶（stove），现在是每口灶一项（stoves）
+  if (Array.isArray(h.stoves)) house.stoves = h.stoves.map(j => (isObject(j) ? j as unknown as StoveJob : null));
+  else if (isObject(h.stove)) house.stoves = [h.stove as unknown as StoveJob];
+  if (typeof h.yardLevel === 'number') house.yardLevel = count(h.yardLevel);
+  if (Array.isArray(h.decor)) house.decor = h.decor.map(k => (typeof k === 'string' ? k as DecorKind : null));
+  if (h.plaque === true) house.plaque = true;
   if (isObject(h.request)) house.request = h.request as unknown as Request;
   if (isObject(h.nightReceipt)) {
     // v3 的旧回执已入账，只为原战报补编号。

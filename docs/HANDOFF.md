@@ -15,7 +15,7 @@
 | 在哪 | `docs/proto/loop/index.html`（一日一夜样机）、`docs/art/creator/index.html`（武林捏人台），都是单文件页面 | `src/core`（规则）、`src/sim`（模拟器）、`src/web`（网页壳）、`test/` |
 | 状态 | 能玩、有浏览器测试和难度模拟；规则写在页面的脚本里，还没进 `src/core` | 94 个测试全过；红线、存档、确定性随机这些底子以后还要用 |
 
-**下一步的大活**就是把样机里的规则搬进 `src/core/loop/`。顺序按 `docs/SESSION_REVIEW.md` 最后的分阶段表。第一阶段（时间、野外、五波守夜）已经做完，见 `docs/STAGE1_REPORT.md`；页面还没改成调用核心。第一晚只来普通鬼的小任务也做完了（11-21）。第二阶段（家的存档、两个口袋、一晚只结算一次）也做完了（11-22），见 `docs/qa/stage2/README.md`。第三阶段（交给机关守、不在线的晚上、回来时的摘要）也做完了（11-23），见 `docs/qa/stage3/README.md`；把握的公式和全表在 `docs/qa/stage3/ODDS.md`。第四阶段（灶台加工、邻居托付、每天的行情）也做完了（11-23，Claude 直接写的），见 `docs/qa/stage4/README.md`，规则在 `src/core/loop/trade.ts`。**接手的人注意：第四阶段的代码要用完整的项目压缩包交接。**
+**下一步的大活**就是把样机里的规则搬进 `src/core/loop/`。顺序按 `docs/SESSION_REVIEW.md` 最后的分阶段表。第一阶段（时间、野外、五波守夜）已经做完，见 `docs/STAGE1_REPORT.md`；页面还没改成调用核心。第一晚只来普通鬼的小任务也做完了（11-21）。第二阶段（家的存档、两个口袋、一晚只结算一次）也做完了（11-22），见 `docs/qa/stage2/README.md`。第三阶段（交给机关守、不在线的晚上、回来时的摘要）也做完了（11-23），见 `docs/qa/stage3/README.md`；把握的公式和全表在 `docs/qa/stage3/ODDS.md`。第四阶段（灶台加工、邻居托付、每天的行情）也做完了（11-23，Claude 直接写的），见 `docs/qa/stage4/README.md`，规则在 `src/core/loop/trade.ts`。第五阶段（扩院子、装饰、匾额、几口灶、给伴侣买礼物）和第六阶段（家、投胎、当厉鬼搬进核心）也做完了（11-24），见 `docs/qa/stage5`、`docs/qa/stage6`。**接手的人注意：第四阶段的代码要用完整的项目压缩包交接。**
 
 玩法的两把尺子（产品负责人定的，每个改动都拿它验收）：**一，玩家觉得爽；二，自由度尽可能高**（目标定死，方法放开）。
 
@@ -74,7 +74,7 @@ design/                   11 月 14 日的旧设计稿画布（有已删掉的�
 | 块 | 主要函数 | 说明 |
 | --- | --- | --- |
 | 设定 | `CFG`、`RINGS`、`DOORS`、`TRAPS`、`GHOSTS`、`NIGHT`、`PERKS`、`HAUNT`、`GRADES` | 所有数字都在这里 |
-| 院子（白天） | `renderHome`、`openMarket`、`openBuild`、`openFriends` | 卖货、修院子、交情 |
+| 院子（白天） | `renderHome`、`openMarket`、`openBuild`、`yardOffers`、`openArrange`、`openStove`、`openFriends` | 卖货、修院子（门、机关、扩院子、装饰、匾额）、摆设、灶台、交情。花钱修家的规则在 `src/core/loop/home.ts`，装饰的位置坐标在页面的 `DECOR_SLOTS` |
 | 野外（白天） | `renderMap`、`walkTo`、`gather`、`danger`、`knocked`、`dusk`、`goHome` | 三圈地图、天黑前回家 |
 | 家 | `offerMatch`、`takeDisciple`、`maybeBirth`、`openFamily`、`openHall`、`ownFamily` | 结缘、孩子、徒弟、祠堂。规则在 `src/core/loop/family.ts`，页面只起名字、画长相 |
 | 夜里守门 | `startNight`、`startWave`、`offerPerks`、`choosePerk`、`nightStep`、`hitAt`、`endNight` | 5 波，每波挑本事 |

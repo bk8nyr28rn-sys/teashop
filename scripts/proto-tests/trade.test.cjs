@@ -42,18 +42,18 @@ async function run(browser, width, height, entry) {
 
     // 第 3 天：灶台出现，念头提醒能生火
     await page.evaluate(async () => {
-      Object.assign(G, { day: 3, door: 1, guideHall: true, guideSoldDay: 3, chest: 50, purse: 0, goods: { 柴: 7 }, store: { 草药: 2 }, stove: null });
+      Object.assign(G, { day: 3, door: 1, guideHall: true, guideSoldDay: 3, chest: 50, purse: 0, goods: { 柴: 7 }, store: { 草药: 2 }, stoves: [] });
       await save(); render();
     });
     assert.equal(await page.locator('#thought').getAttribute('data-thought'), 'kiln');
     await page.locator('[data-a=stove]').click();
     assert.equal(await sheet().locator('[data-cook=salve][data-owner-cook=person]').isDisabled(), true);
     await sheet().locator('[data-cook=charcoal][data-owner-cook=person]').click();
-    assert.deepEqual(await page.evaluate(() => [G.goods.柴, G.stove.recipe, G.stove.owner]), [4, 'charcoal', 'person']);
+    assert.deepEqual(await page.evaluate(() => [G.goods.柴, G.stoves[0].recipe, G.stoves[0].owner]), [4, 'charcoal', 'person']);
     assert.match(await page.locator('[data-a=stove]').innerText(), /在烧木炭/);
     // 现实时间再久也不会好：刷新后还在烧
     await page.reload();
-    assert.equal(await page.evaluate(() => LoopCore.stoveStatus(G.stove, G.lifeId, G.day)), 'cooking');
+    assert.equal(await page.evaluate(() => LoopCore.stoveStatus(G.stoves[0], G.lifeId, G.day)), 'cooking');
     await page.screenshot({ path: path.join(OUT, `trade-yard-${width}.png`), animations: 'disabled' });
 
     // 过完一晚：第 4 天早上灶上的木炭好了
@@ -63,9 +63,9 @@ async function run(browser, width, height, entry) {
     assert.match(await page.locator('#thought-title').innerText(), /木炭烧好了/);
     await page.locator('[data-a=stove]').click();
     await button('取出来').click();
-    assert.deepEqual(await page.evaluate(() => [G.goods.木炭, !!G.stove]), [1, false]);
+    assert.deepEqual(await page.evaluate(() => [G.goods.木炭, LoopCore.stoveJobs(G).some(Boolean)]), [1, false]);
     await page.reload();
-    assert.deepEqual(await page.evaluate(() => [G.goods.木炭, !!G.stove]), [1, false]);
+    assert.deepEqual(await page.evaluate(() => [G.goods.木炭, LoopCore.stoveJobs(G).some(Boolean)]), [1, false]);
 
     // 第 4 天：集市里有行情标记和邻居托付；接下、凑够、交货
     await page.evaluate(async () => {
@@ -105,7 +105,7 @@ async function run(browser, width, height, entry) {
 
     // 攒天用完时：灶和托付都只能看
     await page.evaluate(async () => {
-      G.stove = { jobId: 'x', recipe: 'salve', owner: 'house', lifeId: G.lifeId, day: G.day };
+      G.stoves = [{ jobId: 'x', recipe: 'salve', owner: 'house', lifeId: G.lifeId, day: G.day }];
       G.phase = 'dawn'; G.bankedDays = 0; G.lastGrantDate = localDateKey(); G.nightReceipt = null; await save(); render();
     });
     assert.equal(await page.locator('[data-a=stove][disabled]').count(), 1);

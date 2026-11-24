@@ -5,7 +5,7 @@ const tests = [
   'creator.test.cjs', 'creator-fold.test.cjs', 'creator-draw.test.cjs',
   'creator-embed.test.cjs', 'creator-layers.test.cjs',
   'guidance.test.cjs', 'first-night.test.cjs', 'day-bank.test.cjs', 'day-field.test.cjs', 'riverside.test.cjs', 'day-market.test.cjs',
-  'pockets-mobile.test.cjs', 'trade.test.cjs', 'loop-family.test.cjs', 'loop-gate.test.cjs', 'night-receipt.test.cjs', 'auto-watch.test.cjs', 'afterlife.test.cjs', 'terms.test.cjs', 'loop.test.cjs',
+  'pockets-mobile.test.cjs', 'trade.test.cjs', 'home.test.cjs', 'loop-family.test.cjs', 'loop-gate.test.cjs', 'night-receipt.test.cjs', 'auto-watch.test.cjs', 'afterlife.test.cjs', 'terms.test.cjs', 'loop.test.cjs',
 ];
 let bad = 0;
 for (const t of tests) {

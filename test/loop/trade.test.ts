@@ -4,12 +4,12 @@ import { finishLife, fromView, toView } from '../../src/core/loop/household';
 import { makeHouse, makePerson } from '../../src/core/loop/state';
 import {
   TRADE, acceptRequest, canCook, collectStove, dayPrices, deliverRequest, offerFor, planDelivery, priceTrend,
-  requestBoard, startStove, stoveStatus, useHealing, type TradeHouse,
+  requestBoard, startStove, stoveJobs, stoveStatus, useHealing, type TradeHouse,
 } from '../../src/core/loop/trade';
 
 const NEIGHBORS = ['wang', 'li', 'zhao'];
 const LIFE = 'w/life-1';
-const house = (): ReturnType<typeof makeHouse> & TradeHouse => ({ ...makeHouse(), stove: null, request: null });
+const house = (): ReturnType<typeof makeHouse> & TradeHouse => ({ ...makeHouse(), request: null });
 
 describe('行情', () => {
   it('第 1 天固定基础价；之后每样货每天在八成到一成二之间', () => {
@@ -64,15 +64,15 @@ describe('灶台：过一夜就好', () => {
     p.goods = { 柴: 7 };
     expect(startStove(h, p, 'charcoal', 'person', { lifeId: LIFE, day: 3 })).toMatchObject({ recipe: 'charcoal', owner: 'person' });
     expect(p.goods).toEqual({ 柴: 4 });
-    expect(stoveStatus(h.stove, LIFE, 3)).toBe('cooking');
+    expect(stoveStatus(stoveJobs(h)[0], LIFE, 3)).toBe('cooking');
     // 现实里过多久都一样：只看游戏里的天
     expect(collectStove(h, p, { lifeId: LIFE, day: 3 })).toBeNull();
     expect(p.goods).toEqual({ 柴: 4 });
-    expect(stoveStatus(h.stove, LIFE, 4)).toBe('ready');
-    expect(collectStove(h, p, { lifeId: LIFE, day: 4 })).toEqual({ kind: '木炭', count: 1, owner: 'person' });
+    expect(stoveStatus(stoveJobs(h)[0], LIFE, 4)).toBe('ready');
+    expect(collectStove(h, p, { lifeId: LIFE, day: 4 })).toEqual({ kind: '木炭', count: 1, owner: 'person', index: 0 });
     expect(collectStove(h, p, { lifeId: LIFE, day: 4 })).toBeNull();
     expect(p.goods).toEqual({ 柴: 4, 木炭: 1 });
-    expect(h.stove).toBeNull();
+    expect(stoveJobs(h)).toEqual([null]);
   });
 
   it('用家里的料，成品进家里的仓库；料不够不能放；一次只能烧一锅', () => {
@@ -83,7 +83,7 @@ describe('灶台：过一夜就好', () => {
     expect(startStove(h, p, 'salve', 'house', { lifeId: LIFE, day: 2 })).not.toBeNull();
     expect(h.store).toEqual({ 柴: 3 });
     expect(startStove(h, p, 'charcoal', 'house', { lifeId: LIFE, day: 2 })).toBeNull();
-    expect(collectStove(h, p, { lifeId: LIFE, day: 3 })).toEqual({ kind: '金疮药', count: 1, owner: 'house' });
+    expect(collectStove(h, p, { lifeId: LIFE, day: 3 })).toEqual({ kind: '金疮药', count: 1, owner: 'house', index: 0 });
     expect([h.store, p.goods]).toEqual([{ 柴: 3, 金疮药: 1 }, { 草药: 1 }]);
   });
 
@@ -93,10 +93,10 @@ describe('灶台：过一夜就好', () => {
     startStove(view, view, 'charcoal', 'person', { lifeId: view.lifeId, day: 5 });
     finishLife(view, { name: '林一' });
     const saved = fromView(view);
-    expect(saved.houses[view.houseId]!.stove).toMatchObject({ recipe: 'charcoal', owner: 'person' });
+    expect(saved.houses[view.houseId]!.stoves?.[0]).toMatchObject({ recipe: 'charcoal', owner: 'person' });
     const h = saved.houses[view.houseId]!;
     const next = makePerson();
-    expect(collectStove(h, next, { lifeId: 'life-2', day: 1 })).toEqual({ kind: '木炭', count: 1, owner: 'house' });
+    expect(collectStove(h, next, { lifeId: 'life-2', day: 1 })).toEqual({ kind: '木炭', count: 1, owner: 'house', index: 0 });
     expect(h.store.木炭).toBe(1);
     expect(next.goods).toEqual({});
   });
@@ -182,10 +182,10 @@ describe('存档', () => {
     startStove(view, view, 'charcoal', 'person', { lifeId: view.lifeId, day: 3 });
     acceptRequest(view, view.lifeId, 3, NEIGHBORS);
     const saved = fromView(view);
-    expect(saved.houses[view.houseId]!.stove?.recipe).toBe('charcoal');
+    expect(saved.houses[view.houseId]!.stoves?.[0]?.recipe).toBe('charcoal');
     expect(saved.houses[view.houseId]!.request?.status).toBe('accepted');
-    expect('stove' in saved.person).toBe(false);
+    expect('stoves' in saved.person).toBe(false);
     const again = toView(saved);
-    expect([again.stove, again.request]).toEqual([view.stove, view.request]);
+    expect([again.stoves, again.request]).toEqual([view.stoves, view.request]);
   });
 });
