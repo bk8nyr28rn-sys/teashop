@@ -137,6 +137,9 @@ button:disabled { opacity: 0.45; cursor: not-allowed; }
 .talk-bubble { position: relative; flex: 1; margin: 0; background: var(--bg); border-radius: 14px 14px 14px 4px; padding: 9px 12px; font-size: 15px; line-height: 1.5; }
 .talk-bubble small { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
 .talk-bubble::before { content: ''; position: absolute; left: -7px; bottom: 10px; border: 7px solid transparent; border-right-color: var(--bg); border-left: 0; }
+/* 不在卡片里（例如奈何桥的面板上），气泡换成卡片的颜色，免得和底色一样 */
+#panel .talk-bubble { background: var(--panel); }
+#panel .talk-bubble::before { border-right-color: var(--panel); }
 .sh-btns button.reply { text-align: left; border-radius: 14px 14px 4px 14px; padding: 9px 14px; }
 .sh-btns button.reply.main small { color: inherit; opacity: 0.85; }
 .sh-btns .choice-back { min-height: 40px; background: transparent; border-style: dashed; }
@@ -1443,6 +1446,43 @@ function yardMore(left, toWharf, heals) {
 // ================= 和人说话 =================
 // 一个地方站一个人：说一句话，你用回话来选。台词看情况变；字要少，一句话，最多一行半
 const MERCHANT = { id: 'merchant', name: '钱掌柜', look: INSPIRE[3][1] };
+const CARPENTER = { id: 'carpenter', name: '鲁师傅 · 木匠', look: { ...INSPIRE[0][1], topColor: '#8A6A4C', trimColor: '#5A4632', weapon: 'none' } };
+const FERRYMAN = { id: 'ferryman', name: '摆渡人', look: { ...INSPIRE[1][1], hairColor: '#C9C4BC', topColor: '#5B5F6E', weapon: 'none' }, expr: 'calm', age: 'elder' };
+// 鲁师傅看情况说话：头一回认识、同一天又来、昨夜门破了、柴门、院墙空着、院子摆满了
+function carpenterLine() {
+  const nextDoor = DOORS[G.door + 1], last = lastNight();
+  if (!G.metCarpenter) return '我姓鲁，换门、装机关、扩院子，都找我。';
+  if (G.carpenterDay === G.day) return '还要添点啥？';
+  if (last && !last.won) return '昨夜门挨砸了吧？换扇结实的，夜里睡得踏实。';
+  if (G.door === 0) return LoopCore.quoteHome(G, G, DOORS[1].cost).shortfall
+    ? `柴门不经砸。攒够 ${DOORS[1].cost} 文，我给你换扇木门。` : `这扇柴门不经砸，${DOORS[1].cost} 文就能换木门。`;
+  if (Guidance.open(2) && !Object.values(G.traps).some(Boolean)) return '院墙上能装机关了，装好就能夜夜替你守门。';
+  if (Guidance.open(2) && LoopCore.decorSlots(G).every(Boolean) && LoopCore.nextYard(G)) return '院子摆得满当当了，再扩扩？';
+  return nextDoor ? `要修点啥？${nextDoor.name}可比现在这扇结实。` : '门已经是顶好的了。院子里还想添点啥？';
+}
+// 家和祠堂：有伴侣就是伴侣说话，没有就是祖宗
+function familyTalk() {
+  if (G.spouse) {
+    const last = lastNight();
+    const line = G.giftDay === G.day ? '这礼物我收着了，你有心。'
+      : G.bornToday === G.day ? '孩子今天可乖了，你抱抱。'
+      : last && !last.won ? '昨夜真吓人，门都破了。你没伤着吧？'
+      : { 相识: '你回来啦。', 知己: '今天累不累？歇会儿再出去。', 倾心: '院里的花开了，你看见没？', 挚爱: '有你在，夜里也不怕。' }[threadName(G.love)];
+    return talkHead({ id: 'spouse', name: `${G.spouse.name} · 红线${threadName(G.love)}`, look: G.spouse.look }, line);
+  }
+  const line = !Guidance.open(3) ? '等你长大些，再说成家的事。'
+    : G.kids.some(k => k.kind === '徒') ? '徒弟收得好，这家就有人接着。'
+    : '你长大了。想成家就找个有缘人；不想的话，收个徒弟也一样。';
+  return talkHead(ancestorNpc(), line);
+}
+// 摆渡人：看你这一世怎么过的
+function ferrymanLine(tier) {
+  const A = G.afterlife;
+  if (A?.kind === 'haunt' && A.won) return '身上还揣着抢来的东西？过了河就归你了。';
+  if (A?.kind === 'haunt' && A.caught) return '在葫芦里关了一阵吧？过河去，重新来过。';
+  if (G.kids.length) return '家里还有后人等你回去。回去，还是换户人家？';
+  return ['这一世过得紧巴，下一世好好来。挑一户吧。', '这一世过得踏实。过了河，挑户人家吧。', '你这一世积了不少德，好人家都等着你。'][tier];
+}
 function talkHead(npc, line) {
   const look = lookOf(npc.look);
   // 头像只露头和上身：人按原尺寸画，鬼也按原尺寸画在同一个位置
@@ -1744,6 +1784,8 @@ function paymentText({chest, purse, shortfall}) {
 }
 
 function openBuild() {
+  const line = carpenterLine();
+  if (!G.metCarpenter || G.carpenterDay !== G.day) { G.metCarpenter = true; G.carpenterDay = G.day; save(); }
   const next = DOORS[G.door + 1];
   const doorQuote = next && LoopCore.quoteHome(G, G, next.cost);
   const currentChance = LoopCore.defenseChance(G.day, G.door, G.traps);
@@ -1763,7 +1805,7 @@ function openBuild() {
   }).join('');
   sheet({
     title: '修院子', dismiss: true,
-    body: `<p>现在是<b>${DOORS[G.door].name}</b>，门血 ${DOORS[G.door].hp}。</p>
+    body: `${talkHead(CARPENTER, line)}<p>现在是<b>${DOORS[G.door].name}</b>，门血 ${DOORS[G.door].hp}。</p>
       ${next ? `<button type="button" class="big${doorQuote.shortfall ? '' : ' main'}" id="up-door"${doorQuote.shortfall ? ' disabled' : ''}>换成${next.name}（${next.cost} 文）<small>门血 ${next.hp} · ${paymentText(doorQuote)}</small><small>${preview(G.door + 1, G.traps)}</small></button>` : '<p class="note">已经是最气派的门了。</p>'}
       ${Guidance.open(2) ? `<div class="sub">机关</div><div class="trap-offers">${trapRows}</div>${yardOffers()}` : ''}`,
     buttons: [['回去', null]],
@@ -1811,7 +1853,6 @@ function openBuild() {
       });
     },
   });
-  Guidance.speak(Guidance.open(2) ? '院墙上能装机关了，装好就能夜夜替你守门。' : '攒够四十文，这道柴门就能换成木门。', true);
 }
 
 // 修院子里的「扩院子」和「装饰」两块（第 2 天起，和机关一起出现）
@@ -2211,7 +2252,7 @@ function openFamily() {
   const fam = G.kids.map((k) => `<li>${k.name}<span>${k.kind === '徒' ? '徒弟' : k.kind === '子' ? '儿子' : '女儿'} · ${k.grade}</span></li>`).join('');
   sheet({
     title: `${G.fam} · ${G.name}`, dismiss: true,
-    body: `<p>你出生时爹娘红线是<b>${G.thread}</b>，品级<b>${G.grade}</b>（强弱 ×${G.power}）。${G.own ? '你是回自己家投胎的。' : ''}</p>
+    body: `${familyTalk()}<p>你出生时爹娘红线是<b>${G.thread}</b>，品级<b>${G.grade}</b>（强弱 ×${G.power}）。${G.own ? '你是回自己家投胎的。' : ''}</p>
       <ul class="list">${G.parents.map((p) => `<li>${p.name}<span>${p.rel}</span></li>`).join('')}</ul>
       ${G.spouse ? `<div class="fr"><div class="fr-top"><b>${G.spouse.name}</b><span class="note">红线 ${threadName(G.love)}（${G.love}）</span></div><div class="fbar" role="img" aria-label="红线 ${G.love}"><i style="width:${G.love}%"></i><s style="left:20%"></s><s style="left:45%"></s><s style="left:70%"></s></div><p class="note">红线到知己以后会生孩子；越浓，孩子品级越好（最多差三成）。一辈子里最多到挚爱。</p></div>` : `<p class="note">${adult ? '还没牵红线。' : '长大以后可以结缘、收徒。'}</p>`}
       ${fam ? `<div class="sub">后人</div><ul class="list">${fam}</ul><p class="note">夜里，一家人会帮着守门。</p>` : ''}`,
@@ -2946,7 +2987,7 @@ function renderReborn() {
   const famCard = (f, i) => `<button type="button" class="big${i === 0 ? ' main' : ''}" data-fam="${i}">${f.own ? `回自己家投胎：做${f.parents[0].name}的孩子` : `投胎到${f.name}`}<small>${f.own ? `${LoopCore.YARD.levels[f.yardLevel || 0].name}${f.decorCount ? `（摆着 ${f.decorCount} 件东西）` : ''}、机关、宝物都还在；祠堂里挂着你的画像 · ` : ''}爹娘红线：${f.thread} · ${DOORS[f.door].name} · 钱箱 ${f.money} 文${f.crossbow ? ` · 弩机 ${f.crossbow}` : ''}${f.lamp ? ' · 灯笼串' : ''}${f.talisman ? ' · 镇宅符' : ''}${f.treasures.length ? ` · 宝物 ${f.treasures.length}` : ''}</small></button>`;
   const loot = G.afterlife && G.afterlife.won && G.afterlife.loot;
   const keep = NEIGHBORS.filter((n) => G.friends[n.id] >= CFG.helpAt);
-  $('panel').innerHTML = `<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>
+  $('panel').innerHTML = `${talkHead(FERRYMAN, ferrymanLine(R.tier))}<div class="where"><b>因果分 ${R.total}</b><span>${TIER_NAME[R.tier]}</span></div>
     <table class="kt"><tbody>${R.rows.map(([a, b, c]) => `<tr><td>${a}</td><td>${b}</td><td>${c > 0 ? '+' : ''}${c}</td></tr>`).join('')}<tr class="total"><td>合计</td><td></td><td>${R.total}</td></tr></tbody></table>
     <p class="note">${G.kids.length ? '回自己家可以挑一位后人，也可以去按因果分选出的另外两户人家。' : '你没有留下孩子或徒弟。这一世的宅子还在，只是没人住，院子会长草，东西和画像都留着。按因果分，系统给你三户人家挑。'}${loot ? `前世抢来的${loot.n}和 ${HAUNT.lootCoins} 文会跟着你。` : ''}${keep.length ? `${keep.map((n) => n.who).join('、')}和你交情深，下一世还记得你（交情留一半）。` : ''}</p>
     <div class="fams">${R.fams.map(famCard).join('')}</div>`;

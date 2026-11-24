@@ -53,8 +53,11 @@ function openReturnSummary(unread = false) {
   const facts = [won && `守住 ${won} 次`, broken && `门破 ${broken} 次`].filter(Boolean).join('，');
   const loss = chestLost ? `钱箱少了 ${chestLost} 文。` : '';
   const houseId = G.houseId;
+  // 祖宗说一句人话，数字写在下面的小字里
+  const line = !broken ? '你不在这些天，机关都守住了，放心。'
+    : chestLost ? '你不在的时候门破过，钱箱少了点，人都没事。' : '门破过，好在新家有保护，没丢东西。';
   sheet({ title: '你不在的这段日子', focusTitle: true,
-    body: `<p>离开 ${days} 天，鬼来砸了 ${raids} 次门。${facts}。${loss}</p><p>攒着的天：${G.bankedDays} / ${BANK_CAP}</p>`,
+    body: `${talkHead(ancestorNpc(), line)}<p class="note">离开 ${days} 天，鬼来砸了 ${raids} 次门。${facts}。${loss}</p><p class="note">攒着的天：${G.bankedDays} / ${BANK_CAP}</p>`,
     buttons: [['知道了', async () => {
       await withGameLock(() => {
         const latest = storedGame();

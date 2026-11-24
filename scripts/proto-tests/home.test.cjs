@@ -30,6 +30,8 @@ async function run(browser, width, height, entry) {
 
     // 修院子：买一盆盆栽、一棵桂花树（钱箱先付）
     await page.locator('[data-a=build]').click();
+    // 修院子是鲁师傅在说话；头一回认识，第二回同一天只说「还要添点啥？」
+    assert.match(await sheet().locator('[data-npc=carpenter]').innerText(), /我姓鲁/);
     assert.match(await sheet().innerText(), /扩院子[\s\S]*装饰[\s\S]*位置 0 \/ 3/);
     await noOverflow();
     await sheet().locator('[data-decor=pot]').click();
@@ -68,6 +70,8 @@ async function run(browser, width, height, entry) {
     // 给伴侣买礼物：只用钱袋，一天一次
     await page.evaluate(async () => { LoopCore.match(G, { name: '甲', look: randomLook() }); G.love = 30; await save(); render(); });
     await page.locator('[data-a=family]').click();
+    // 家和祠堂：有伴侣就是伴侣开口
+    assert.equal(await sheet().locator('[data-npc=spouse]').count(), 1);
     await sheetButton('送礼物').click();
     s = await state();
     assert.deepEqual([s.love, s.purse, s.chest], [38, 50, 0]);

@@ -38,6 +38,8 @@ const { ROOT } = require('./lib.cjs');
     assert.equal(rows.红线, 15);
     assert.equal(rows.养育, 10);
     assert.equal(rows.当护家神, undefined);
+    // 奈何桥是摆渡人在说话；有后人时他提起家里
+    assert.match(await page.locator('#panel [data-npc=ferryman]').innerText(), /后人等你回去/);
     // 有后人：第一张是回自家，后面两户
     assert.equal(await page.locator('[data-fam]').count(), 3);
     assert.match(await page.locator('[data-fam="0"]').innerText(), /回自己家投胎/);
