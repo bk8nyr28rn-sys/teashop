@@ -55,6 +55,9 @@ docs/
   proto/loop/index.html   一日一夜样机（新方向）
   art/creator/index.html  武林捏人台（新方向）
   ART_SPEC.md             美术规格（部分还是修仙时期写的，人物部分仍有用）
+  ART_ASSETS.md           给美工的美术需求清单：每个位置的编号、尺寸、文件名、提示词（11-24）
+  ART_INTEGRATION_SPEC.md 给 Codex 的美术接入任务：有图用图，没图照旧画色块
+  art/slots/              美术位置图（院子里每个位置的编号和大小）
   DESIGN_v2.1.md          最早的方案文档（很多已过时）
 scripts/
   proto-tests/            样机和捏人台的浏览器测试、难度模拟
