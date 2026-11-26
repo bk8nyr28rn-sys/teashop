@@ -1,0 +1,114 @@
+{
+  "common": {
+    "tagline": "A quiet place to be yourself.",
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "loading": "Loading…",
+    "language": "Language",
+    "comingSoon": "Coming soon"
+  },
+  "nav": {
+    "home": "Home",
+    "responder": "Responder desk",
+    "admin": "Admin"
+  },
+  "landing": {
+    "title": "A community for LGBTQ+ people, built around privacy.",
+    "body": "Join circles that fit you, share in a safe space, and reach real people when you need someone to talk to.",
+    "cta": "Get started",
+    "privacyTitle": "Privacy first",
+    "privacyPoints": [
+      "Use a nickname — your email is never shown.",
+      "We never ask you to state your orientation or identity.",
+      "No ad trackers. Delete your account and data any time."
+    ]
+  },
+  "signIn": {
+    "title": "Sign in or create an account",
+    "intro": "We'll email you a one-time code. No password needed.",
+    "emailLabel": "Email",
+    "sendCode": "Send code",
+    "codeLabel": "6-digit code",
+    "codeSent": "We sent a code to {email}.",
+    "verify": "Continue",
+    "useAnother": "Use a different email",
+    "errorGeneric": "Something went wrong. Please try again.",
+    "errorCode": "That code is invalid or has expired."
+  },
+  "onboarding": {
+    "title": "Join the community",
+    "intro": "Everyone here is either invited by a member or reviewed by our team. This keeps the space safe.",
+    "handleLabel": "Nickname (shown publicly)",
+    "handleHint": "3–20 characters: lowercase letters, numbers, underscore. Avoid your real name.",
+    "ageConfirm": "I confirm that I am {age} or older.",
+    "inviteTitle": "I have an invite code",
+    "inviteLabel": "Invite code",
+    "inviteSubmit": "Join with invite",
+    "applyTitle": "Apply to join",
+    "applyIntro": "Answer a few questions. A moderator reads them, then they are deleted — only the decision is kept.",
+    "questions": {
+      "why": "Why would you like to join?",
+      "lookingFor": "What are you hoping to find or share here?",
+      "guidelines": "In your own words: how will you help keep this space safe and respectful?"
+    },
+    "answerHint": "{min}–{max} characters.",
+    "applySubmit": "Submit application",
+    "rejectedNote": "Your previous application was not approved. You are welcome to apply again.",
+    "errors": {
+      "age-not-confirmed": "Please confirm your age.",
+      "invalid-handle": "That nickname is not valid.",
+      "handle-taken": "That nickname is already taken.",
+      "invalid-invite": "This invite code is invalid, used up or expired.",
+      "invalid-answers": "Please answer every question within the length limits.",
+      "not-allowed": "You can't do that right now."
+    }
+  },
+  "pending": {
+    "title": "Thanks — your application is in review",
+    "body": "A moderator will read it soon. If someone gives you an invite code meanwhile, you can use it right away.",
+    "useInvite": "I have an invite code"
+  },
+  "suspended": {
+    "title": "Your account is suspended",
+    "body": "If you believe this is a mistake, contact the moderation team."
+  },
+  "home": {
+    "title": "Welcome, {name}",
+    "trust": "Trust level {level}",
+    "circlesTitle": "Circles",
+    "circlesEmpty": "No circles yet.",
+    "visibility": {
+      "open": "Open",
+      "approval": "Request to join",
+      "invite": "Invite only"
+    },
+    "outcome": {
+      "already-member": "Joined",
+      "already-requested": "Requested",
+      "join": "Can join",
+      "request": "Can request",
+      "invite-only": "Invite only",
+      "trust-too-low": "Unlocks at a higher trust level",
+      "banned": "Unavailable",
+      "denied": "Unavailable"
+    },
+    "inviteTitle": "Invite someone",
+    "inviteBody": "Only invite people you know and trust. If they break the rules, it reflects on you.",
+    "inviteCreate": "Create invite code",
+    "inviteCreated": "New code (valid 7 days): {code}",
+    "inviteLocked": "You can invite others once you reach trust level 2."
+  },
+  "responder": {
+    "title": "Responder desk",
+    "body": "Paid questions assigned to you will appear here."
+  },
+  "admin": {
+    "title": "Admin",
+    "queueTitle": "Applications waiting for review",
+    "queueEmpty": "Nothing to review.",
+    "submitted": "Submitted {date}",
+    "approve": "Approve",
+    "reject": "Reject",
+    "decisionNote": "Answers are deleted as soon as you decide."
+  }
+}

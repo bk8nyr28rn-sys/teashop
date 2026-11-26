@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* Warm, low-key palette: comfortable to open in public, not loud. */
+:root {
+  --bg: #faf7f2;
+  --surface: #ffffff;
+  --ink: #2b2622;
+  --muted: #6f655c;
+  --line: #e7dfd5;
+  --accent: #7a5c99;
+  --accent-ink: #ffffff;
+  --danger: #b4443a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1b1917;
+    --surface: #24211e;
+    --ink: #eee7df;
+    --muted: #a99d91;
+    --line: #3a342f;
+    --accent: #b9a0d6;
+    --accent-ink: #1b1917;
+    --danger: #e0786e;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-danger: var(--danger);
+  /* System fonts only: no third-party font requests. */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+}

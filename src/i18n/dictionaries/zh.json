@@ -1,0 +1,114 @@
+{
+  "common": {
+    "tagline": "一个可以安心做自己的地方。",
+    "signIn": "登录",
+    "signOut": "退出登录",
+    "loading": "加载中…",
+    "language": "语言",
+    "comingSoon": "即将上线"
+  },
+  "nav": {
+    "home": "首页",
+    "responder": "答主工作台",
+    "admin": "管理后台"
+  },
+  "landing": {
+    "title": "一个以隐私为核心的 LGBTQ+ 社群。",
+    "body": "加入适合你的圈子，在安全的空间里分享；需要倾诉时，有真人在。",
+    "cta": "开始使用",
+    "privacyTitle": "隐私优先",
+    "privacyPoints": [
+      "使用昵称，你的邮箱永远不会被展示。",
+      "我们从不要求你声明性取向或身份。",
+      "没有广告追踪，随时可以注销账号并删除数据。"
+    ]
+  },
+  "signIn": {
+    "title": "登录或创建账号",
+    "intro": "我们会给你的邮箱发送一次性验证码，不需要密码。",
+    "emailLabel": "邮箱",
+    "sendCode": "发送验证码",
+    "codeLabel": "6 位验证码",
+    "codeSent": "验证码已发送至 {email}。",
+    "verify": "继续",
+    "useAnother": "换一个邮箱",
+    "errorGeneric": "出了点问题，请重试。",
+    "errorCode": "验证码无效或已过期。"
+  },
+  "onboarding": {
+    "title": "加入社群",
+    "intro": "这里的每个人都是由成员邀请，或经过团队审核加入的，这样才能保证空间安全。",
+    "handleLabel": "昵称（公开显示）",
+    "handleHint": "3–20 个字符：小写字母、数字、下划线。请不要使用真实姓名。",
+    "ageConfirm": "我确认自己已年满 {age} 岁。",
+    "inviteTitle": "我有邀请码",
+    "inviteLabel": "邀请码",
+    "inviteSubmit": "使用邀请码加入",
+    "applyTitle": "申请加入",
+    "applyIntro": "回答几个问题。版主阅读后会删除你的回答，只保留审核结果。",
+    "questions": {
+      "why": "你为什么想加入？",
+      "lookingFor": "你希望在这里找到或分享什么？",
+      "guidelines": "用你自己的话说说：你会怎样帮助这里保持安全和互相尊重？"
+    },
+    "answerHint": "{min}–{max} 个字符。",
+    "applySubmit": "提交申请",
+    "rejectedNote": "你之前的申请未通过，欢迎再次申请。",
+    "errors": {
+      "age-not-confirmed": "请确认你的年龄。",
+      "invalid-handle": "昵称格式不正确。",
+      "handle-taken": "这个昵称已被使用。",
+      "invalid-invite": "邀请码无效、已用完或已过期。",
+      "invalid-answers": "请回答所有问题，并注意字数要求。",
+      "not-allowed": "当前无法进行这个操作。"
+    }
+  },
+  "pending": {
+    "title": "谢谢，你的申请正在审核中",
+    "body": "版主很快会阅读你的申请。如果这期间有人给了你邀请码，可以直接使用。",
+    "useInvite": "我有邀请码"
+  },
+  "suspended": {
+    "title": "你的账号已被停用",
+    "body": "如果你认为这是误判，请联系管理团队。"
+  },
+  "home": {
+    "title": "欢迎，{name}",
+    "trust": "信任等级 {level}",
+    "circlesTitle": "圈子",
+    "circlesEmpty": "还没有圈子。",
+    "visibility": {
+      "open": "公开",
+      "approval": "需申请",
+      "invite": "仅限邀请"
+    },
+    "outcome": {
+      "already-member": "已加入",
+      "already-requested": "已申请",
+      "join": "可加入",
+      "request": "可申请",
+      "invite-only": "仅限邀请",
+      "trust-too-low": "信任等级更高后解锁",
+      "banned": "不可用",
+      "denied": "不可用"
+    },
+    "inviteTitle": "邀请朋友",
+    "inviteBody": "只邀请你认识并信任的人。如果对方违反规则，你的信誉也会受影响。",
+    "inviteCreate": "生成邀请码",
+    "inviteCreated": "新邀请码（7 天内有效）：{code}",
+    "inviteLocked": "达到信任等级 2 后才能邀请他人。"
+  },
+  "responder": {
+    "title": "答主工作台",
+    "body": "分配给你的付费问题会显示在这里。"
+  },
+  "admin": {
+    "title": "管理后台",
+    "queueTitle": "待审核的申请",
+    "queueEmpty": "暂时没有需要审核的申请。",
+    "submitted": "提交于 {date}",
+    "approve": "通过",
+    "reject": "拒绝",
+    "decisionNote": "一旦你做出决定，申请回答会立即删除。"
+  }
+}
