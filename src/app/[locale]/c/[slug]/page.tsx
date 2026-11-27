@@ -2,11 +2,12 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getDb } from "@/db";
-import { format, getDictionary, getLocale } from "@/i18n/dictionaries";
+import { getDictionary, getLocale } from "@/i18n/dictionaries";
 import { requireArea } from "@/lib/dal";
 import { listCirclePosts, loadCircle } from "@/lib/community";
 import { can } from "@/lib/permissions";
 import { ui } from "@/components/ui";
+import { PostCard } from "@/components/post-card";
 import { joinAction, leaveAction } from "../actions";
 import { PostForm } from "../forms";
 
@@ -27,7 +28,6 @@ async function CircleView({ params }: Pick<PageProps<"/[locale]/c/[slug]">, "par
   if (!loaded) notFound();
   const { circle: c, access } = loaded;
   const t = dict.circle;
-  const dateFmt = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
   const posts = access.canRead ? await listCirclePosts(db, c.id) : [];
   const m = access.membership;
 
@@ -71,7 +71,7 @@ async function CircleView({ params }: Pick<PageProps<"/[locale]/c/[slug]">, "par
         (can(viewer.profile, "post") ? (
           <PostForm locale={locale} circleId={c.id} slug={c.slug} t={t} errors={dict.errors} />
         ) : (
-          <p className={ui.card}>{t.postLocked}</p>
+          <p className={ui.notice}>{t.postLocked}</p>
         ))}
       {access.canRead && !access.canWrite && <p className={ui.muted}>{t.mustJoin}</p>}
 
@@ -81,19 +81,13 @@ async function CircleView({ params }: Pick<PageProps<"/[locale]/c/[slug]">, "par
           <ul className="grid gap-3">
             {posts.map((p) => (
               <li key={p.id}>
-                <Link href={`/${locale}/c/${c.slug}/p/${p.id}`} className={`${ui.card} block hover:border-accent`}>
-                  <h3 className="font-medium">{p.title}</h3>
-                  <p className="mt-1 text-xs text-muted">
-                    {format(t.by, { handle: p.authorHandle ?? "?" })} · {dateFmt.format(p.createdAt)} ·{" "}
-                    {format(t.comments, { n: p.comments })}
-                  </p>
-                </Link>
+                <PostCard post={p} href={`/${locale}/c/${c.slug}/p/${p.id}`} locale={locale} dict={dict} />
               </li>
             ))}
           </ul>
         </section>
       ) : (
-        <p className={ui.card}>{t.privateNotice}</p>
+        <p className={`${ui.panel} text-sm`}>{t.privateNotice}</p>
       )}
     </div>
   );

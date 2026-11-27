@@ -1,45 +1,113 @@
 @import "tailwindcss";
 
-/* Warm, low-key palette: comfortable to open in public, not loud. */
+/*
+ * Design tokens. Direction: "a warm, quiet shelter" — paper-warm neutrals,
+ * deep plum accent, soft depth. Calm enough to open on a bus.
+ */
 :root {
-  --bg: #faf7f2;
-  --surface: #ffffff;
-  --ink: #2b2622;
-  --muted: #6f655c;
-  --line: #e7dfd5;
-  --accent: #7a5c99;
+  --bg: #f7f3ee;
+  --surface: #fffdfa;
+  --surface-2: #f1ebe3;
+  --ink: #27221f;
+  --muted: #6e645b;
+  --line: #e6ddd2;
+  --accent: #6b4f8f;
+  --accent-strong: #573c78;
+  --accent-soft: #eee6f6;
   --accent-ink: #ffffff;
   --danger: #b4443a;
+  --danger-soft: #f8e7e4;
+  --success: #2f7a5b;
+  --success-soft: #e3f2ea;
+  --warn: #9a5f0e;
+  --warn-soft: #fbf0dc;
+  --shadow: 0 1px 2px rgb(39 34 31 / 0.04), 0 4px 16px rgb(39 34 31 / 0.04);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #1b1917;
-    --surface: #24211e;
-    --ink: #eee7df;
+    --bg: #171514;
+    --surface: #211e1c;
+    --surface-2: #2a2624;
+    --ink: #efe8e0;
     --muted: #a99d91;
-    --line: #3a342f;
+    --line: #37312d;
     --accent: #b9a0d6;
-    --accent-ink: #1b1917;
+    --accent-strong: #cdb8e6;
+    --accent-soft: #2f2738;
+    --accent-ink: #171514;
     --danger: #e0786e;
+    --danger-soft: #3a2422;
+    --success: #6fc29d;
+    --success-soft: #1f3129;
+    --warn: #e0ad5e;
+    --warn-soft: #362b19;
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3);
   }
 }
 
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-ink: var(--ink);
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-accent-soft: var(--accent-soft);
   --color-accent-ink: var(--accent-ink);
   --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --shadow-soft: var(--shadow);
   /* System fonts only: no third-party font requests. */
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Noto Sans SC", sans-serif;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Noto Sans SC",
+    "Microsoft YaHei", sans-serif;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+p {
+  text-wrap: pretty;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Space for the mobile tab bar + iOS home indicator. */
+.pb-tabbar {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom));
+}
+@media (min-width: 640px) {
+  .pb-tabbar {
+    padding-bottom: 2rem;
+  }
 }

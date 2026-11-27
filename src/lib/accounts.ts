@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, ilike, inArray, ne, sql } from "drizzle-orm";
 import type { Db } from "@/db";
-import { auditLog, comment, post, profile, session, user, verification } from "@/db/schema";
+import { auditLog, comment, post, profile, question, session, user, verification } from "@/db/schema";
 import { canEnterMemberArea, type Viewer } from "./permissions";
+import { releasePendingQuestionsFor } from "./qa";
 
 /**
  * Account-level safety actions: platform suspension, self-service deletion,
@@ -47,6 +48,33 @@ export async function suspendUser(
       targetId: input.userId,
       meta: input.reason?.trim() ? { reason: input.reason.trim().slice(0, 500) } : null,
     });
+  });
+  // Pending paid questions involving them expire at the next sweep (holds released).
+  await releasePendingQuestionsFor(db, input.userId);
+  return { ok: true };
+}
+
+/** Admin: appoint or remove a responder. Admin roles are only changed via the CLI. */
+export async function setResponderRole(
+  db: Db,
+  actor: Actor,
+  input: { userId: string; responder: boolean },
+): Promise<{ ok: true } | Fail> {
+  if (!isAdmin(actor)) return fail("forbidden");
+  const [target] = await db.select().from(profile).where(eq(profile.userId, input.userId));
+  if (!target || target.status !== "approved") return fail("not-found");
+  if (target.role === "admin") return fail("cannot-target-admin");
+  await db
+    .update(profile)
+    .set({ role: input.responder ? "responder" : "member" })
+    .where(eq(profile.userId, input.userId));
+  if (!input.responder) await releasePendingQuestionsFor(db, input.userId);
+  await db.insert(auditLog).values({
+    id: randomUUID(),
+    actorId: actor.userId,
+    action: input.responder ? "user.responder.added" : "user.responder.removed",
+    targetType: "user",
+    targetId: input.userId,
   });
   return { ok: true };
 }
@@ -138,6 +166,17 @@ export async function deleteAccount(db: Db, userId: string): Promise<{ ok: true 
       .update(comment)
       .set({ body: "", removedAt: sql`coalesce(${comment.removedAt}, now())`, removal: "author" })
       .where(eq(comment.authorId, userId));
+    // Paid questions they asked: erase the texts, keep amounts for accounting.
+    await tx
+      .update(question)
+      .set({ title: "", body: "", answer: null, feedback: null, disputeReason: null })
+      .where(eq(question.askerId, userId));
+    await tx
+      .update(question)
+      .set({ deadlineAt: sql`now()` })
+      .where(
+        and(eq(question.status, "open"), sql`(${question.askerId} = ${userId} or ${question.responderId} = ${userId})`),
+      );
     await tx.delete(verification).where(
       inArray(
         verification.identifier,

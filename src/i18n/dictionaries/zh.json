@@ -13,10 +13,14 @@
     "admin": "管理后台",
     "settings": "设置",
     "mfaSetup": "设置两步验证",
-    "mfaVerify": "完成两步验证"
+    "mfaVerify": "完成两步验证",
+    "circles": "圈子",
+    "ask": "倾诉",
+    "me": "我的",
+    "help": "需要立即帮助？"
   },
   "landing": {
-    "title": "一个以隐私为核心的 LGBTQ+ 社群。",
+    "title": "一个可以安心做自己的地方。",
     "body": "加入适合你的圈子，在安全的空间里分享；需要倾诉时，有真人在。",
     "cta": "开始使用",
     "privacyTitle": "隐私优先",
@@ -24,6 +28,23 @@
       "使用昵称，你的邮箱永远不会被展示。",
       "我们从不要求你声明性取向或身份。",
       "没有广告追踪，随时可以注销账号并删除数据。"
+    ],
+    "eyebrow": "一个私密的 LGBTQ+ 社群",
+    "ctaInvite": "我有邀请码",
+    "footnote": "通过邀请或审核加入。",
+    "features": [
+      {
+        "title": "适合你的圈子",
+        "body": "加入公开圈子，或申请进入私密圈子。你只会看到和自己相关的内容。"
+      },
+      {
+        "title": "有真人倾听",
+        "body": "私下向可信赖的答主提问，对方永远不知道你是谁。"
+      },
+      {
+        "title": "隐私是设计出来的",
+        "body": "只用昵称，没有广告追踪，不保存 IP。随时可以删除一切。"
+      }
     ]
   },
   "signIn": {
@@ -266,5 +287,136 @@
   "goodbye": {
     "title": "你的账号已注销",
     "body": "你的帖子和评论已被抹除。谢谢你曾经是这个社群的一员，请好好照顾自己。"
+  },
+  "circlesPage": {
+    "title": "圈子",
+    "intro": "公开圈子所有成员都能看到；私密圈子只有圈内成员能看到。"
+  },
+  "me": {
+    "myQuestions": "我的提问",
+    "settings": "设置",
+    "security": "两步验证",
+    "responderDesk": "答主工作台",
+    "responderProfile": "答主资料",
+    "admin": "管理后台",
+    "staffTitle": "工作人员",
+    "invite": "邀请朋友",
+    "help": "支持资源"
+  },
+  "help": {
+    "title": "你并不孤单",
+    "intro": "如果你正处于危险中，或者有伤害自己的念头，请现在就联系危机热线。热线是免费且保密的，他们每天都在陪伴和你有同样感受的人。",
+    "emergency": "如有紧急危险，请立即拨打当地紧急电话（中国大陆：110 / 120）。",
+    "resourcesTitle": "危机热线",
+    "note": "本站答主是分享亲身经历的同伴，不是危机干预人员。"
+  },
+  "qa": {
+    "title": "找人聊聊",
+    "intro": "私下向答主提问。只有对方在 48 小时内回答后才会扣款，否则卡上冻结的金额会自动释放。",
+    "anonymity": "答主看不到你的昵称和邮箱。",
+    "disclaimer": "答主是分享亲身经历的社群成员，不是心理咨询师、医生或律师，也不提供危机干预。",
+    "empty": "目前没有可以提问的答主，请稍后再来。",
+    "unavailable": "付费问答暂未开放。",
+    "choose": "提问",
+    "price": "每个问题 {price}",
+    "myQuestions": "我的提问",
+    "composeTitle": "向 @{handle} 提问",
+    "titleLabel": "简短标题",
+    "bodyLabel": "你的问题",
+    "bodyHint": "按你觉得舒服的程度分享。请不要写真实姓名、地点或任何可能暴露身份的信息。",
+    "pay": "继续付款 · {price}",
+    "how": ["你的卡只会被预授权，不会立即扣款。", "答主有 48 小时回答。", "收到回答后才会真正扣款。"],
+    "crisisTitle": "继续之前",
+    "crisisBody": "听起来你可能正在经历非常艰难的时刻。你值得马上得到支持——危机热线今天就可以和你聊，而且是免费的。",
+    "crisisAck": "我现在是安全的，想继续提问",
+    "crisisHelpLink": "查看全部支持资源",
+    "status": {
+      "awaiting_payment": "等待付款",
+      "open": "等待回答",
+      "answered": "已回答",
+      "expired": "已过期 · 未扣款",
+      "cancelled": "已撤回 · 未扣款",
+      "refunded": "已退款"
+    },
+    "dueBy": "最晚 {date} 前回答",
+    "yourQuestion": "你的问题",
+    "answer": "回答",
+    "from": "由 @{handle} 回答",
+    "waiting": "正在等待回答。收到回答后才会扣款。",
+    "checkoutDone": "预授权成功，问题已发送。",
+    "checkoutPending": "正在确认付款……请稍后刷新。",
+    "checkoutCancelled": "付款已取消，未扣任何费用。",
+    "cancel": "撤回问题",
+    "rateTitle": "这个回答对你有帮助吗？",
+    "feedbackLabel": "还有什么想说的吗？（可选，仅团队可见）",
+    "rate": "提交评分",
+    "rated": "谢谢你的反馈。",
+    "disputeTitle": "回答有问题？",
+    "disputeLabel": "告诉我们发生了什么",
+    "dispute": "申请复核",
+    "disputed": "团队正在复核。",
+    "disputeResolved": "复核已结束。",
+    "crisisBanner": "检测到危机相关用语。请先表达关怀，提供危机资源，不要给出医疗建议。",
+    "answerLabel": "你的回答",
+    "answerHint": "{min}–{max} 个字符。发送后会向提问者扣款。",
+    "submitAnswer": "发送回答",
+    "anonymousAsker": "匿名成员",
+    "youEarn": "你将获得 {amount}",
+    "myQuestionsEmpty": "你还没有提问。",
+    "queueTitle": "等你回答",
+    "queueEmpty": "目前没有待回答的问题。",
+    "historyTitle": "最近",
+    "profileTitle": "答主资料",
+    "profileIntro": "设置一句话介绍、擅长话题和价格。设置好收款后才能接受提问。",
+    "headline": "一句话介绍",
+    "bio": "关于你",
+    "topicsLabel": "擅长话题",
+    "languagesLabel": "语言",
+    "priceLabel": "每个问题价格（美元）",
+    "priceHint": "在 {min} 到 {max} 之间，平台收取 {fee}%。",
+    "accepting": "接受新提问",
+    "save": "保存资料",
+    "saved": "已保存。",
+    "payoutsTitle": "收款",
+    "payoutsReady": "收款已设置。",
+    "payoutsNotReady": "通过 Stripe 设置收款后才能收到钱。",
+    "payoutsButton": "设置收款",
+    "devNote": "开发模式：付款为模拟。",
+    "devCheckoutTitle": "模拟付款",
+    "devCheckoutBody": "仅开发环境使用，不涉及真实银行卡。",
+    "devAuthorize": "预授权 {price}",
+    "disputesTitle": "问答复核",
+    "disputesEmpty": "暂无待复核的问答。",
+    "refund": "退款",
+    "keep": "维持扣款",
+    "makeResponder": "设为答主",
+    "removeResponder": "取消答主",
+    "topics": {
+      "coming-out": "出柜",
+      "relationships": "感情关系",
+      "family": "家庭",
+      "identity": "身份认同",
+      "gender": "性别",
+      "wellbeing": "身心状态",
+      "work-school": "工作与学业",
+      "other": "其他"
+    },
+    "languages": {
+      "en": "English",
+      "zh": "中文"
+    },
+    "errors": {
+      "forbidden": "你没有权限进行这个操作。",
+      "not-found": "这个问题不存在或无法查看。",
+      "invalid-input": "请检查填写内容的长度。",
+      "unavailable": "这位答主目前无法接受提问。",
+      "self": "不能向自己提问。",
+      "crisis-check": "请先阅读支持信息。",
+      "too-many-open": "你已经有 3 个进行中的提问。",
+      "payouts-not-ready": "请先设置收款。",
+      "expired": "这个问题已过期。",
+      "payment-failed": "付款未能完成，没有向任何人扣款。",
+      "already-done": "这个问题已经结束。"
+    }
   }
 }

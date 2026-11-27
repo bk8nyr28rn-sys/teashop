@@ -1,65 +1,59 @@
 import Link from "next/link";
-import { siteConfig } from "@/config/site";
 import { getDictionary, getLocale } from "@/i18n/dictionaries";
 import { getViewer } from "@/lib/dal";
-import { canEnterAdminArea, canEnterMemberArea, canEnterResponderArea } from "@/lib/permissions";
+import { canEnterMemberArea } from "@/lib/permissions";
 import { LocaleSwitcher } from "./locale-switcher";
+import { Logo } from "./logo";
+import { BottomNav, TopNav, type NavItem } from "./nav";
 import { SignOutButton } from "./sign-out-button";
+import { ui } from "./ui";
 
 /** Reads the session, so it must render inside a <Suspense> boundary. */
 export async function SiteHeader() {
   const [locale, dict, viewer] = await Promise.all([getLocale(), getDictionary(), getViewer()]);
-  const p = viewer?.profile ?? null;
-  const link = "whitespace-nowrap text-sm text-muted hover:text-ink";
+  const member = canEnterMemberArea(viewer?.profile ?? null);
+  const items: NavItem[] = member
+    ? [
+        { href: `/${locale}/home`, label: dict.nav.home, icon: "home" },
+        { href: `/${locale}/circles`, label: dict.nav.circles, icon: "circles" },
+        { href: `/${locale}/ask`, label: dict.nav.ask, icon: "ask" },
+        { href: `/${locale}/me`, label: dict.nav.me, icon: "me" },
+      ]
+    : [];
+  const needsMfa = viewer?.staffMfa === "setup" || viewer?.staffMfa === "verify";
 
   return (
-    <header className="border-b border-line">
-      <div className="mx-auto flex max-w-2xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-        <Link href={`/${locale}`} className="font-semibold">
-          {siteConfig.name}
-        </Link>
-        {/* On phones the nav drops to its own row so nothing is cut off. */}
-        <nav className="order-last flex w-full items-center gap-4 overflow-x-auto sm:order-none sm:w-auto sm:flex-1">
-          {canEnterMemberArea(p) && (
-            <Link className={link} href={`/${locale}/home`}>
-              {dict.nav.home}
-            </Link>
-          )}
-          {canEnterResponderArea(p) && (
-            <Link className={link} href={`/${locale}/responder`}>
-              {dict.nav.responder}
-            </Link>
-          )}
-          {canEnterAdminArea(p) && (
-            <Link className={link} href={`/${locale}/admin`}>
-              {dict.nav.admin}
-            </Link>
-          )}
-          {(viewer?.staffMfa === "setup" || viewer?.staffMfa === "verify") && (
-            <Link
-              className="whitespace-nowrap rounded-full border border-danger px-2 py-0.5 text-xs text-danger"
-              href={`/${locale}/settings/security`}
-            >
-              {viewer.staffMfa === "setup" ? dict.nav.mfaSetup : dict.nav.mfaVerify}
-            </Link>
-          )}
-          {viewer && (
-            <Link className={link} href={`/${locale}/settings`}>
-              {dict.nav.settings}
-            </Link>
-          )}
-        </nav>
-        <div className="ml-auto flex items-center gap-3">
-          <LocaleSwitcher current={locale} label={dict.common.language} />
-          {viewer ? (
-            <SignOutButton locale={locale} label={dict.common.signOut} />
-          ) : (
-            <Link className={link} href={`/${locale}/sign-in`}>
-              {dict.common.signIn}
-            </Link>
-          )}
+    <>
+      <header className="sticky top-0 z-30 border-b border-line/70 bg-bg/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
+          <Link href={`/${locale}${member ? "/home" : ""}`} aria-label="Home">
+            <Logo />
+          </Link>
+          <TopNav items={items} />
+          <div className="ml-auto flex items-center gap-2">
+            {needsMfa && (
+              <Link className={ui.badgeDanger} href={`/${locale}/settings/security`}>
+                {viewer.staffMfa === "setup" ? dict.nav.mfaSetup : dict.nav.mfaVerify}
+              </Link>
+            )}
+            <LocaleSwitcher current={locale} label={dict.common.language} />
+            {!viewer && (
+              <Link className={`${ui.button} min-h-9 px-4 text-sm`} href={`/${locale}/sign-in`}>
+                {dict.common.signIn}
+              </Link>
+            )}
+            {viewer && !member && (
+              <>
+                <Link className={ui.buttonSmall} href={`/${locale}/settings`}>
+                  {dict.nav.settings}
+                </Link>
+                <SignOutButton locale={locale} label={dict.common.signOut} />
+              </>
+            )}
+          </div>
         </div>
-      </div>
-    </header>
+      </header>
+      {member && <BottomNav items={items} />}
+    </>
   );
 }

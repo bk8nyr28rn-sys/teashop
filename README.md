@@ -1,7 +1,7 @@
 # Qijian (working title)
 
 A privacy-first community for LGBTQ+ people, with paid emotional-support Q&A answered by real people.
-**Status: early build** — accounts, membership gating, circles, posts, comments, reports, moderation and account safety (staff 2FA, suspension, deletion) work end-to-end; payments are next.
+**Status: early build** — accounts, membership gating, circles, posts, comments, moderation, account safety and paid Q&A (Stripe Connect) work end-to-end.
 
 ## Stack
 
@@ -12,7 +12,8 @@ A privacy-first community for LGBTQ+ people, with paid emotional-support Q&A ans
 | Auth | Better Auth, passwordless email one-time codes; TOTP step-up for staff |
 | i18n | Built-in dictionaries + `next/root-params` (`/en`, `/zh`) |
 | Styling | Tailwind CSS 4, system fonts only |
-| Tests | Vitest (unit + real-Postgres integration) |
+| Payments | Stripe Connect (Express), manual-capture destination charges; fake provider in dev |
+| Tests | Vitest (unit + real-Postgres integration + Stripe SDK against a mock server) |
 
 > Next.js 16 differs from older versions: `middleware.ts` is now `src/proxy.ts`, and anything reading the session must render inside `<Suspense>`. Read `node_modules/next/dist/docs/` before changing routing or caching.
 
@@ -74,6 +75,13 @@ sign in (email code) → onboarding ─┬─ invite code ───────�
 - **Sign out other devices** from Settings.
 - **Account deletion** from Settings (also available while suspended): requires a sign-in from the last 15 minutes and typing your nickname. Post/comment text is erased and left as "deleted by the author" tombstones so others' replies survive; everything else cascades.
 
+## Paid Q&A
+
+- Members ask an available responder privately; **responders never see who asked**.
+- Card is authorised at checkout, **captured only when the answer is delivered**, released if unanswered in 48 h. Platform fee via `application_fee_amount`; disputes reviewed by admins can refund (reversing the transfer).
+- Crisis language (`src/lib/crisis.ts`) shows crisis lines before any payment and flags the question for the responder. `/help` lists support lines on every page.
+- Without `STRIPE_SECRET_KEY`, development uses a fake provider with a simulated checkout page (`/dev/checkout/…`); production shows Q&A as unavailable.
+
 ## Privacy decisions (do not regress)
 
 - No orientation / gender-identity column anywhere. Belonging = circle membership.
@@ -96,6 +104,9 @@ src/
   lib/community.ts     circles, posts, comments, reports, trust refresh (integration-tested)
   lib/mfa.ts           staff TOTP enrolment / step-up
   lib/accounts.ts      suspension, sign-out-others, account deletion
+  lib/qa.ts            paid Q&A lifecycle (ask, authorise, answer+capture, expire, dispute)
+  lib/payments/        PaymentProvider interface, Stripe and fake implementations
+  lib/crisis.ts        crisis-language detection and support lines
   lib/dal.ts           session → viewer; the only place that reads auth (applies the 2FA downgrade)
   i18n/                locale config and en/zh dictionaries
   proxy.ts             locale redirect + optimistic auth gate
@@ -107,4 +118,4 @@ docs/DEPLOY.md         production deployment guide
 
 ## Not built yet
 
-Editing posts, notifications, 2FA for circle moderators, a data export, optional evidence upload (schema fields exist; must auto-delete after review), passkeys, the paid Q&A flow (Stripe Connect), crisis-keyword safety prompts, and the low-profile ("discreet") mode.
+Editing posts, notifications, 2FA for circle moderators, a data export, follow-up messages on paid questions, payout dashboards for responders, optional evidence upload (schema fields exist; must auto-delete after review), passkeys, and the low-profile ("discreet") mode.

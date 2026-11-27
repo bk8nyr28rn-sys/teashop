@@ -32,6 +32,20 @@ export function productionEnvErrors(env: Record<string, string | undefined>): st
     !!env.EMAIL_FROM?.includes("@"),
     'e.g. "Account <no-reply@your-domain>" on a domain verified in Resend',
   );
+  // Paid Q&A is optional; when Stripe is configured the rest must be too.
+  if (env.STRIPE_SECRET_KEY) {
+    need(
+      "STRIPE_SECRET_KEY",
+      /^(sk|rk)_(live|test)_/.test(env.STRIPE_SECRET_KEY),
+      "must be a Stripe secret or restricted key",
+    );
+    need(
+      "STRIPE_WEBHOOK_SECRET",
+      !!env.STRIPE_WEBHOOK_SECRET && env.STRIPE_WEBHOOK_SECRET.split(",").every((x) => x.trim().startsWith("whsec_")),
+      "copy the signing secret of the webhook endpoint",
+    );
+    need("CRON_SECRET", (env.CRON_SECRET?.length ?? 0) >= 16, "16+ random characters; used by the hold-release cron");
+  }
   return errors;
 }
 

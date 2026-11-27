@@ -13,10 +13,14 @@
     "admin": "Admin",
     "settings": "Settings",
     "mfaSetup": "Set up 2FA",
-    "mfaVerify": "Verify 2FA"
+    "mfaVerify": "Verify 2FA",
+    "circles": "Circles",
+    "ask": "Ask",
+    "me": "Me",
+    "help": "Need help now?"
   },
   "landing": {
-    "title": "A community for LGBTQ+ people, built around privacy.",
+    "title": "A quiet place to be yourself.",
     "body": "Join circles that fit you, share in a safe space, and reach real people when you need someone to talk to.",
     "cta": "Get started",
     "privacyTitle": "Privacy first",
@@ -24,6 +28,23 @@
       "Use a nickname — your email is never shown.",
       "We never ask you to state your orientation or identity.",
       "No ad trackers. Delete your account and data any time."
+    ],
+    "eyebrow": "A private community for LGBTQ+ people",
+    "ctaInvite": "I have an invite",
+    "footnote": "Joining is by invitation or review.",
+    "features": [
+      {
+        "title": "Circles that fit you",
+        "body": "Join open circles or request access to private ones. You only see what's relevant to you."
+      },
+      {
+        "title": "Real people to talk to",
+        "body": "Ask a trusted responder privately. They never see who you are."
+      },
+      {
+        "title": "Privacy by design",
+        "body": "Nicknames only, no ad trackers, no stored IPs. Delete everything any time."
+      }
     ]
   },
   "signIn": {
@@ -266,5 +287,140 @@
   "goodbye": {
     "title": "Your account has been deleted",
     "body": "Your posts and comments have been erased. Thank you for being part of this community — take good care of yourself."
+  },
+  "circlesPage": {
+    "title": "Circles",
+    "intro": "Open circles are visible to every member. Private circles are only visible to the people inside."
+  },
+  "me": {
+    "myQuestions": "My questions",
+    "settings": "Settings",
+    "security": "Two-factor authentication",
+    "responderDesk": "Responder desk",
+    "responderProfile": "Responder profile",
+    "admin": "Admin",
+    "staffTitle": "Staff",
+    "invite": "Invite someone",
+    "help": "Support resources"
+  },
+  "help": {
+    "title": "You're not alone",
+    "intro": "If you're in danger or thinking about hurting yourself, please reach out to a crisis line now. They're free and confidential, and they talk with people every day who feel the way you do.",
+    "emergency": "In immediate danger? Call your local emergency number.",
+    "resourcesTitle": "Crisis lines",
+    "note": "Responders on this site are peers sharing lived experience, not crisis counsellors."
+  },
+  "qa": {
+    "title": "Talk to someone",
+    "intro": "Ask a responder privately. You're only charged if they answer within 48 hours — otherwise the hold on your card is released.",
+    "anonymity": "Responders never see your nickname or email.",
+    "disclaimer": "Responders are community members sharing lived experience — not therapists, doctors or lawyers. This isn't crisis care.",
+    "empty": "No responders are available right now. Please check back soon.",
+    "unavailable": "Paid questions aren't available yet.",
+    "choose": "Ask",
+    "price": "{price} per question",
+    "myQuestions": "My questions",
+    "composeTitle": "Ask @{handle}",
+    "titleLabel": "Short title",
+    "bodyLabel": "Your question",
+    "bodyHint": "Share as much as you're comfortable with. Leave out names, places or anything that could identify you.",
+    "pay": "Continue to payment · {price}",
+    "how": [
+      "Your card is only authorised, not charged.",
+      "The responder has 48 hours to answer.",
+      "You're charged only when the answer arrives."
+    ],
+    "crisisTitle": "Before you continue",
+    "crisisBody": "It sounds like you might be going through something really hard. You deserve support right now — a crisis line can talk with you today, for free.",
+    "crisisAck": "I'm safe right now and want to continue with my question",
+    "crisisHelpLink": "See all support options",
+    "status": {
+      "awaiting_payment": "Waiting for payment",
+      "open": "Waiting for answer",
+      "answered": "Answered",
+      "expired": "Expired · not charged",
+      "cancelled": "Cancelled · not charged",
+      "refunded": "Refunded"
+    },
+    "dueBy": "Answer due {date}",
+    "yourQuestion": "Your question",
+    "answer": "Answer",
+    "from": "Answered by @{handle}",
+    "waiting": "Waiting for an answer. You'll only be charged once it arrives.",
+    "checkoutDone": "Payment authorised. Your question has been sent.",
+    "checkoutPending": "Confirming your payment… refresh in a moment.",
+    "checkoutCancelled": "Payment was cancelled. Nothing was charged.",
+    "cancel": "Withdraw question",
+    "rateTitle": "How helpful was this?",
+    "feedbackLabel": "Anything to add? (optional, private)",
+    "rate": "Send rating",
+    "rated": "Thanks for your feedback.",
+    "disputeTitle": "Something wrong with this answer?",
+    "disputeLabel": "Tell us what happened",
+    "dispute": "Request a review",
+    "disputed": "Our team is reviewing this.",
+    "disputeResolved": "Review closed.",
+    "crisisBanner": "Crisis language detected. Lead with care, share crisis resources, and don't give medical advice.",
+    "answerLabel": "Your answer",
+    "answerHint": "{min}–{max} characters. Sending it charges the asker.",
+    "submitAnswer": "Send answer",
+    "anonymousAsker": "Anonymous member",
+    "youEarn": "You receive {amount}",
+    "myQuestionsEmpty": "You haven't asked anything yet.",
+    "queueTitle": "Waiting for you",
+    "queueEmpty": "No open questions right now.",
+    "historyTitle": "Recent",
+    "profileTitle": "Responder profile",
+    "profileIntro": "Set your headline, topics and price. You can accept questions once payouts are set up.",
+    "headline": "Headline",
+    "bio": "About you",
+    "topicsLabel": "Topics",
+    "languagesLabel": "Languages",
+    "priceLabel": "Price per question (USD)",
+    "priceHint": "Between {min} and {max}. The platform keeps {fee}%.",
+    "accepting": "Accept new questions",
+    "save": "Save profile",
+    "saved": "Saved.",
+    "payoutsTitle": "Payouts",
+    "payoutsReady": "Payouts are set up.",
+    "payoutsNotReady": "Set up payouts with Stripe to receive money.",
+    "payoutsButton": "Set up payouts",
+    "devNote": "Development mode: payments are simulated.",
+    "devCheckoutTitle": "Test payment",
+    "devCheckoutBody": "Development only — no real card is used.",
+    "devAuthorize": "Authorise {price}",
+    "disputesTitle": "Q&A reviews",
+    "disputesEmpty": "No open reviews.",
+    "refund": "Refund",
+    "keep": "Keep payment",
+    "makeResponder": "Make responder",
+    "removeResponder": "Remove responder",
+    "topics": {
+      "coming-out": "Coming out",
+      "relationships": "Relationships",
+      "family": "Family",
+      "identity": "Identity",
+      "gender": "Gender",
+      "wellbeing": "Wellbeing",
+      "work-school": "Work & school",
+      "other": "Other"
+    },
+    "languages": {
+      "en": "English",
+      "zh": "中文"
+    },
+    "errors": {
+      "forbidden": "You can't do that.",
+      "not-found": "This question isn't available.",
+      "invalid-input": "Please check the length of what you wrote.",
+      "unavailable": "This responder isn't available right now.",
+      "self": "You can't ask yourself.",
+      "crisis-check": "Please read the support information first.",
+      "too-many-open": "You already have 3 questions in progress.",
+      "payouts-not-ready": "Set up payouts first.",
+      "expired": "This question has expired.",
+      "payment-failed": "The payment couldn't be completed. Nobody was charged.",
+      "already-done": "This question is already closed."
+    }
   }
 }

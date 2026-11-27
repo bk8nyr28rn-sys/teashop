@@ -350,6 +350,86 @@ export const rateLimit = pgTable(
   (t) => [index("rate_limit_window_idx").on(t.windowStart)],
 );
 
+/* ------------------------------------------------------------------ */
+/* Paid Q&A                                                            */
+/* ------------------------------------------------------------------ */
+
+/** A responder's public card and payout setup. */
+export const responderProfile = pgTable("responder_profile", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  headline: text("headline").notNull().default(""),
+  bio: text("bio").notNull().default(""),
+  topics: jsonb("topics").$type<string[]>().notNull().default([]),
+  languages: jsonb("languages").$type<string[]>().notNull().default([]),
+  priceCents: integer("price_cents").notNull().default(1500),
+  currency: text("currency").notNull().default("usd"),
+  /** Responder-controlled availability switch. */
+  accepting: boolean("accepting").notNull().default(false),
+  /** Stripe Connect (Express) account; null until onboarding starts. */
+  payoutAccountId: text("payout_account_id").unique(),
+  /** True once the payment provider says the account can receive transfers. */
+  payoutsReady: boolean("payouts_ready").notNull().default(false),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * awaiting_payment – created, checkout not completed yet
+ * open             – card authorised (not charged); responder has until deadline
+ * answered         – answer delivered and payment captured
+ * expired          – deadline passed, authorisation released (never charged)
+ * cancelled        – asker cancelled before an answer (never charged)
+ * refunded         – captured, then refunded after a dispute
+ */
+export const questionStatusEnum = pgEnum("question_status", [
+  "awaiting_payment",
+  "open",
+  "answered",
+  "expired",
+  "cancelled",
+  "refunded",
+]);
+
+export const question = pgTable(
+  "question",
+  {
+    id: text("id").primaryKey(),
+    /** Null after the asker deletes their account (texts are wiped first). */
+    askerId: text("asker_id").references(() => user.id, { onDelete: "set null" }),
+    responderId: text("responder_id").references(() => user.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    status: questionStatusEnum("status").notNull().default("awaiting_payment"),
+    priceCents: integer("price_cents").notNull(),
+    feeCents: integer("fee_cents").notNull(),
+    currency: text("currency").notNull(),
+    /** Crisis language detected; asker saw crisis resources before paying. */
+    crisisFlag: boolean("crisis_flag").notNull().default(false),
+    checkoutRef: text("checkout_ref").unique(),
+    paymentRef: text("payment_ref").unique(),
+    authorizedAt: timestamp("authorized_at", { withTimezone: true }),
+    deadlineAt: timestamp("deadline_at", { withTimezone: true }),
+    answer: text("answer"),
+    answeredAt: timestamp("answered_at", { withTimezone: true }),
+    rating: integer("rating"),
+    feedback: text("feedback"),
+    disputeReason: text("dispute_reason"),
+    disputedAt: timestamp("disputed_at", { withTimezone: true }),
+    disputeResolvedAt: timestamp("dispute_resolved_at", { withTimezone: true }),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    index("question_responder_idx").on(t.responderId, t.status, t.deadlineAt),
+    index("question_asker_idx").on(t.askerId, t.createdAt),
+    index("question_status_deadline_idx").on(t.status, t.deadlineAt),
+    check("question_rating_range", sql`${t.rating} is null or ${t.rating} between 1 and 5`),
+    check("question_fee_le_price", sql`${t.feeCents} between 0 and ${t.priceCents}`),
+  ],
+);
+
 /** Who did what, for moderation accountability (incl. every evidence view). */
 export const auditLog = pgTable(
   "audit_log",
@@ -375,3 +455,6 @@ export type Post = typeof post.$inferSelect;
 export type Comment = typeof comment.$inferSelect;
 export type ReportReason = (typeof reportReasonEnum.enumValues)[number];
 export type ReportTarget = (typeof reportTargetEnum.enumValues)[number];
+export type ResponderProfile = typeof responderProfile.$inferSelect;
+export type Question = typeof question.$inferSelect;
+export type QuestionStatus = (typeof questionStatusEnum.enumValues)[number];

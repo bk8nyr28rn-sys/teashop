@@ -4,7 +4,9 @@ import "../globals.css";
 import { siteConfig } from "@/config/site";
 import { locales } from "@/i18n/config";
 import { getDictionary, getLocale } from "@/i18n/dictionaries";
+import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
+import { Icon } from "@/components/icons";
 
 export async function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -23,20 +25,29 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#faf7f2" },
-    { media: "(prefers-color-scheme: dark)", color: "#1b1917" },
+    { media: "(prefers-color-scheme: light)", color: "#f7f3ee" },
+    { media: "(prefers-color-scheme: dark)", color: "#171514" },
   ],
 };
 
 export default async function LocaleLayout({ children }: LayoutProps<"/[locale]">) {
-  const locale = await getLocale();
+  const [locale, dict] = await Promise.all([getLocale(), getDictionary()]);
   return (
-    <html lang={locale === "zh" ? "zh-Hans" : "en"} className="h-full antialiased">
-      <body className="min-h-full flex flex-col">
-        <Suspense fallback={<div className="h-14 border-b border-line" />}>
+    <html lang={locale === "zh" ? "zh-Hans" : "en"} className="h-full">
+      <body className="flex min-h-full flex-col">
+        <Suspense fallback={<div className="h-14 border-b border-line/70" />}>
           <SiteHeader />
         </Suspense>
-        <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-8">{children}</main>
+        <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-6">{children}</main>
+        <footer className="pb-tabbar mx-auto w-full max-w-2xl px-4 pt-10">
+          <Link
+            href={`/${locale}/help`}
+            className="flex items-center justify-center gap-2 rounded-2xl py-3 text-sm text-muted transition hover:bg-surface-2 hover:text-ink"
+          >
+            <Icon name="help" className="size-4" />
+            {dict.nav.help}
+          </Link>
+        </footer>
       </body>
     </html>
   );

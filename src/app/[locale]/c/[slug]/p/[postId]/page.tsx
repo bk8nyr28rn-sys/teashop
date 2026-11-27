@@ -6,6 +6,7 @@ import { format, getDictionary, getLocale } from "@/i18n/dictionaries";
 import { requireArea } from "@/lib/dal";
 import { listComments, loadPost } from "@/lib/community";
 import { ui } from "@/components/ui";
+import { Avatar } from "@/components/avatar";
 import { deleteOwnAction, moderatorRemoveAction } from "../../../actions";
 import { CommentForm, ReportForm } from "../../../forms";
 
@@ -43,8 +44,10 @@ async function PostView({ params }: Pick<Props, "params">) {
       <article className={`${ui.card} space-y-3`}>
         {p.removedAt && <p className={`${ui.badge} inline-block`}>{t.moderatorView}</p>}
         <h1 className={ui.h1}>{p.title}</h1>
-        <p className="text-xs text-muted">
-          {format(dict.circle.by, { handle: authorHandle ?? "?" })} · {dateFmt.format(p.createdAt)}
+        <p className="flex items-center gap-2 text-xs text-muted">
+          <Avatar name={authorHandle} size={28} />
+          <span className="font-medium text-ink">{format(dict.circle.by, { handle: authorHandle ?? "?" })}</span>·{" "}
+          {dateFmt.format(p.createdAt)}
         </p>
         <p className="whitespace-pre-wrap break-words">{p.body}</p>
         {!p.removedAt && (
@@ -72,43 +75,47 @@ async function PostView({ params }: Pick<Props, "params">) {
             const own = cm.authorId === viewer.userId;
             const hidden = cm.removedAt && !(access.isModerator && cm.removal === "moderator");
             return (
-              <li key={cm.id} className="rounded-xl border border-line bg-surface p-3" data-testid="comment">
-                {hidden ? (
-                  <p className="text-sm italic text-muted">
-                    {cm.removal === "author" ? t.removedByAuthor : t.removedByModerator}
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-xs text-muted">
-                      @{cm.authorHandle} · {dateFmt.format(cm.createdAt)}
-                      {cm.removedAt && ` · ${t.moderatorView}`}
+              <li key={cm.id} className="flex gap-3" data-testid="comment">
+                <Avatar name={hidden ? null : cm.authorHandle} size={32} />
+                <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md border border-line bg-surface px-4 py-3">
+                  {hidden ? (
+                    <p className="text-sm italic text-muted">
+                      {cm.removal === "author" ? t.removedByAuthor : t.removedByModerator}
                     </p>
-                    <p className="mt-1 whitespace-pre-wrap break-words text-sm">{cm.body}</p>
-                    {!cm.removedAt && !p.removedAt && (
-                      <div className="mt-2 flex flex-wrap items-start gap-4">
-                        {own && (
-                          <form action={deleteOwnAction.bind(null, locale, "comment", cm.id, undefined)}>
-                            <button className={small}>{t.delete}</button>
-                          </form>
-                        )}
-                        {access.isModerator && !own && (
-                          <form action={moderatorRemoveAction.bind(null, locale, "comment", cm.id)}>
-                            <button className={small}>{t.remove}</button>
-                          </form>
-                        )}
-                        {!own && (
-                          <ReportForm
-                            locale={locale}
-                            targetType="comment"
-                            targetId={cm.id}
-                            t={t}
-                            errors={dict.errors}
-                          />
-                        )}
-                      </div>
-                    )}
-                  </>
-                )}
+                  ) : (
+                    <>
+                      <p className="text-xs text-muted">
+                        <span className="font-medium text-ink">@{cm.authorHandle}</span> ·{" "}
+                        {dateFmt.format(cm.createdAt)}
+                        {cm.removedAt && ` · ${t.moderatorView}`}
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm">{cm.body}</p>
+                      {!cm.removedAt && !p.removedAt && (
+                        <div className="mt-2 flex flex-wrap items-start gap-4">
+                          {own && (
+                            <form action={deleteOwnAction.bind(null, locale, "comment", cm.id, undefined)}>
+                              <button className={small}>{t.delete}</button>
+                            </form>
+                          )}
+                          {access.isModerator && !own && (
+                            <form action={moderatorRemoveAction.bind(null, locale, "comment", cm.id)}>
+                              <button className={small}>{t.remove}</button>
+                            </form>
+                          )}
+                          {!own && (
+                            <ReportForm
+                              locale={locale}
+                              targetType="comment"
+                              targetId={cm.id}
+                              t={t}
+                              errors={dict.errors}
+                            />
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </li>
             );
           })}

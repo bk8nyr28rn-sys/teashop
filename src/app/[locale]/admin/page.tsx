@@ -7,7 +7,10 @@ import { listOpenReports } from "@/lib/community";
 import { ReportList } from "@/components/report-list";
 import { ui } from "@/components/ui";
 import { findMembers, listSuspended } from "@/lib/accounts";
-import { decideApplicationAction, suspendAction, unsuspendAction } from "./actions";
+import { decideApplicationAction, setResponderAction, suspendAction, unsuspendAction } from "./actions";
+import Link from "next/link";
+import { formatMoney } from "@/config/qa";
+import { listOpenDisputes } from "@/lib/qa";
 
 type Props = PageProps<"/[locale]/admin">;
 
@@ -58,17 +61,26 @@ async function Members({ searchParams }: Pick<Props, "searchParams">) {
               ) : (
                 m.role !== "admin" &&
                 m.userId !== viewer.userId && (
-                  <form action={suspendAction.bind(null, locale, m.userId)} className="flex flex-wrap gap-2">
-                    <input
-                      name="reason"
-                      placeholder={t.suspendReason}
-                      maxLength={500}
-                      className={`${ui.input} flex-1`}
-                    />
-                    <button className="rounded-xl border border-danger px-4 py-2 text-danger hover:bg-danger/10">
-                      {t.suspend}
-                    </button>
-                  </form>
+                  <div className="space-y-2">
+                    {m.status === "approved" && (
+                      <form action={setResponderAction.bind(null, locale, m.userId, m.role !== "responder")}>
+                        <button className={ui.buttonSmall}>
+                          {m.role === "responder" ? dict.qa.removeResponder : dict.qa.makeResponder}
+                        </button>
+                      </form>
+                    )}
+                    <form action={suspendAction.bind(null, locale, m.userId)} className="flex flex-wrap gap-2">
+                      <input
+                        name="reason"
+                        placeholder={t.suspendReason}
+                        maxLength={500}
+                        className={`${ui.input} flex-1`}
+                      />
+                      <button className="rounded-full border border-danger px-4 py-2 text-danger hover:bg-danger-soft">
+                        {t.suspend}
+                      </button>
+                    </form>
+                  </div>
                 )
               )}
             </li>
@@ -98,7 +110,11 @@ async function Queue() {
   const [locale, dict] = await Promise.all([getLocale(), getDictionary()]);
   await requireArea(locale, "admin");
   const t = dict.admin;
-  const [apps, reports] = await Promise.all([listPendingApplications(getDb()), listOpenReports(getDb(), "all")]);
+  const [apps, reports, disputes] = await Promise.all([
+    listPendingApplications(getDb()),
+    listOpenReports(getDb(), "all"),
+    listOpenDisputes(getDb()),
+  ]);
   const dateFmt = new Intl.DateTimeFormat(locale, {
     dateStyle: "medium",
     timeStyle: "short",
@@ -106,6 +122,23 @@ async function Queue() {
 
   return (
     <div className="space-y-8">
+      <section className="space-y-3">
+        <h2 className={ui.h2}>{dict.qa.disputesTitle}</h2>
+        {disputes.length === 0 && <p className={ui.muted}>{dict.qa.disputesEmpty}</p>}
+        <ul className="grid gap-2">
+          {disputes.map((d) => (
+            <li key={d.id}>
+              <Link href={`/${locale}/questions/${d.id}`} className={`${ui.cardLink} space-y-1`} data-testid="dispute">
+                <p className="flex items-center justify-between gap-2 font-semibold">
+                  <span className="truncate">{d.title || "—"}</span>
+                  <span className={ui.badgeWarn}>{formatMoney(d.priceCents, d.currency, locale)}</span>
+                </p>
+                <p className={`${ui.muted} line-clamp-2`}>“{d.disputeReason}”</p>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </section>
       <section className="space-y-3">
         <h2 className={ui.h2}>{t.reportsTitle}</h2>
         <ReportList reports={reports} locale={locale} dict={dict} />

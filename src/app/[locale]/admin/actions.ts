@@ -5,7 +5,7 @@ import { getDb } from "@/db";
 import { hasLocale } from "@/i18n/config";
 import { requireArea } from "@/lib/dal";
 import { decideApplication, type Decision } from "@/lib/membership";
-import { suspendUser, unsuspendUser } from "@/lib/accounts";
+import { setResponderRole, suspendUser, unsuspendUser } from "@/lib/accounts";
 
 export async function decideApplicationAction(locale: string, applicationId: string, decision: Decision) {
   if (!hasLocale(locale)) throw new Error("Unsupported locale");
@@ -30,5 +30,12 @@ export async function unsuspendAction(locale: string, userId: string) {
   if (!hasLocale(locale)) throw new Error("Unsupported locale");
   const viewer = await requireArea(locale, "admin");
   await unsuspendUser(getDb(), viewer, userId);
+  refresh();
+}
+
+export async function setResponderAction(locale: string, userId: string, responder: boolean) {
+  if (!hasLocale(locale)) throw new Error("Unsupported locale");
+  const viewer = await requireArea(locale, "admin");
+  await setResponderRole(getDb(), viewer, { userId, responder });
   refresh();
 }
