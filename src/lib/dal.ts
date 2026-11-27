@@ -6,13 +6,9 @@ import { getDb } from "@/db";
 import type { Profile } from "@/db/schema";
 import type { Locale } from "@/i18n/config";
 import { getAuth } from "./auth";
+import { refreshTrust } from "./community";
 import { ensureProfile } from "./membership";
-import {
-  canEnterAdminArea,
-  canEnterMemberArea,
-  canEnterResponderArea,
-  landingPathFor,
-} from "./permissions";
+import { canEnterAdminArea, canEnterMemberArea, canEnterResponderArea, landingPathFor } from "./permissions";
 
 /**
  * Data Access Layer: the single place that turns the request's session cookie
@@ -25,7 +21,13 @@ export type ViewerContext = { userId: string; profile: Profile };
 export const getViewer = cache(async (): Promise<ViewerContext | null> => {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) return null;
-  const profile = await ensureProfile(getDb(), session.user.id);
+  const db = getDb();
+  let profile = await ensureProfile(db, session.user.id);
+  if (profile.status === "approved") {
+    // Trust grows with time and activity; re-evaluate once per request.
+    const level = await refreshTrust(db, session.user.id);
+    if (level !== null && level !== profile.trustLevel) profile = { ...profile, trustLevel: level };
+  }
   return { userId: session.user.id, profile };
 });
 

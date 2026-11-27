@@ -96,7 +96,9 @@
     "inviteBody": "只邀请你认识并信任的人。如果对方违反规则，你的信誉也会受影响。",
     "inviteCreate": "生成邀请码",
     "inviteCreated": "新邀请码（7 天内有效）：{code}",
-    "inviteLocked": "达到信任等级 2 后才能邀请他人。"
+    "inviteLocked": "达到信任等级 2 后才能邀请他人。",
+    "feedTitle": "来自你的圈子",
+    "feedEmpty": "加入圈子后，这里会显示帖子。"
   },
   "responder": {
     "title": "答主工作台",
@@ -109,6 +111,83 @@
     "submitted": "提交于 {date}",
     "approve": "通过",
     "reject": "拒绝",
-    "decisionNote": "一旦你做出决定，申请回答会立即删除。"
+    "decisionNote": "一旦你做出决定，申请回答会立即删除。",
+    "reportsTitle": "待处理举报（全部圈子）",
+    "manage": "前往管理"
+  },
+  "circle": {
+    "join": "加入",
+    "request": "申请加入",
+    "leave": "退出圈子",
+    "cancelRequest": "取消申请",
+    "requested": "你的申请正在等待版主审核。",
+    "privateNotice": "这是私密圈子，加入后才能看到帖子。",
+    "mustJoin": "加入这个圈子后才能发帖和评论。",
+    "postLocked": "信任等级达到 1 后才能发帖，现在已经可以评论。",
+    "newPost": "发新帖",
+    "titleLabel": "标题",
+    "bodyLabel": "想说点什么？",
+    "publish": "发布",
+    "postsEmpty": "还没有帖子，来开启第一个话题吧！",
+    "comments": "{n} 条评论",
+    "by": "@{handle}",
+    "moderate": "管理",
+    "privacyReminder": "请不要分享任何可能暴露你或他人身份的信息：不写真名、工作单位，也不要发聊天截图。"
+  },
+  "post": {
+    "back": "返回{circle}",
+    "commentsTitle": "评论",
+    "commentsEmpty": "还没有评论。",
+    "commentLabel": "写评论",
+    "send": "发送",
+    "delete": "删除",
+    "remove": "移除",
+    "removedByAuthor": "作者已删除。",
+    "removedByModerator": "已被版主移除。",
+    "moderatorView": "已移除，仅版主可见。",
+    "report": "举报",
+    "reportTitle": "你为什么举报这条内容？",
+    "reportDetails": "补充说明（可选）",
+    "reportSubmit": "提交举报",
+    "reported": "谢谢，版主会尽快处理。",
+    "selfHarmNote": "如果有人可能正处于危险中，请同时联系当地紧急服务或心理危机热线。",
+    "reasons": {
+      "harassment": "骚扰或霸凌",
+      "hate": "仇恨或歧视",
+      "outing": "曝光他人身份或隐私（出柜、截图等）",
+      "sexual": "不受欢迎的色情内容",
+      "spam": "垃圾信息或诈骗",
+      "self_harm": "自伤或有人处于危机中",
+      "other": "其他"
+    }
+  },
+  "errors": {
+    "not-found": "这条内容不存在或无法查看。",
+    "forbidden": "你没有权限进行这个操作。",
+    "must-join": "请先加入这个圈子。",
+    "trust-too-low": "信任等级更高后解锁。",
+    "rate-limited": "今天的次数已用完，请稍后再试。",
+    "invalid-input": "请检查填写内容的长度。",
+    "already-reported": "你已经举报过这条内容了。",
+    "own-content": "不能对自己的内容进行这个操作。"
+  },
+  "mod": {
+    "title": "管理 · {circle}",
+    "requestsTitle": "入圈申请",
+    "requestsEmpty": "暂无待处理的申请。",
+    "approve": "通过",
+    "decline": "拒绝",
+    "trust": "信任 {level}",
+    "reportsTitle": "待处理举报",
+    "reportsEmpty": "暂无待处理的举报。",
+    "uphold": "确认违规并移除",
+    "dismiss": "驳回",
+    "reportedPost": "@{handle} 的帖子",
+    "reportedComment": "@{handle} 的评论",
+    "open": "查看帖子",
+    "membersTitle": "成员",
+    "makeMod": "设为版主",
+    "removeMod": "取消版主",
+    "moderator": "版主"
   }
 }

@@ -96,7 +96,9 @@
     "inviteBody": "Only invite people you know and trust. If they break the rules, it reflects on you.",
     "inviteCreate": "Create invite code",
     "inviteCreated": "New code (valid 7 days): {code}",
-    "inviteLocked": "You can invite others once you reach trust level 2."
+    "inviteLocked": "You can invite others once you reach trust level 2.",
+    "feedTitle": "From your circles",
+    "feedEmpty": "Join a circle to see posts here."
   },
   "responder": {
     "title": "Responder desk",
@@ -109,6 +111,83 @@
     "submitted": "Submitted {date}",
     "approve": "Approve",
     "reject": "Reject",
-    "decisionNote": "Answers are deleted as soon as you decide."
+    "decisionNote": "Answers are deleted as soon as you decide.",
+    "reportsTitle": "Open reports (all circles)",
+    "manage": "Moderate"
+  },
+  "circle": {
+    "join": "Join",
+    "request": "Request to join",
+    "leave": "Leave",
+    "cancelRequest": "Cancel request",
+    "requested": "Your request is waiting for a moderator.",
+    "privateNotice": "This circle is private. Join to see its posts.",
+    "mustJoin": "Join this circle to post and comment.",
+    "postLocked": "You can start posts once you reach trust level 1. Commenting is open now.",
+    "newPost": "New post",
+    "titleLabel": "Title",
+    "bodyLabel": "What's on your mind?",
+    "publish": "Publish",
+    "postsEmpty": "No posts yet. Start the conversation!",
+    "comments": "{n} comments",
+    "by": "@{handle}",
+    "moderate": "Moderate",
+    "privacyReminder": "Don't share anything that could identify you or others — no real names, workplaces or screenshots of chats."
+  },
+  "post": {
+    "back": "Back to {circle}",
+    "commentsTitle": "Comments",
+    "commentsEmpty": "No comments yet.",
+    "commentLabel": "Write a comment",
+    "send": "Send",
+    "delete": "Delete",
+    "remove": "Remove",
+    "removedByAuthor": "Deleted by the author.",
+    "removedByModerator": "Removed by a moderator.",
+    "moderatorView": "Removed — visible to moderators only.",
+    "report": "Report",
+    "reportTitle": "Why are you reporting this?",
+    "reportDetails": "Details (optional)",
+    "reportSubmit": "Send report",
+    "reported": "Thanks — a moderator will review it.",
+    "selfHarmNote": "If someone may be in immediate danger, please also contact local emergency services or a crisis line.",
+    "reasons": {
+      "harassment": "Harassment or bullying",
+      "hate": "Hate or discrimination",
+      "outing": "Outing / sharing someone's private info",
+      "sexual": "Unwanted sexual content",
+      "spam": "Spam or scam",
+      "self_harm": "Self-harm or someone in crisis",
+      "other": "Something else"
+    }
+  },
+  "errors": {
+    "not-found": "This content isn't available.",
+    "forbidden": "You don't have permission to do that.",
+    "must-join": "Join this circle first.",
+    "trust-too-low": "This unlocks at a higher trust level.",
+    "rate-limited": "You've reached today's limit. Please try again later.",
+    "invalid-input": "Please check the length of what you wrote.",
+    "already-reported": "You've already reported this.",
+    "own-content": "You can't do that with your own content."
+  },
+  "mod": {
+    "title": "Moderate · {circle}",
+    "requestsTitle": "Join requests",
+    "requestsEmpty": "No pending requests.",
+    "approve": "Approve",
+    "decline": "Decline",
+    "trust": "trust {level}",
+    "reportsTitle": "Open reports",
+    "reportsEmpty": "No open reports.",
+    "uphold": "Uphold & remove",
+    "dismiss": "Dismiss",
+    "reportedPost": "Post by @{handle}",
+    "reportedComment": "Comment by @{handle}",
+    "open": "Open thread",
+    "membersTitle": "Members",
+    "makeMod": "Make moderator",
+    "removeMod": "Remove moderator",
+    "moderator": "moderator"
   }
 }

@@ -27,12 +27,7 @@ export async function ensureProfile(db: Db, userId: string) {
 type JoinBase = { userId: string; handle: string; ageConfirmed: boolean };
 
 export type JoinError =
-  | "age-not-confirmed"
-  | "invalid-handle"
-  | "handle-taken"
-  | "invalid-invite"
-  | "invalid-answers"
-  | "not-allowed";
+  "age-not-confirmed" | "invalid-handle" | "handle-taken" | "invalid-invite" | "invalid-answers" | "not-allowed";
 
 export type JoinResult = { ok: true } | { ok: false; error: JoinError };
 
@@ -158,8 +153,7 @@ export async function submitApplication(
 export type Decision = "approved" | "rejected";
 
 export type DecideResult =
-  | { ok: true; evidenceKeyToDelete: string | null }
-  | { ok: false; error: "not-found" | "self-review" };
+  { ok: true; evidenceKeyToDelete: string | null } | { ok: false; error: "not-found" | "self-review" };
 
 /**
  * Approve or reject an application. Answers and the evidence reference are

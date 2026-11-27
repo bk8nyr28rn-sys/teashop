@@ -4,13 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import { createDb, type Db } from "@/db";
 import { application, auditLog, invite, profile, user } from "@/db/schema";
-import {
-  createInvite,
-  decideApplication,
-  ensureProfile,
-  redeemInvite,
-  submitApplication,
-} from "@/lib/membership";
+import { createInvite, decideApplication, ensureProfile, redeemInvite, submitApplication } from "@/lib/membership";
 
 /**
  * Integration tests against a real PostgreSQL. Skipped unless
@@ -56,7 +50,12 @@ describe.skipIf(!url)("membership (postgres)", () => {
     const code = (created as { code: string }).code;
 
     const joiner = await newUser();
-    const res = await redeemInvite(db, { userId: joiner, code: code.toLowerCase(), handle: "New_One", ageConfirmed: true });
+    const res = await redeemInvite(db, {
+      userId: joiner,
+      code: code.toLowerCase(),
+      handle: "New_One",
+      ageConfirmed: true,
+    });
     expect(res).toEqual({ ok: true });
 
     const [p] = await db.select().from(profile).where(eq(profile.userId, joiner));
@@ -96,16 +95,25 @@ describe.skipIf(!url)("membership (postgres)", () => {
     });
 
     const expired = await make();
-    await db.update(invite).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(invite.code, expired));
-    expect((await redeemInvite(db, { userId: joiner, code: expired, handle: "joiner", ageConfirmed: true })).ok).toBe(false);
+    await db
+      .update(invite)
+      .set({ expiresAt: new Date(Date.now() - 1000) })
+      .where(eq(invite.code, expired));
+    expect((await redeemInvite(db, { userId: joiner, code: expired, handle: "joiner", ageConfirmed: true })).ok).toBe(
+      false,
+    );
 
     const revoked = await make();
     await db.update(invite).set({ revokedAt: new Date() }).where(eq(invite.code, revoked));
-    expect((await redeemInvite(db, { userId: joiner, code: revoked, handle: "joiner", ageConfirmed: true })).ok).toBe(false);
+    expect((await redeemInvite(db, { userId: joiner, code: revoked, handle: "joiner", ageConfirmed: true })).ok).toBe(
+      false,
+    );
 
     const valid = await make();
     await db.update(profile).set({ status: "suspended" }).where(eq(profile.userId, inviter));
-    expect((await redeemInvite(db, { userId: joiner, code: valid, handle: "joiner", ageConfirmed: true })).ok).toBe(false);
+    expect((await redeemInvite(db, { userId: joiner, code: valid, handle: "joiner", ageConfirmed: true })).ok).toBe(
+      false,
+    );
 
     const [p] = await db.select().from(profile).where(eq(profile.userId, joiner));
     expect(p.status).toBe("new");
@@ -128,7 +136,12 @@ describe.skipIf(!url)("membership (postgres)", () => {
       error: "handle-taken",
     });
     expect(
-      await submitApplication(db, { userId: u, handle: "ok_name", ageConfirmed: true, answers: { ...answers, why: "short" } }),
+      await submitApplication(db, {
+        userId: u,
+        handle: "ok_name",
+        ageConfirmed: true,
+        answers: { ...answers, why: "short" },
+      }),
     ).toEqual({ ok: false, error: "invalid-answers" });
   });
 
@@ -136,17 +149,23 @@ describe.skipIf(!url)("membership (postgres)", () => {
     const admin = await newUser({ status: "approved", role: "admin", trustLevel: 3 });
     const applicant = await newUser();
 
-    expect(await submitApplication(db, { userId: applicant, handle: "applicant", ageConfirmed: true, answers })).toEqual({ ok: true });
-    expect((await submitApplication(db, { userId: applicant, handle: "applicant", ageConfirmed: true, answers })).ok).toBe(false);
+    expect(
+      await submitApplication(db, { userId: applicant, handle: "applicant", ageConfirmed: true, answers }),
+    ).toEqual({ ok: true });
+    expect(
+      (await submitApplication(db, { userId: applicant, handle: "applicant", ageConfirmed: true, answers })).ok,
+    ).toBe(false);
 
     const [app] = await db.select().from(application).where(eq(application.userId, applicant));
     expect(app.status).toBe("pending");
     expect(app.answers).toHaveLength(3);
 
-    expect(await decideApplication(db, { applicationId: app.id, reviewerId: applicant, decision: "approved" })).toEqual({
-      ok: false,
-      error: "self-review",
-    });
+    expect(await decideApplication(db, { applicationId: app.id, reviewerId: applicant, decision: "approved" })).toEqual(
+      {
+        ok: false,
+        error: "self-review",
+      },
+    );
 
     const res = await decideApplication(db, { applicationId: app.id, reviewerId: admin, decision: "approved" });
     expect(res).toEqual({ ok: true, evidenceKeyToDelete: null });
@@ -173,7 +192,9 @@ describe.skipIf(!url)("membership (postgres)", () => {
     await submitApplication(db, { userId: u, handle: "retry_me", ageConfirmed: true, answers });
     const [app] = await db.select().from(application).where(eq(application.userId, u));
     await decideApplication(db, { applicationId: app.id, reviewerId: admin, decision: "rejected" });
-    expect(await submitApplication(db, { userId: u, handle: "retry_me", ageConfirmed: true, answers })).toEqual({ ok: true });
+    expect(await submitApplication(db, { userId: u, handle: "retry_me", ageConfirmed: true, answers })).toEqual({
+      ok: true,
+    });
 
     const { code } = (await createInvite(db, { inviterId: admin })) as { code: string };
     expect(await redeemInvite(db, { userId: u, code, handle: "retry_me", ageConfirmed: true })).toEqual({ ok: true });

@@ -31,7 +31,13 @@ function IdentityFields({ t, defaultHandle, values }: { t: T; defaultHandle?: st
         <p className={ui.muted}>{t.handleHint}</p>
       </div>
       <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" name="ageConfirmed" required className="mt-1" defaultChecked={values?.ageConfirmed === "on"} />
+        <input
+          type="checkbox"
+          name="ageConfirmed"
+          required
+          className="mt-1"
+          defaultChecked={values?.ageConfirmed === "on"}
+        />
         <span>{t.ageConfirm.replace("{age}", String(siteConfig.minimumAge))}</span>
       </label>
     </>

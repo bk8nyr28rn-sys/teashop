@@ -32,7 +32,10 @@ const CIRCLES: {
   {
     slug: "trans",
     name: { en: "Trans & Non-binary", zh: "跨性别与非二元" },
-    description: { en: "A moderated space for trans and non-binary members.", zh: "为跨性别与非二元成员设立的审核制空间。" },
+    description: {
+      en: "A moderated space for trans and non-binary members.",
+      zh: "为跨性别与非二元成员设立的审核制空间。",
+    },
     visibility: "approval",
     minTrustLevel: 1,
   },
@@ -53,7 +56,10 @@ const CIRCLES: {
   {
     slug: "bi-plus",
     name: { en: "Bi+ & Pan", zh: "双性恋+与泛性恋" },
-    description: { en: "Bi, pan, and everyone attracted to more than one gender.", zh: "双性恋、泛性恋，以及被不止一种性别吸引的人。" },
+    description: {
+      en: "Bi, pan, and everyone attracted to more than one gender.",
+      zh: "双性恋、泛性恋，以及被不止一种性别吸引的人。",
+    },
     visibility: "approval",
     minTrustLevel: 1,
   },

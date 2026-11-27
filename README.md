@@ -1,7 +1,7 @@
 # Qijian (working title)
 
 A privacy-first community for LGBTQ+ people, with paid emotional-support Q&A answered by real people.
-**Status: skeleton** — accounts, roles, membership gating and i18n work end-to-end; community features and payments are next.
+**Status: early build** — accounts, membership gating, circles, posts, comments, reports and moderation work end-to-end; payments are next.
 
 ## Stack
 
@@ -40,6 +40,7 @@ Without `RESEND_API_KEY`, sign-in codes are printed to the dev server log (`[dev
 | `npm run typecheck` | Generate route types and run `tsc` |
 | `npm run lint` | ESLint |
 | `npm run build` | Production build |
+| `npm run format` | Prettier |
 | `npm run db:generate` | Create a migration after editing `src/db/schema.ts` |
 
 ## How membership works
@@ -52,6 +53,9 @@ sign in (email code) → onboarding ─┬─ invite code ───────�
 - **Roles:** `member`, `responder`, `admin` (platform-wide); circle `moderator` is per circle.
 - **Trust levels 0–3** unlock posting, joining request-only circles, DMs and creating invites (`src/lib/permissions.ts`).
 - **Circles** are `open`, `approval` or `invite`; each can require a minimum trust level.
+- **Reading:** open circles are readable by every approved member; request/invite circles only by their members. **Writing** always requires joining.
+- **Daily limits** per trust level (posts 0/5/20/50, comments 10/50/200/500), enforced under a per-user advisory lock.
+- **Reports** (incl. a dedicated *outing / private info* reason) go to circle moderators and admins. Upholding hides the content (kept for appeals) and blocks the author's trust promotion; author deletions erase the text.
 - Invite codes are single-use by default (members max 3 uses, admins max 100), expire after 7 days, and are consumed atomically.
 
 ## Privacy decisions (do not regress)
@@ -68,10 +72,12 @@ sign in (email code) → onboarding ─┬─ invite code ───────�
 ```
 src/
   app/[locale]/        pages: landing, sign-in, start, onboarding, pending, home, responder, admin
+  app/[locale]/c/      circle, post thread and moderation pages + server actions
   app/api/auth/        Better Auth handler
   db/schema.ts         all tables
   lib/permissions.ts   pure permission rules (unit-tested)
   lib/membership.ts    invite / application state transitions (integration-tested)
+  lib/community.ts     circles, posts, comments, reports, trust refresh (integration-tested)
   lib/dal.ts           session → viewer; the only place that reads auth
   i18n/                locale config and en/zh dictionaries
   proxy.ts             locale redirect + optimistic auth gate
@@ -82,4 +88,4 @@ drizzle/               generated SQL migrations
 
 ## Not built yet
 
-Posts and comments, joining circles, reports and moderation tools, account deletion, optional evidence upload (schema fields exist; must auto-delete after review), passkeys / mandatory 2FA for staff, the paid Q&A flow (Stripe Connect), crisis-keyword safety prompts, and the low-profile ("discreet") mode.
+Account deletion, suspending users from the admin UI, editing posts, notifications, optional evidence upload (schema fields exist; must auto-delete after review), passkeys / mandatory 2FA for staff, the paid Q&A flow (Stripe Connect), crisis-keyword safety prompts, and the low-profile ("discreet") mode.

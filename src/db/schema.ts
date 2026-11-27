@@ -180,18 +180,10 @@ export const invite = pgTable(
     revokedAt: timestamp("revoked_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [
-    index("invite_inviter_idx").on(t.inviterId),
-    check("invite_uses_le_max", sql`${t.uses} <= ${t.maxUses}`),
-  ],
+  (t) => [index("invite_inviter_idx").on(t.inviterId), check("invite_uses_le_max", sql`${t.uses} <= ${t.maxUses}`)],
 );
 
-export const applicationStatusEnum = pgEnum("application_status", [
-  "pending",
-  "approved",
-  "rejected",
-  "withdrawn",
-]);
+export const applicationStatusEnum = pgEnum("application_status", ["pending", "approved", "rejected", "withdrawn"]);
 
 /** Free-text answers to the join questions. Wiped once a decision is made. */
 export type ApplicationAnswers = { questionId: string; answer: string }[];
@@ -223,6 +215,92 @@ export const application = pgTable(
   ],
 );
 
+/* ------------------------------------------------------------------ */
+/* Posts, comments, reports                                            */
+/* ------------------------------------------------------------------ */
+
+/** author: wiped by the author (text erased). moderator: hidden, text kept for appeals. */
+export const removalEnum = pgEnum("removal", ["author", "moderator"]);
+
+export const post = pgTable(
+  "post",
+  {
+    id: text("id").primaryKey(),
+    circleId: text("circle_id")
+      .notNull()
+      .references(() => circle.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedBy: text("removed_by").references(() => user.id, { onDelete: "set null" }),
+    removal: removalEnum("removal"),
+  },
+  (t) => [index("post_circle_idx").on(t.circleId, t.createdAt), index("post_author_idx").on(t.authorId, t.createdAt)],
+);
+
+export const comment = pgTable(
+  "comment",
+  {
+    id: text("id").primaryKey(),
+    postId: text("post_id")
+      .notNull()
+      .references(() => post.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedBy: text("removed_by").references(() => user.id, { onDelete: "set null" }),
+    removal: removalEnum("removal"),
+  },
+  (t) => [index("comment_post_idx").on(t.postId, t.createdAt), index("comment_author_idx").on(t.authorId, t.createdAt)],
+);
+
+export const reportTargetEnum = pgEnum("report_target", ["post", "comment"]);
+export const reportReasonEnum = pgEnum("report_reason", [
+  "harassment",
+  "hate",
+  "outing", // revealing someone's identity, doxxing, sharing screenshots
+  "sexual",
+  "spam",
+  "self_harm",
+  "other",
+]);
+export const reportStatusEnum = pgEnum("report_status", ["open", "upheld", "dismissed"]);
+
+export const report = pgTable(
+  "report",
+  {
+    id: text("id").primaryKey(),
+    reporterId: text("reporter_id").references(() => user.id, { onDelete: "set null" }),
+    targetType: reportTargetEnum("target_type").notNull(),
+    targetId: text("target_id").notNull(),
+    /** Denormalised so moderators can query their circle and trust can count per author. */
+    circleId: text("circle_id")
+      .notNull()
+      .references(() => circle.id, { onDelete: "cascade" }),
+    authorId: text("author_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    reason: reportReasonEnum("reason").notNull(),
+    details: text("details"),
+    status: reportStatusEnum("status").notNull().default("open"),
+    handledBy: text("handled_by").references(() => user.id, { onDelete: "set null" }),
+    handledAt: timestamp("handled_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("report_once_per_reporter").on(t.reporterId, t.targetType, t.targetId),
+    index("report_circle_status_idx").on(t.circleId, t.status, t.createdAt),
+    index("report_author_status_idx").on(t.authorId, t.status),
+  ],
+);
+
 /** Who did what, for moderation accountability (incl. every evidence view). */
 export const auditLog = pgTable(
   "audit_log",
@@ -244,3 +322,7 @@ export type CircleMember = typeof circleMember.$inferSelect;
 export type Role = (typeof roleEnum.enumValues)[number];
 export type MembershipStatus = (typeof membershipStatusEnum.enumValues)[number];
 export type CircleVisibility = (typeof circleVisibilityEnum.enumValues)[number];
+export type Post = typeof post.$inferSelect;
+export type Comment = typeof comment.$inferSelect;
+export type ReportReason = (typeof reportReasonEnum.enumValues)[number];
+export type ReportTarget = (typeof reportTargetEnum.enumValues)[number];

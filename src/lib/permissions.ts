@@ -23,13 +23,7 @@ export const TRUST_LEVELS = [0, 1, 2, 3] as const;
 export type TrustLevel = (typeof TRUST_LEVELS)[number];
 
 export type Capability =
-  | "browse"
-  | "comment"
-  | "post"
-  | "requestCircle"
-  | "directMessage"
-  | "createInvite"
-  | "moderateCandidate";
+  "browse" | "comment" | "post" | "requestCircle" | "directMessage" | "createInvite" | "moderateCandidate";
 
 const REQUIRED_TRUST: Record<Capability, TrustLevel> = {
   browse: 0,
@@ -73,6 +67,19 @@ function clampTrust(n: number): TrustLevel {
   return Math.min(3, Math.max(0, Math.trunc(n))) as TrustLevel;
 }
 
+/* ----------------------------- Rate limits ------------------------------ */
+
+/** Max new items per rolling 24h by trust level (index = level). Admins: unlimited. */
+export const DAILY_LIMITS = {
+  post: [0, 5, 20, 50],
+  comment: [10, 50, 200, 500],
+} as const;
+
+export function dailyLimit(viewer: Viewer, kind: keyof typeof DAILY_LIMITS): number {
+  if (viewer.role === "admin") return Number.POSITIVE_INFINITY;
+  return DAILY_LIMITS[kind][clampTrust(viewer.trustLevel)];
+}
+
 /* ------------------------------- Areas ---------------------------------- */
 
 export function canEnterMemberArea(viewer: Viewer | null): boolean {
@@ -105,14 +112,7 @@ export function landingPathFor(status: MembershipStatus): "/onboarding" | "/pend
 /* ------------------------------- Circles -------------------------------- */
 
 export type CircleJoinOutcome =
-  | "already-member"
-  | "already-requested"
-  | "join"
-  | "request"
-  | "invite-only"
-  | "trust-too-low"
-  | "banned"
-  | "denied";
+  "already-member" | "already-requested" | "join" | "request" | "invite-only" | "trust-too-low" | "banned" | "denied";
 
 export function circleJoinOutcome(
   viewer: Viewer | null,
