@@ -5,7 +5,7 @@ import { formatMoney } from "@/config/qa";
 import { format, getDictionary, getLocale } from "@/i18n/dictionaries";
 import { requireArea } from "@/lib/dal";
 import { getPaymentProvider } from "@/lib/payments";
-import { expireOverdue, getResponderProfile, listResponderQueue } from "@/lib/qa";
+import { expireOverdue, getResponderProfile, getResponderStanding, listResponderQueue } from "@/lib/qa";
 import { Icon } from "@/components/icons";
 import { QuestionStatusBadge } from "@/components/question-status";
 import { ui } from "@/components/ui";
@@ -29,14 +29,26 @@ async function Desk() {
   const db = getDb();
   const provider = getPaymentProvider();
   if (provider) await expireOverdue(db, provider);
-  const [profile, { open, history }] = await Promise.all([
+  const [profile, { open, history }, standing] = await Promise.all([
     getResponderProfile(db, viewer.userId),
     listResponderQueue(db, viewer.userId),
+    getResponderStanding(db, viewer.userId),
   ]);
   const dt = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
 
   return (
     <div className="space-y-8">
+      {standing.pausedAt ? (
+        <p className={`${ui.error} font-medium`} data-testid="standing">
+          {standing.pauseReason === "overdue" ? t.standingPausedOverdue : t.standingPausedAdmin}
+        </p>
+      ) : (
+        standing.warned && (
+          <p className={`${ui.notice} border border-warn/40 bg-warn-soft font-medium text-warn`} data-testid="standing">
+            {format(t.standingWarned, { n: standing.missed, m: standing.pauseAt })}
+          </p>
+        )
+      )}
       <Link href={`/${locale}/responder/profile`} className={`${ui.cardLink} flex items-center gap-3`}>
         <span className="inline-flex size-10 items-center justify-center rounded-2xl bg-accent-soft text-accent">
           <Icon name="me" />

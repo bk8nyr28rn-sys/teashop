@@ -103,9 +103,15 @@ export function createStripeProvider(opts: {
       }
     },
 
-    async refund(paymentRef, idempotencyKey) {
+    async refund(paymentRef, idempotencyKey, amountCents) {
       await stripe.refunds.create(
-        { payment_intent: paymentRef, reverse_transfer: true, refund_application_fee: true },
+        {
+          payment_intent: paymentRef,
+          ...(amountCents ? { amount: amountCents } : {}),
+          // Proportional for partial refunds: the responder's share and our fee shrink together.
+          reverse_transfer: true,
+          refund_application_fee: true,
+        },
         { idempotencyKey },
       );
     },

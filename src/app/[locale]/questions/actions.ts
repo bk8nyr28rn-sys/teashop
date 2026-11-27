@@ -7,6 +7,7 @@ import { getDb } from "@/db";
 import { hasLocale } from "@/i18n/config";
 import { requireArea } from "@/lib/dal";
 import { resolveBaseUrl } from "@/lib/env";
+import { applyAsResponder, type AdminError } from "@/lib/qa-admin";
 import { getPaymentProvider } from "@/lib/payments";
 import {
   answerQuestion,
@@ -17,7 +18,6 @@ import {
   openDispute,
   rateAnswer,
   refreshPayoutStatus,
-  resolveDispute,
   saveResponderProfile,
   startPayoutOnboarding,
   type QaError,
@@ -173,10 +173,17 @@ export async function refreshPayoutsAction(locale: string) {
   refresh();
 }
 
-/* -------------------------------- Admin -------------------------------- */
+/* ------------------------- Responder applications ------------------------ */
 
-export async function resolveDisputeAction(locale: string, questionId: string, refund: boolean) {
-  const viewer = await requireArea(hasLocale(locale) ? locale : "en", "admin");
-  await resolveDispute(getDb(), payments(), viewer, { questionId, refund });
-  refresh();
+export type ApplyState = { error?: AdminError } | undefined;
+
+export async function applyResponderAction(locale: string, _p: ApplyState, fd: FormData): Promise<ApplyState> {
+  const viewer = await member(locale);
+  const res = await applyAsResponder(getDb(), viewer, {
+    experience: String(fd.get("experience") ?? ""),
+    topics: fd.getAll("topics").map(String),
+    guidelinesAccepted: fd.get("guidelines") === "on",
+  });
+  if (!res.ok) return { error: res.error };
+  redirect(`/${locale}/me`);
 }

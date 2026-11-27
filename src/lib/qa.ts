@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
-import { auditLog, profile, question, responderProfile, type Question } from "@/db/schema";
+import { auditLog, profile, qaSettings, question, responderProfile, type QaSettings, type Question } from "@/db/schema";
 import { platformFee, qaConfig } from "@/config/qa";
 import { hasCrisisLanguage } from "./crisis";
 import { PaymentError, type PaymentProvider } from "./payments/types";
@@ -46,6 +46,27 @@ async function audit(db: Db, actorId: string | null, action: string, targetId: s
   await db.insert(auditLog).values({ id: randomUUID(), actorId, action, targetType: "question", targetId, meta });
 }
 
+/* -------------------------------- Settings ------------------------------- */
+
+const DEFAULT_SETTINGS: QaSettings = {
+  id: 1,
+  feePercent: qaConfig.defaultFeePercent,
+  answerHours: qaConfig.answerHours,
+  priceMinCents: qaConfig.priceMinCents,
+  priceMaxCents: qaConfig.priceMaxCents,
+  maxOpenPerAsker: qaConfig.maxOpenPerAsker,
+  overdueWarnAt: 2,
+  overduePauseAt: 3,
+  updatedAt: new Date(0),
+  updatedBy: null,
+};
+
+/** Admin-editable settings (single row). Falls back to code defaults if missing. */
+export async function getQaSettings(db: Db): Promise<QaSettings> {
+  const [row] = await db.select().from(qaSettings).where(eq(qaSettings.id, 1));
+  return row ?? DEFAULT_SETTINGS;
+}
+
 /* --------------------------- Responder profile --------------------------- */
 
 export async function getResponderProfile(db: Db, userId: string) {
@@ -70,7 +91,8 @@ export async function saveResponderProfile(db: Db, actor: Actor, input: Responde
   const topics = [...new Set(input.topics)].filter((t) => (qaConfig.topics as readonly string[]).includes(t));
   const languages = [...new Set(input.languages)].filter((l) => (qaConfig.languages as readonly string[]).includes(l));
   if (headline === null || bio === null || !Number.isInteger(price)) return fail("invalid-input");
-  if (price < qaConfig.priceMinCents || price > qaConfig.priceMaxCents) return fail("invalid-input");
+  const settings = await getQaSettings(db);
+  if (price < settings.priceMinCents || price > settings.priceMaxCents) return fail("invalid-input");
 
   const existing = await getResponderProfile(db, actor.userId);
   if (input.accepting && !existing?.payoutsReady) return fail("payouts-not-ready");
@@ -148,6 +170,7 @@ export async function listAvailableResponders(db: Db) {
       and(
         eq(responderProfile.accepting, true),
         eq(responderProfile.payoutsReady, true),
+        isNull(responderProfile.pausedAt),
         eq(profile.status, "approved"),
         inArray(profile.role, ["responder", "admin"]),
       ),
@@ -193,10 +216,12 @@ export async function askQuestion(
     .select({ n: count() })
     .from(question)
     .where(and(eq(question.askerId, actor.userId), inArray(question.status, ["awaiting_payment", "open"])));
-  if (n >= qaConfig.maxOpenPerAsker) return fail("too-many-open");
+  const settings = await getQaSettings(db);
+  if (n >= settings.maxOpenPerAsker) return fail("too-many-open");
 
   const id = randomUUID();
-  const feeCents = platformFee(responder.priceCents);
+  // Fee and answer window are snapshotted: later setting changes never touch this question.
+  const feeCents = platformFee(responder.priceCents, settings.feePercent);
   await db.insert(question).values({
     id,
     askerId: actor.userId,
@@ -205,6 +230,7 @@ export async function askQuestion(
     body,
     priceCents: responder.priceCents,
     feeCents,
+    answerHours: settings.answerHours,
     currency: responder.currency,
     crisisFlag: crisis,
   });
@@ -248,7 +274,7 @@ export async function markAuthorized(
       status: "open",
       paymentRef: ev.paymentRef,
       authorizedAt: now,
-      deadlineAt: new Date(now.getTime() + qaConfig.answerHours * HOUR),
+      deadlineAt: new Date(now.getTime() + q.answerHours * HOUR),
     })
     .where(and(eq(question.id, ev.questionId), eq(question.status, "awaiting_payment")))
     .returning({ id: question.id });
@@ -258,7 +284,7 @@ export async function markAuthorized(
 export async function markCheckoutExpired(db: Db, questionId: string) {
   await db
     .update(question)
-    .set({ status: "cancelled", closedAt: new Date() })
+    .set({ status: "cancelled", closedAt: new Date(), closeReason: "cancelled" })
     .where(and(eq(question.id, questionId), eq(question.status, "awaiting_payment")));
 }
 
@@ -286,7 +312,10 @@ export async function answerQuestion(
     } catch (e) {
       const code = e instanceof PaymentError ? e.code : "provider_error";
       if (code === "provider_error") throw e; // transient: let the responder retry
-      await tx.update(question).set({ status: "expired", closedAt: new Date() }).where(eq(question.id, q.id));
+      await tx
+        .update(question)
+        .set({ status: "expired", closedAt: new Date(), closeReason: "payment_failed" })
+        .where(eq(question.id, q.id));
       return fail("payment-failed");
     }
     const now = new Date();
@@ -310,7 +339,10 @@ export async function cancelQuestion(
     if (!q || q.askerId !== actor.userId) return fail("not-found");
     if (q.status !== "awaiting_payment" && q.status !== "open") return fail("already-done");
     if (q.status === "open" && q.paymentRef) await provider.cancel(q.paymentRef);
-    await tx.update(question).set({ status: "cancelled", closedAt: new Date() }).where(eq(question.id, q.id));
+    await tx
+      .update(question)
+      .set({ status: "cancelled", closedAt: new Date(), closeReason: "cancelled" })
+      .where(eq(question.id, q.id));
     return { ok: true } as const;
   });
 }
@@ -318,29 +350,42 @@ export async function cancelQuestion(
 /** Release holds on overdue questions and clean up abandoned checkouts. Run from cron and lazily. */
 export async function expireOverdue(db: Db, provider: PaymentProvider, now = new Date()): Promise<number> {
   const overdue = await db
-    .select({ id: question.id, paymentRef: question.paymentRef })
+    .select({
+      id: question.id,
+      paymentRef: question.paymentRef,
+      responderId: question.responderId,
+      authorizedAt: question.authorizedAt,
+      answerHours: question.answerHours,
+      deadlineAt: question.deadlineAt,
+    })
     .from(question)
     .where(and(eq(question.status, "open"), lt(question.deadlineAt, now)))
     .limit(100);
 
   let expired = 0;
+  const missedBy = new Set<string>();
   for (const q of overdue) {
+    // A deadline pulled forward (suspension, removal, account deletion) isn't the responder's miss.
+    const natural = q.authorizedAt ? q.authorizedAt.getTime() + q.answerHours * HOUR : 0;
+    const reason = q.deadlineAt && q.deadlineAt.getTime() < natural - 60_000 ? "released" : "deadline";
     try {
       if (q.paymentRef) await provider.cancel(q.paymentRef);
       const rows = await db
         .update(question)
-        .set({ status: "expired", closedAt: now })
+        .set({ status: "expired", closedAt: now, closeReason: reason })
         .where(and(eq(question.id, q.id), eq(question.status, "open")))
         .returning({ id: question.id });
       expired += rows.length;
+      if (rows.length && reason === "deadline" && q.responderId) missedBy.add(q.responderId);
     } catch (e) {
       console.error("[qa] failed to expire", q.id, e);
     }
   }
+  for (const responderId of missedBy) await evaluateMissedDeadlines(db, responderId);
 
   await db
     .update(question)
-    .set({ status: "cancelled", closedAt: now })
+    .set({ status: "cancelled", closedAt: now, closeReason: "cancelled" })
     .where(
       and(
         eq(question.status, "awaiting_payment"),
@@ -348,6 +393,89 @@ export async function expireOverdue(db: Db, provider: PaymentProvider, now = new
       ),
     );
   return expired;
+}
+
+/* --------------------------- Missed deadlines --------------------------- */
+
+const STRIKE_WINDOW_MS = 30 * 24 * HOUR;
+
+export async function missedDeadlines(db: Db, responderId: string): Promise<number> {
+  const [{ n }] = await db
+    .select({ n: count() })
+    .from(question)
+    .where(
+      and(
+        eq(question.responderId, responderId),
+        eq(question.status, "expired"),
+        eq(question.closeReason, "deadline"),
+        gt(question.closedAt, new Date(Date.now() - STRIKE_WINDOW_MS)),
+      ),
+    );
+  return n;
+}
+
+/**
+ * Warn first, then pause: at `overdueWarnAt` misses (30 days) the responder is
+ * warned; only a responder who was already warned is paused at
+ * `overduePauseAt`. Someone who jumps straight past both still gets the warning first.
+ */
+export async function evaluateMissedDeadlines(db: Db, responderId: string): Promise<"none" | "warned" | "paused"> {
+  const [settings, rp, missed] = await Promise.all([
+    getQaSettings(db),
+    getResponderProfile(db, responderId),
+    missedDeadlines(db, responderId),
+  ]);
+  if (!rp || rp.pausedAt) return "none";
+  const warnedRecently = !!rp.overdueWarnedAt && rp.overdueWarnedAt.getTime() > Date.now() - STRIKE_WINDOW_MS;
+
+  if (warnedRecently && missed >= settings.overduePauseAt) {
+    await db
+      .update(responderProfile)
+      .set({ pausedAt: new Date(), pauseReason: "overdue" })
+      .where(eq(responderProfile.userId, responderId));
+    await db.insert(auditLog).values({
+      id: randomUUID(),
+      actorId: null,
+      action: "responder.auto-paused",
+      targetType: "user",
+      targetId: responderId,
+      meta: { missed },
+    });
+    return "paused";
+  }
+  if (!warnedRecently && missed >= settings.overdueWarnAt) {
+    await db
+      .update(responderProfile)
+      .set({ overdueWarnedAt: new Date() })
+      .where(eq(responderProfile.userId, responderId));
+    await db.insert(auditLog).values({
+      id: randomUUID(),
+      actorId: null,
+      action: "responder.warned",
+      targetType: "user",
+      targetId: responderId,
+      meta: { missed },
+    });
+    return "warned";
+  }
+  return "none";
+}
+
+/** What the responder desk shows about their standing. */
+export async function getResponderStanding(db: Db, responderId: string) {
+  const [settings, rp, missed] = await Promise.all([
+    getQaSettings(db),
+    getResponderProfile(db, responderId),
+    missedDeadlines(db, responderId),
+  ]);
+  return {
+    missed,
+    warnAt: settings.overdueWarnAt,
+    pauseAt: settings.overduePauseAt,
+    warned: !!rp?.overdueWarnedAt && rp.overdueWarnedAt.getTime() > Date.now() - STRIKE_WINDOW_MS,
+    pausedAt: rp?.pausedAt ?? null,
+    pauseReason: rp?.pauseReason ?? null,
+  };
 }
 
 /* ------------------------- Feedback and disputes ------------------------ */
@@ -393,31 +521,44 @@ export async function openDispute(
   return { ok: true };
 }
 
-/** Admin decision on a dispute: refund (money back, responder transfer reversed) or keep. */
+/**
+ * Admin decision on a dispute: refund any amount up to what's left (0 keeps
+ * the payment). Partial refunds reverse the responder's share and the platform
+ * fee proportionally; a full refund marks the question refunded.
+ */
 export async function resolveDispute(
   db: Db,
   provider: PaymentProvider,
   actor: Actor,
-  input: { questionId: string; refund: boolean },
+  input: { questionId: string; refundCents: number; note?: string },
 ): Promise<{ ok: true } | Fail> {
   if (!isAdmin(actor)) return fail("forbidden");
+  const refundCents = Math.round(input.refundCents);
+  if (!Number.isInteger(refundCents) || refundCents < 0) return fail("invalid-input");
   return db.transaction(async (tx) => {
     const [q] = await tx.select().from(question).where(eq(question.id, input.questionId)).for("update");
     if (!q || !q.disputedAt || q.disputeResolvedAt) return fail("not-found");
-    if (input.refund) {
+    if (refundCents > 0) {
       if (q.status !== "answered" || !q.paymentRef) return fail("already-done");
-      await provider.refund(q.paymentRef, `refund-${q.id}`);
+      if (refundCents > q.priceCents - q.refundedCents) return fail("invalid-input");
+      await provider.refund(q.paymentRef, `refund-${q.id}-${q.refundedCents}`, refundCents);
     }
+    const refunded = q.refundedCents + refundCents;
     await tx
       .update(question)
-      .set({ disputeResolvedAt: new Date(), ...(input.refund ? { status: "refunded" as const } : {}) })
+      .set({
+        disputeResolvedAt: new Date(),
+        refundedCents: refunded,
+        ...(refunded === q.priceCents ? { status: "refunded" as const } : {}),
+      })
       .where(eq(question.id, q.id));
     await tx.insert(auditLog).values({
       id: randomUUID(),
       actorId: actor.userId,
-      action: input.refund ? "question.refunded" : "question.dispute-rejected",
+      action: refundCents > 0 ? "question.refunded" : "question.dispute-rejected",
       targetType: "question",
       targetId: q.id,
+      meta: { refundCents, ...(input.note?.trim() ? { note: input.note.trim().slice(0, 500) } : {}) },
     });
     return { ok: true } as const;
   });
@@ -437,13 +578,14 @@ export async function flagChargeback(db: Db, paymentRef: string) {
 /* -------------------------------- Reading ------------------------------- */
 
 export type QuestionView = {
-  viewerRole: "asker" | "responder" | "admin";
+  viewerRole: "asker" | "responder";
   id: string;
   title: string;
   body: string;
   status: Question["status"];
   priceCents: number;
   feeCents: number;
+  refundedCents: number;
   currency: string;
   crisisFlag: boolean;
   deadlineAt: Date | null;
@@ -461,7 +603,8 @@ export type QuestionView = {
 
 /**
  * Load a question for the viewer, or null. Askers see everything; responders
- * see the question but never the asker; admins only see disputed questions.
+ * see the question but never the asker. Admins never read content here — only
+ * through the logged unlock in the admin console (lib/qa-admin.ts).
  */
 export async function getQuestionView(db: Db, actor: Actor, id: string): Promise<QuestionView | null> {
   const [row] = await db
@@ -476,7 +619,6 @@ export async function getQuestionView(db: Db, actor: Actor, id: string): Promise
   if (q.askerId === actor.userId) viewerRole = "asker";
   else if (q.responderId === actor.userId && isResponder(actor) && q.status !== "awaiting_payment")
     viewerRole = "responder";
-  else if (isAdmin(actor) && q.disputedAt) viewerRole = "admin";
   if (!viewerRole) return null;
 
   return {
@@ -487,6 +629,7 @@ export async function getQuestionView(db: Db, actor: Actor, id: string): Promise
     status: q.status,
     priceCents: q.priceCents,
     feeCents: q.feeCents,
+    refundedCents: q.refundedCents,
     currency: q.currency,
     crisisFlag: q.crisisFlag,
     deadlineAt: q.deadlineAt,
@@ -553,18 +696,24 @@ export async function listResponderQueue(db: Db, responderId: string) {
   return { open, history };
 }
 
+/** Open disputes for the admin console — metadata and the asker's stated reason, never the question text. */
 export async function listOpenDisputes(db: Db) {
   return db
     .select({
       id: question.id,
-      title: question.title,
       disputeReason: question.disputeReason,
       disputedAt: question.disputedAt,
       priceCents: question.priceCents,
+      feeCents: question.feeCents,
+      refundedCents: question.refundedCents,
       currency: question.currency,
       status: question.status,
+      rating: question.rating,
+      answeredAt: question.answeredAt,
+      responderHandle: profile.handle,
     })
     .from(question)
+    .leftJoin(profile, eq(profile.userId, question.responderId))
     .where(and(isNotNull(question.disputedAt), isNull(question.disputeResolvedAt)))
     .orderBy(asc(question.disputedAt));
 }

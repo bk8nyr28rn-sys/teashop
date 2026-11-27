@@ -1,11 +1,11 @@
 import { Suspense } from "react";
 import Link from "next/link";
 import { getDb } from "@/db";
-import { feePercent, formatMoney, qaConfig } from "@/config/qa";
+import { formatMoney, qaConfig } from "@/config/qa";
 import { format, getDictionary, getLocale } from "@/i18n/dictionaries";
 import { requireArea } from "@/lib/dal";
 import { getPaymentProvider } from "@/lib/payments";
-import { getResponderProfile, refreshPayoutStatus } from "@/lib/qa";
+import { getQaSettings, getResponderProfile, refreshPayoutStatus } from "@/lib/qa";
 import { ui } from "@/components/ui";
 import { startPayoutsAction } from "../../questions/actions";
 import { ResponderProfileForm } from "../../questions/forms";
@@ -34,7 +34,7 @@ async function ProfileEditor({ searchParams }: Pick<Props, "searchParams">) {
 
   // Coming back from payout onboarding: ask the provider for the latest status.
   if (sp.payouts === "return") await refreshPayoutStatus(db, provider, viewer.userId);
-  const profile = await getResponderProfile(db, viewer.userId);
+  const [profile, settings] = await Promise.all([getResponderProfile(db, viewer.userId), getQaSettings(db)]);
   const ready = !!profile?.payoutsReady;
   const money = (c: number) => formatMoney(c, qaConfig.currency, locale);
 
@@ -65,10 +65,12 @@ async function ProfileEditor({ searchParams }: Pick<Props, "searchParams">) {
           locale={locale}
           t={t}
           payoutsReady={ready}
+          priceMinCents={settings.priceMinCents}
+          priceMaxCents={settings.priceMaxCents}
           priceHint={format(t.priceHint, {
-            min: money(qaConfig.priceMinCents),
-            max: money(qaConfig.priceMaxCents),
-            fee: feePercent(),
+            min: money(settings.priceMinCents),
+            max: money(settings.priceMaxCents),
+            fee: settings.feePercent,
           })}
           initial={{
             headline: profile?.headline ?? "",

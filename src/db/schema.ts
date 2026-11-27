@@ -371,9 +371,71 @@ export const responderProfile = pgTable("responder_profile", {
   payoutAccountId: text("payout_account_id").unique(),
   /** True once the payment provider says the account can receive transfers. */
   payoutsReady: boolean("payouts_ready").notNull().default(false),
+  /** Set when the team (or the missed-deadline rule) pauses this responder. */
+  pausedAt: timestamp("paused_at", { withTimezone: true }),
+  pauseReason: text("pause_reason").$type<"admin" | "overdue">(),
+  /** Warned about missed deadlines; an automatic pause only ever follows a warning. */
+  overdueWarnedAt: timestamp("overdue_warned_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+export const responderApplicationStatusEnum = pgEnum("responder_application_status", [
+  "pending",
+  "approved",
+  "declined",
+]);
+
+/** Members applying to become responders. The experience text is wiped once decided. */
+export const responderApplication = pgTable(
+  "responder_application",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    experience: text("experience"),
+    topics: jsonb("topics").$type<string[]>().notNull().default([]),
+    guidelinesAcceptedAt: timestamp("guidelines_accepted_at", { withTimezone: true }).notNull(),
+    status: responderApplicationStatusEnum("status").notNull().default("pending"),
+    reviewerId: text("reviewer_id").references(() => user.id, { onDelete: "set null" }),
+    decidedAt: timestamp("decided_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("responder_application_one_pending")
+      .on(t.userId)
+      .where(sql`${t.status} = 'pending'`),
+  ],
+);
+
+/**
+ * Admin-editable Q&A settings (single row, id = 1). Changes only affect new
+ * questions: price, fee and answer window are snapshotted onto each question.
+ */
+export const qaSettings = pgTable(
+  "qa_settings",
+  {
+    id: integer("id").primaryKey().default(1),
+    feePercent: integer("fee_percent").notNull().default(20),
+    answerHours: integer("answer_hours").notNull().default(48),
+    priceMinCents: integer("price_min_cents").notNull().default(500),
+    priceMaxCents: integer("price_max_cents").notNull().default(10000),
+    maxOpenPerAsker: integer("max_open_per_asker").notNull().default(3),
+    /** Missed deadlines (30 days) that trigger a warning, then an automatic pause. */
+    overdueWarnAt: integer("overdue_warn_at").notNull().default(2),
+    overduePauseAt: integer("overdue_pause_at").notNull().default(3),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedBy: text("updated_by").references(() => user.id, { onDelete: "set null" }),
+  },
+  (t) => [
+    check("qa_settings_singleton", sql`${t.id} = 1`),
+    check("qa_settings_fee", sql`${t.feePercent} between 0 and 50`),
+    check("qa_settings_hours", sql`${t.answerHours} between 12 and 168`),
+    check("qa_settings_prices", sql`${t.priceMinCents} >= 100 and ${t.priceMaxCents} >= ${t.priceMinCents}`),
+    check("qa_settings_overdue", sql`${t.overdueWarnAt} >= 1 and ${t.overduePauseAt} >= ${t.overdueWarnAt}`),
+  ],
+);
 
 /**
  * awaiting_payment – created, checkout not completed yet
@@ -404,6 +466,10 @@ export const question = pgTable(
     status: questionStatusEnum("status").notNull().default("awaiting_payment"),
     priceCents: integer("price_cents").notNull(),
     feeCents: integer("fee_cents").notNull(),
+    /** Answer window snapshotted from settings when the question was asked. */
+    answerHours: integer("answer_hours").notNull().default(48),
+    /** Total refunded so far (partial or full). */
+    refundedCents: integer("refunded_cents").notNull().default(0),
     currency: text("currency").notNull(),
     /** Crisis language detected; asker saw crisis resources before paying. */
     crisisFlag: boolean("crisis_flag").notNull().default(false),
@@ -419,6 +485,8 @@ export const question = pgTable(
     disputedAt: timestamp("disputed_at", { withTimezone: true }),
     disputeResolvedAt: timestamp("dispute_resolved_at", { withTimezone: true }),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    /** Why an open question closed without an answer. Only "deadline" counts against the responder. */
+    closeReason: text("close_reason").$type<"deadline" | "released" | "payment_failed" | "cancelled">(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [
@@ -427,6 +495,7 @@ export const question = pgTable(
     index("question_status_deadline_idx").on(t.status, t.deadlineAt),
     check("question_rating_range", sql`${t.rating} is null or ${t.rating} between 1 and 5`),
     check("question_fee_le_price", sql`${t.feeCents} between 0 and ${t.priceCents}`),
+    check("question_refund_le_price", sql`${t.refundedCents} between 0 and ${t.priceCents}`),
   ],
 );
 
@@ -458,3 +527,4 @@ export type ReportTarget = (typeof reportTargetEnum.enumValues)[number];
 export type ResponderProfile = typeof responderProfile.$inferSelect;
 export type Question = typeof question.$inferSelect;
 export type QuestionStatus = (typeof questionStatusEnum.enumValues)[number];
+export type QaSettings = typeof qaSettings.$inferSelect;

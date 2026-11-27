@@ -301,7 +301,7 @@ describe.skipIf(!url)("paid Q&A (postgres)", () => {
     expect(await rateAnswer(db, r, { questionId: id, rating: 5 })).toEqual({ ok: false, error: "not-found" });
     expect(await rateAnswer(db, asker, { questionId: id, rating: 2, feedback: "Felt rushed" })).toEqual({ ok: true });
 
-    expect(await getQuestionView(db, admin, id)).toBeNull(); // admins only see disputed questions
+    expect(await getQuestionView(db, admin, id)).toBeNull(); // admins never read content via member pages
     expect(await openDispute(db, asker, { questionId: id, reason: "short" })).toEqual({
       ok: false,
       error: "invalid-input",
@@ -311,21 +311,27 @@ describe.skipIf(!url)("paid Q&A (postgres)", () => {
     ).toEqual({
       ok: true,
     });
-    expect((await getQuestionView(db, admin, id))?.viewerRole).toBe("admin");
+    expect(await getQuestionView(db, admin, id)).toBeNull(); // not even once disputed — only via logged unlock
 
     const downgraded = { ...admin, profile: { ...admin.profile, role: "member" as const } }; // no 2FA yet
-    expect(await resolveDispute(db, payments, downgraded, { questionId: id, refund: true })).toEqual({
+    expect(await resolveDispute(db, payments, downgraded, { questionId: id, refundCents: 2000 })).toEqual({
       ok: false,
       error: "forbidden",
     });
-    expect(await resolveDispute(db, payments, admin, { questionId: id, refund: true })).toEqual({ ok: true });
-    expect(await resolveDispute(db, payments, admin, { questionId: id, refund: true })).toEqual({
+    expect(await resolveDispute(db, payments, admin, { questionId: id, refundCents: 2001 })).toEqual({
+      ok: false,
+      error: "invalid-input",
+    });
+    expect(await resolveDispute(db, payments, admin, { questionId: id, refundCents: 2000 })).toEqual({ ok: true });
+    expect(await resolveDispute(db, payments, admin, { questionId: id, refundCents: 2000 })).toEqual({
       ok: false,
       error: "not-found",
     });
     const [q] = await db.select().from(question).where(eq(question.id, id));
-    expect(q.status).toBe("refunded");
-    expect(payments.ledger.filter((e) => e.op === "refund")).toHaveLength(1);
+    expect(q).toMatchObject({ status: "refunded", refundedCents: 2000 });
+    expect(payments.ledger.filter((e) => e.op === "refund")).toEqual([
+      { op: "refund", ref: payments.paymentRefFor(id), key: `refund-${id}-0`, amountCents: 2000 },
+    ]);
   });
 
   it("closes the dispute window after 7 days", async () => {

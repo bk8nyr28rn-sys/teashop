@@ -103,7 +103,7 @@ Without Stripe keys the *Ask* tab says paid questions aren't available yet; ever
 - Check Stripe's restricted-business list for your country; avoid anything that reads as fortune-telling or medical advice.
 - Stripe dashboard → *Settings → Public details*: use a **neutral statement descriptor** (it shows on bank statements other people may see). Checkout and receipts already use the neutral product name "Q&A session".
 
-**How money moves:** the asker's card is *authorised* (not charged) at checkout. Answering captures the payment: Stripe pays the responder's Connect account and keeps the platform fee (`PLATFORM_FEE_PERCENT`, default 20). Unanswered after 48 h → the hold is released, nothing is charged. Admin-approved disputes refund the asker and reverse the responder's transfer.
+**How money moves:** the asker's card is *authorised* (not charged) at checkout. Answering captures the payment: Stripe pays the responder's Connect account and keeps the platform fee (default 20%, set in *Admin → Settings*). Unanswered after 48 h → the hold is released, nothing is charged. Admin-approved disputes refund the asker and reverse the responder's transfer.
 
 **Setup (test mode first)**
 1. Stripe → *Connect* → get started as a **platform**, Express accounts.
@@ -112,10 +112,12 @@ Without Stripe keys the *Ask* tab says paid questions aren't available yet; ever
    `payment_intent.amount_capturable_updated`, `checkout.session.expired`, `charge.dispute.created`.
    Add a second endpoint (same URL) for **events on connected accounts** with `account.updated`.
    Each endpoint has its own signing secret — put both in `STRIPE_WEBHOOK_SECRET`, comma-separated.
-4. Vercel env vars (Production): `STRIPE_SECRET_KEY` (`sk_test_…` first), `STRIPE_WEBHOOK_SECRET` (`whsec_platform,whsec_connect`), `CRON_SECRET` (16+ random characters), optionally `PLATFORM_FEE_PERCENT`. The server refuses to start if Stripe is half-configured.
+4. Vercel env vars (Production): `STRIPE_SECRET_KEY` (`sk_test_…` first), `STRIPE_WEBHOOK_SECRET` (`whsec_platform,whsec_connect`), `CRON_SECRET` (16+ random characters). The server refuses to start if Stripe is half-configured.
 5. Redeploy. `vercel.json` schedules `/api/cron/expire-questions` once a day (the Hobby limit); on Pro change it to hourly (`17 * * * *`). Holds are also released whenever askers or responders open their pages, and card authorisations last ~7 days, so nothing is ever captured late.
-6. Admin → *Members* → search → **Make responder**. The responder sets up 2FA, then *Me → Responder profile → Set up payouts* (Stripe onboarding), fills in their profile and turns on *Accept new questions*.
+6. Members can apply from *Me → Become a responder*; review them in *Admin → Responders* (or appoint someone directly in *Admin → Community → Make responder*). The responder sets up 2FA, then *Me → Responder profile → Set up payouts* (Stripe onboarding), fills in their profile and turns on *Accept new questions*.
 7. Test with card `4242 4242 4242 4242`, any future date, any CVC: ask → answer → check the payment is captured and the transfer appears on the connected account. Then switch to live keys.
+
+**Tune before launch:** *Admin → Settings* holds the platform fee, answer window, price range, open questions per member and the missed-deadline thresholds (warn, then pause).
 
 **Safety:** questions containing crisis language show crisis lines *before* payment and are flagged for the responder. Review the keyword list (`src/lib/crisis.ts`) and every hotline number for your regions before launch.
 

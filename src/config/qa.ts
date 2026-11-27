@@ -3,7 +3,7 @@ export const qaConfig = {
   currency: "usd",
   priceMinCents: 500,
   priceMaxCents: 10_000,
-  /** Platform share of each answered question. Override with PLATFORM_FEE_PERCENT. */
+  /** Default platform share; the live value is in the qa_settings table (Admin → Settings). */
   defaultFeePercent: 20,
   /** Responders must answer within this many hours or the hold is released. */
   answerHours: 48,
@@ -23,12 +23,7 @@ export const qaConfig = {
   languages: ["en", "zh"],
 } as const;
 
-export function feePercent(env: Record<string, string | undefined> = process.env): number {
-  const n = Number(env.PLATFORM_FEE_PERCENT);
-  return Number.isFinite(n) && n >= 0 && n <= 50 ? n : qaConfig.defaultFeePercent;
-}
-
-export function platformFee(priceCents: number, percent = feePercent()): number {
+export function platformFee(priceCents: number, percent: number): number {
   return Math.round((priceCents * percent) / 100);
 }
 

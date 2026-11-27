@@ -38,7 +38,8 @@ export default async function LocaleLayout({ children }: LayoutProps<"/[locale]"
         <Suspense fallback={<div className="h-14 border-b border-line/70" />}>
           <SiteHeader />
         </Suspense>
-        <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-6">{children}</main>
+        {/* Admin pages mark themselves with .admin-wide to get a wider canvas. */}
+        <main className="mx-auto w-full max-w-2xl flex-1 px-4 pt-6 has-[.admin-wide]:max-w-5xl">{children}</main>
         <footer className="pb-tabbar mx-auto w-full max-w-2xl px-4 pt-10">
           <Link
             href={`/${locale}/help`}

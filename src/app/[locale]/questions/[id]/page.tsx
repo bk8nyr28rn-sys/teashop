@@ -10,7 +10,7 @@ import { expireOverdue, getQuestionView } from "@/lib/qa";
 import { Avatar } from "@/components/avatar";
 import { QuestionStatusBadge } from "@/components/question-status";
 import { ui } from "@/components/ui";
-import { cancelQuestionAction, resolveDisputeAction } from "../actions";
+import { cancelQuestionAction } from "../actions";
 import { AnswerForm, DisputeForm, RateForm } from "../forms";
 
 type Props = PageProps<"/[locale]/questions/[id]">;
@@ -42,10 +42,10 @@ async function Question({ params, searchParams }: Pick<Props, "params" | "search
   return (
     <div className="space-y-5">
       <Link
-        href={`/${locale}/${isResponder ? "responder" : isAsker ? "questions" : "admin"}`}
+        href={`/${locale}/${isResponder ? "responder" : "questions"}`}
         className="text-sm text-muted hover:text-ink"
       >
-        ← {isResponder ? dict.nav.responder : isAsker ? t.myQuestions : dict.nav.admin}
+        ← {isResponder ? dict.nav.responder : t.myQuestions}
       </Link>
 
       {isAsker && checkout === "done" && (
@@ -106,6 +106,10 @@ async function Question({ params, searchParams }: Pick<Props, "params" | "search
         </form>
       )}
 
+      {isAsker && q.refundedCents > 0 && q.status === "answered" && (
+        <p className={ui.success}>{format(t.refundedPartial, { p: money(q.refundedCents) })}</p>
+      )}
+
       {isAsker && q.status === "answered" && (
         <section className={`${ui.card} space-y-4`}>
           {q.rating ? <p className={ui.success}>{t.rated}</p> : <RateForm locale={locale} questionId={q.id} t={t} />}
@@ -114,20 +118,6 @@ async function Question({ params, searchParams }: Pick<Props, "params" | "search
           ) : (
             <DisputeForm locale={locale} questionId={q.id} t={t} />
           )}
-        </section>
-      )}
-
-      {q.viewerRole === "admin" && q.disputedAt && !q.disputeResolvedAt && (
-        <section className={`${ui.card} space-y-3`}>
-          <p className="text-sm">“{q.disputeReason}”</p>
-          <div className="flex flex-wrap gap-2">
-            <form action={resolveDisputeAction.bind(null, locale, q.id, true)}>
-              <button className={ui.buttonDanger}>{t.refund}</button>
-            </form>
-            <form action={resolveDisputeAction.bind(null, locale, q.id, false)}>
-              <button className={ui.buttonGhost}>{t.keep}</button>
-            </form>
-          </div>
         </section>
       )}
     </div>

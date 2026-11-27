@@ -21,7 +21,8 @@ export interface PaymentProvider {
   capture(paymentRef: string, idempotencyKey: string): Promise<void>;
   /** Release an uncaptured authorisation. Must be safe to call twice. */
   cancel(paymentRef: string): Promise<void>;
-  refund(paymentRef: string, idempotencyKey: string): Promise<void>;
+  /** Refund `amountCents` (or everything). Responder share and platform fee are reversed proportionally. */
+  refund(paymentRef: string, idempotencyKey: string, amountCents?: number): Promise<void>;
 }
 
 export type CheckoutInput = {

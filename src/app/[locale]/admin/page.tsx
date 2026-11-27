@@ -1,179 +1,159 @@
 import { Suspense } from "react";
+import Link from "next/link";
 import { getDb } from "@/db";
+import { formatMoney, qaConfig } from "@/config/qa";
 import { format, getDictionary, getLocale } from "@/i18n/dictionaries";
 import { requireArea } from "@/lib/dal";
-import { listPendingApplications } from "@/lib/membership";
-import { listOpenReports } from "@/lib/community";
-import { ReportList } from "@/components/report-list";
+import { getOverview } from "@/lib/qa-admin";
 import { ui } from "@/components/ui";
-import { findMembers, listSuspended } from "@/lib/accounts";
-import { decideApplicationAction, setResponderAction, suspendAction, unsuspendAction } from "./actions";
-import Link from "next/link";
-import { formatMoney } from "@/config/qa";
-import { listOpenDisputes } from "@/lib/qa";
+import { Kpi, qCode } from "./ui";
 
-type Props = PageProps<"/[locale]/admin">;
-
-export default async function AdminPage({ searchParams }: Props) {
+export default async function AdminOverviewPage() {
   const dict = await getDictionary();
   return (
-    <div className="space-y-8">
-      <h1 className={ui.h1}>{dict.admin.title}</h1>
-      <Suspense fallback={<p className={ui.muted}>{dict.common.loading}</p>}>
-        <Queue />
-        <Members searchParams={searchParams} />
-      </Suspense>
-    </div>
+    <Suspense fallback={<p className={ui.muted}>{dict.common.loading}</p>}>
+      <Overview />
+    </Suspense>
   );
 }
 
-async function Members({ searchParams }: Pick<Props, "searchParams">) {
-  const [locale, dict, sp] = await Promise.all([getLocale(), getDictionary(), searchParams]);
-  const viewer = await requireArea(locale, "admin");
-  const t = dict.admin;
-  const q = typeof sp.q === "string" ? sp.q : "";
-  const db = getDb();
-  const [results, suspended] = await Promise.all([q ? findMembers(db, q) : [], listSuspended(db)]);
-
+function DailyChart({
+  daily,
+  locale,
+  label,
+}: {
+  daily: { day: Date; count: number }[];
+  locale: string;
+  label: string;
+}) {
+  const W = 320;
+  const H = 150;
+  const top = 18;
+  const bottom = 22;
+  const slot = W / daily.length;
+  const bw = Math.min(26, slot * 0.6);
+  const max = Math.max(1, ...daily.map((d) => d.count));
+  const fmt = new Intl.DateTimeFormat(locale, { weekday: "short" });
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <h2 className={ui.h2}>{t.membersTitle}</h2>
-        <form className="flex gap-2" action={`/${locale}/admin`}>
-          <label className="sr-only" htmlFor="q">
-            {t.searchLabel}
-          </label>
-          <input id="q" name="q" defaultValue={q} placeholder={t.searchLabel} className={ui.input} autoComplete="off" />
-          <button className={ui.buttonGhost}>{t.search}</button>
-        </form>
-        {q && results.length === 0 && <p className={ui.muted}>{t.noResults}</p>}
-        <ul className="space-y-2">
-          {results.map((m) => (
-            <li key={m.userId} className={`${ui.card} space-y-2`} data-testid="member-row">
-              <p className="text-sm">
-                <span className="font-medium">@{m.handle}</span> <span className={ui.badge}>{t.roles[m.role]}</span>{" "}
-                <span className={ui.badge}>{t.status[m.status]}</span>
-              </p>
-              {m.status === "suspended" ? (
-                <form action={unsuspendAction.bind(null, locale, m.userId)}>
-                  <button className={ui.buttonGhost}>{t.unsuspend}</button>
-                </form>
-              ) : (
-                m.role !== "admin" &&
-                m.userId !== viewer.userId && (
-                  <div className="space-y-2">
-                    {m.status === "approved" && (
-                      <form action={setResponderAction.bind(null, locale, m.userId, m.role !== "responder")}>
-                        <button className={ui.buttonSmall}>
-                          {m.role === "responder" ? dict.qa.removeResponder : dict.qa.makeResponder}
-                        </button>
-                      </form>
-                    )}
-                    <form action={suspendAction.bind(null, locale, m.userId)} className="flex flex-wrap gap-2">
-                      <input
-                        name="reason"
-                        placeholder={t.suspendReason}
-                        maxLength={500}
-                        className={`${ui.input} flex-1`}
-                      />
-                      <button className="rounded-full border border-danger px-4 py-2 text-danger hover:bg-danger-soft">
-                        {t.suspend}
-                      </button>
-                    </form>
-                  </div>
-                )
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="space-y-3">
-        <h2 className={ui.h2}>{t.suspendedTitle}</h2>
-        {suspended.length === 0 && <p className={ui.muted}>{t.suspendedEmpty}</p>}
-        <ul className="space-y-2">
-          {suspended.map((m) => (
-            <li key={m.userId} className={`${ui.card} flex flex-wrap items-center justify-between gap-2`}>
-              <span>@{m.handle ?? "—"}</span>
-              <form action={unsuspendAction.bind(null, locale, m.userId)}>
-                <button className={ui.buttonGhost}>{t.unsuspend}</button>
-              </form>
-            </li>
-          ))}
-        </ul>
-      </section>
-    </div>
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label={label} className="overflow-visible">
+      <line x1="0" x2={W} y1={H - bottom} y2={H - bottom} stroke="var(--line)" />
+      {daily.map((d, i) => {
+        const h = (d.count / max) * (H - top - bottom);
+        const x = i * slot + (slot - bw) / 2;
+        const y = H - bottom - h;
+        return (
+          <g key={d.day.toISOString()}>
+            <rect
+              x={x}
+              y={y}
+              width={bw}
+              height={Math.max(h, 0.5)}
+              rx="5"
+              fill={i === daily.length - 1 ? "var(--accent-strong)" : "var(--accent)"}
+            />
+            <text x={x + bw / 2} y={y - 5} textAnchor="middle" fontSize="10" fill="var(--muted)">
+              {d.count}
+            </text>
+            <text x={x + bw / 2} y={H - 6} textAnchor="middle" fontSize="10" fill="var(--muted)">
+              {fmt.format(d.day)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
-async function Queue() {
+async function Overview() {
   const [locale, dict] = await Promise.all([getLocale(), getDictionary()]);
-  await requireArea(locale, "admin");
-  const t = dict.admin;
-  const [apps, reports, disputes] = await Promise.all([
-    listPendingApplications(getDb()),
-    listOpenReports(getDb(), "all"),
-    listOpenDisputes(getDb()),
-  ]);
-  const dateFmt = new Intl.DateTimeFormat(locale, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
+  const viewer = await requireArea(locale, "admin");
+  const o = (await getOverview(getDb(), viewer, 7))!;
+  const c = dict.console;
+  const money = (cents: number) => formatMoney(cents, qaConfig.currency, locale);
+  const hours = (n: number | null) => (n === null ? "—" : format(c.hours, { n: n < 1 ? "<1" : Math.round(n) }));
+  const a = o.attention;
+  const base = `/${locale}/admin`;
+
+  const alerts: { tone: string; text: string; href: string }[] = [
+    ...a.crisisWaiting.map((q) => ({
+      tone: "bg-danger",
+      text: format(c.alertCrisis, { id: qCode(q.id), n: Math.round(q.waitedHours), r: q.responder ?? "—" }),
+      href: `${base}/questions/${q.id}`,
+    })),
+    ...a.expiringSoon.map((q) => ({
+      tone: "bg-warn",
+      text: format(c.alertSoon, { id: qCode(q.id), n: Math.round(q.hoursLeft), r: q.responder ?? "—" }),
+      href: `${base}/questions?f=open`,
+    })),
+    ...(a.disputes
+      ? [{ tone: "bg-accent", text: format(c.alertDisputes, { n: a.disputes }), href: `${base}/reviews` }]
+      : []),
+    ...(a.responderApplications
+      ? [
+          {
+            tone: "bg-accent",
+            text: format(c.alertResponderApps, { n: a.responderApplications }),
+            href: `${base}/responders`,
+          },
+        ]
+      : []),
+    ...a.responders.map((r) => ({
+      tone: r.paused ? "bg-danger" : "bg-warn",
+      text: format(r.paused ? c.alertPaused : c.alertWarned, { h: r.handle ?? "—" }),
+      href: `${base}/responders`,
+    })),
+    ...(a.memberApplications
+      ? [{ tone: "bg-accent", text: format(c.alertMemberApps, { n: a.memberApplications }), href: `${base}/community` }]
+      : []),
+    ...(a.openReports
+      ? [{ tone: "bg-accent", text: format(c.alertReports, { n: a.openReports }), href: `${base}/community` }]
+      : []),
+  ];
 
   return (
-    <div className="space-y-8">
-      <section className="space-y-3">
-        <h2 className={ui.h2}>{dict.qa.disputesTitle}</h2>
-        {disputes.length === 0 && <p className={ui.muted}>{dict.qa.disputesEmpty}</p>}
-        <ul className="grid gap-2">
-          {disputes.map((d) => (
-            <li key={d.id}>
-              <Link href={`/${locale}/questions/${d.id}`} className={`${ui.cardLink} space-y-1`} data-testid="dispute">
-                <p className="flex items-center justify-between gap-2 font-semibold">
-                  <span className="truncate">{d.title || "—"}</span>
-                  <span className={ui.badgeWarn}>{formatMoney(d.priceCents, d.currency, locale)}</span>
-                </p>
-                <p className={`${ui.muted} line-clamp-2`}>“{d.disputeReason}”</p>
-              </Link>
-            </li>
-          ))}
-        </ul>
+    <div className="space-y-6">
+      <h1 className={ui.h1}>{format(c.overviewTitle, { n: o.days })}</h1>
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3" data-testid="kpis">
+        <Kpi label={c.kpi.questions} value={String(o.questions)} />
+        <Kpi
+          label={c.kpi.onTime}
+          value={o.closed ? `${Math.round((o.onTime / o.closed) * 100)}%` : "—"}
+          sub={format(c.ofClosed, { a: o.onTime, b: o.closed })}
+        />
+        <Kpi label={c.kpi.response} value={hours(o.medianResponseHours)} />
+        <Kpi
+          label={c.kpi.charged}
+          value={money(o.chargedCents - o.refundedCents)}
+          sub={o.refundedCents ? format(c.afterRefunds, { p: money(o.refundedCents) }) : undefined}
+        />
+        <Kpi label={c.kpi.platform} value={money(o.platformCents)} />
+        <Kpi label={c.kpi.rating} value={o.averageRating === null ? "—" : `★ ${o.averageRating.toFixed(1)}`} />
       </section>
-      <section className="space-y-3">
-        <h2 className={ui.h2}>{t.reportsTitle}</h2>
-        <ReportList reports={reports} locale={locale} dict={dict} />
-      </section>
-      <section className="space-y-3">
-        <h2 className={ui.h2}>{t.queueTitle}</h2>
-        <p className={ui.muted}>{t.decisionNote}</p>
-        {apps.length === 0 && <p className={ui.muted}>{t.queueEmpty}</p>}
-        {apps.map((app) => (
-          <article key={app.id} className={`${ui.card} space-y-3`} data-testid="application">
-            <header className="flex flex-wrap items-baseline justify-between gap-x-3">
-              <span className="font-medium">@{app.handle}</span>
-              <span className={ui.muted}>{format(t.submitted, { date: dateFmt.format(app.createdAt) })}</span>
-            </header>
-            <dl className="space-y-2 text-sm">
-              {app.answers?.map((a) => (
-                <div key={a.questionId}>
-                  <dt className="font-medium">
-                    {dict.onboarding.questions[a.questionId as keyof typeof dict.onboarding.questions] ?? a.questionId}
-                  </dt>
-                  <dd className="whitespace-pre-wrap text-muted">{a.answer}</dd>
-                </div>
-              ))}
-            </dl>
-            <div className="flex gap-3">
-              <form action={decideApplicationAction.bind(null, locale, app.id, "approved")}>
-                <button className={ui.button}>{t.approve}</button>
-              </form>
-              <form action={decideApplicationAction.bind(null, locale, app.id, "rejected")}>
-                <button className={ui.buttonGhost}>{t.reject}</button>
-              </form>
-            </div>
-          </article>
-        ))}
-      </section>
+
+      <div className="grid items-start gap-4 lg:grid-cols-[1.15fr_1fr]">
+        <section className="space-y-2">
+          <h2 className={ui.h2}>{c.attention}</h2>
+          <ul
+            className="divide-y divide-line overflow-hidden rounded-3xl border border-line bg-surface"
+            data-testid="attention"
+          >
+            {alerts.length === 0 && <li className="px-5 py-4 text-sm text-muted">{c.attentionEmpty}</li>}
+            {alerts.map((al, i) => (
+              <li key={i} className="flex items-center gap-3 px-5 py-3">
+                <span aria-hidden className={`size-2 shrink-0 rounded-full ${al.tone}`} />
+                <span className="flex-1 text-sm">{al.text}</span>
+                <Link href={al.href} className={ui.buttonSmall + " border border-line"}>
+                  {c.open}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+        <section className={`${ui.card} space-y-2`}>
+          <h2 className={ui.h2}>{c.chart}</h2>
+          <DailyChart daily={o.daily} locale={locale} label={c.chart} />
+        </section>
+      </div>
     </div>
   );
 }

@@ -2,6 +2,8 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { format, getDictionary, getLocale } from "@/i18n/dictionaries";
 import { requireArea } from "@/lib/dal";
+import { getDb } from "@/db";
+import { getMyResponderApplication } from "@/lib/qa-admin";
 import { Avatar } from "@/components/avatar";
 import { Icon, type IconName } from "@/components/icons";
 import { SignOutButton } from "@/components/sign-out-button";
@@ -51,6 +53,8 @@ async function Me() {
     );
   }
   if (realRole === "admin") staff.push({ href: l("/admin"), label: t.admin, icon: "shield" });
+  const app = realRole === "member" ? await getMyResponderApplication(getDb(), viewer.userId) : null;
+  const q = dict.qa;
   if (staff.length) staff.push({ href: l("/settings/security"), label: t.security, icon: "lock", note: mfaNote });
 
   return (
@@ -69,8 +73,16 @@ async function Me() {
           { href: l("/home#invite"), label: t.invite, icon: "circles" },
           { href: l("/settings"), label: t.settings, icon: "me" },
           { href: l("/help"), label: t.help, icon: "help" },
+          ...(realRole === "member" && app?.status !== "pending"
+            ? [{ href: l("/responder/apply"), label: t.applyResponder, icon: "shield" as const }]
+            : []),
         ]}
       />
+      {app && (
+        <p className={app.status === "declined" ? ui.panel + " text-sm" : ui.notice}>
+          {app.status === "pending" ? q.applyPending : app.status === "approved" ? q.applyApproved : q.applyDeclined}
+        </p>
+      )}
 
       {staff.length > 0 && (
         <section className="space-y-2">

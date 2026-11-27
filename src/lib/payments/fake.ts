@@ -5,7 +5,12 @@ import { PaymentError, type CheckoutInput, type PaymentProvider } from "./types"
  * production (see getPaymentProvider). Its "checkout" is a dev page that
  * simulates the card authorisation.
  */
-export type FakeLedgerEntry = { op: "checkout" | "capture" | "cancel" | "refund"; ref: string; key?: string };
+export type FakeLedgerEntry = {
+  op: "checkout" | "capture" | "cancel" | "refund";
+  ref: string;
+  key?: string;
+  amountCents?: number;
+};
 
 export function createFakeProvider(opts: { failCapture?: boolean } = {}) {
   const ledger: FakeLedgerEntry[] = [];
@@ -40,8 +45,8 @@ export function createFakeProvider(opts: { failCapture?: boolean } = {}) {
     async cancel(paymentRef) {
       ledger.push({ op: "cancel", ref: paymentRef });
     },
-    async refund(paymentRef, key) {
-      ledger.push({ op: "refund", ref: paymentRef, key });
+    async refund(paymentRef, key, amountCents) {
+      ledger.push({ op: "refund", ref: paymentRef, key, amountCents });
     },
   };
   return provider;

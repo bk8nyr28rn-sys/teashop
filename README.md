@@ -82,6 +82,16 @@ sign in (email code) → onboarding ─┬─ invite code ───────�
 - Crisis language (`src/lib/crisis.ts`) shows crisis lines before any payment and flags the question for the responder. `/help` lists support lines on every page.
 - Without `STRIPE_SECRET_KEY`, development uses a fake provider with a simulated checkout page (`/dev/checkout/…`); production shows Q&A as unavailable.
 
+## Admin console (`/admin`)
+
+Admins only, with 2FA. Sections: **Overview** (7-day KPIs, daily chart, needs-attention list), **Questions**, **Responders**, **Reviews**, **Finance**, **Community** (membership applications, reports, members), **Settings**, **Audit log**.
+
+- **Content stays private from staff.** Lists show metadata only (amount, status, timing, responder) — never titles, text or askers. A question can be opened only if it is under review or crisis-flagged, with a stated reason; the view is written to the audit log and lasts 30 minutes (`lib/qa-admin.ts`).
+- **Refunds of any amount.** Admins refund part or all of a disputed question; the responder's share and the platform fee are reversed proportionally. The amount field starts empty on purpose.
+- **Missed deadlines: warn, then pause.** After `overdueWarnAt` missed deadlines in 30 days the responder is warned (desk banner + audit); only an already-warned responder is paused at `overduePauseAt`. Cancellations, failed payments and holds released by suspension don't count. Admins can resume at any time; that clears the warning (not the history), so any later pause again needs a fresh warning first.
+- **Responder applications.** Members (trust ≥ 1) apply from *Me*; admins approve or decline; the application text is wiped after the decision.
+- **Settings in the database** (`qa_settings`): fee, answer window, price range, open questions per member, warning/pause thresholds. Every change is logged with before/after values and only affects new questions (fee and window are snapshotted per question).
+
 ## Privacy decisions (do not regress)
 
 - No orientation / gender-identity column anywhere. Belonging = circle membership.
@@ -104,7 +114,8 @@ src/
   lib/community.ts     circles, posts, comments, reports, trust refresh (integration-tested)
   lib/mfa.ts           staff TOTP enrolment / step-up
   lib/accounts.ts      suspension, sign-out-others, account deletion
-  lib/qa.ts            paid Q&A lifecycle (ask, authorise, answer+capture, expire, dispute)
+  lib/qa.ts            paid Q&A lifecycle (ask, authorise, answer+capture, expire, dispute, missed deadlines)
+  lib/qa-admin.ts      admin console: stats, logged content unlock, responders, applications, finance, settings
   lib/payments/        PaymentProvider interface, Stripe and fake implementations
   lib/crisis.ts        crisis-language detection and support lines
   lib/dal.ts           session → viewer; the only place that reads auth (applies the 2FA downgrade)

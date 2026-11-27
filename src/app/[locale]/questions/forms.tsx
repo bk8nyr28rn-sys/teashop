@@ -210,6 +210,8 @@ export function ResponderProfileForm(props: {
   };
   payoutsReady: boolean;
   priceHint: string;
+  priceMinCents: number;
+  priceMaxCents: number;
 }) {
   const { t, initial } = props;
   const [state, action, pending] = useActionState(saveResponderProfileAction.bind(null, props.locale), undefined);
@@ -276,8 +278,8 @@ export function ResponderProfileForm(props: {
           name="price"
           type="number"
           inputMode="decimal"
-          min={qaConfig.priceMinCents / 100}
-          max={qaConfig.priceMaxCents / 100}
+          min={props.priceMinCents / 100}
+          max={props.priceMaxCents / 100}
           step="1"
           required
           defaultValue={state?.values?.price ?? String(initial.priceCents / 100)}
