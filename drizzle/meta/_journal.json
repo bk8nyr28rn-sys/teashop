@@ -15,6 +15,13 @@
       "when": 1795743419966,
       "tag": "0001_tearful_karen_page",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1795745733774,
+      "tag": "0002_young_cannonball",
+      "breakpoints": true
     }
   ]
 }

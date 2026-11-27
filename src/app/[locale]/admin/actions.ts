@@ -5,6 +5,7 @@ import { getDb } from "@/db";
 import { hasLocale } from "@/i18n/config";
 import { requireArea } from "@/lib/dal";
 import { decideApplication, type Decision } from "@/lib/membership";
+import { suspendUser, unsuspendUser } from "@/lib/accounts";
 
 export async function decideApplicationAction(locale: string, applicationId: string, decision: Decision) {
   if (!hasLocale(locale)) throw new Error("Unsupported locale");
@@ -15,5 +16,19 @@ export async function decideApplicationAction(locale: string, applicationId: str
   if (result.ok && result.evidenceKeyToDelete) {
     // TODO(storage): delete the evidence object from R2 once uploads are wired.
   }
+  refresh();
+}
+
+export async function suspendAction(locale: string, userId: string, fd: FormData) {
+  if (!hasLocale(locale)) throw new Error("Unsupported locale");
+  const viewer = await requireArea(locale, "admin");
+  await suspendUser(getDb(), viewer, { userId, reason: String(fd.get("reason") ?? "") });
+  refresh();
+}
+
+export async function unsuspendAction(locale: string, userId: string) {
+  if (!hasLocale(locale)) throw new Error("Unsupported locale");
+  const viewer = await requireArea(locale, "admin");
+  await unsuspendUser(getDb(), viewer, userId);
   refresh();
 }

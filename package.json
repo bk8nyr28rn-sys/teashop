@@ -13,15 +13,18 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed.ts",
     "admin:grant": "tsx scripts/grant-admin.ts",
-    "format": "prettier --write src tests scripts"
+    "format": "prettier --write src tests scripts",
+    "mfa:reset": "tsx scripts/reset-mfa.ts"
   },
   "dependencies": {
+    "@better-auth/utils": "^0.5.1",
     "@formatjs/intl-localematcher": "^0.10.3",
     "better-auth": "^1.7.28",
     "drizzle-orm": "^0.45.4",
     "negotiator": "^1.1.0",
     "next": "16.4.6",
     "postgres": "^4.1.1",
+    "qrcode": "^1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
@@ -31,6 +34,7 @@
     "@tailwindcss/turbopack": "4.3.3",
     "@types/negotiator": "^0.6.5",
     "@types/node": "^22.20.7",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "drizzle-kit": "^0.31.11",

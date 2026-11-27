@@ -6,16 +6,90 @@ import { listPendingApplications } from "@/lib/membership";
 import { listOpenReports } from "@/lib/community";
 import { ReportList } from "@/components/report-list";
 import { ui } from "@/components/ui";
-import { decideApplicationAction } from "./actions";
+import { findMembers, listSuspended } from "@/lib/accounts";
+import { decideApplicationAction, suspendAction, unsuspendAction } from "./actions";
 
-export default async function AdminPage() {
+type Props = PageProps<"/[locale]/admin">;
+
+export default async function AdminPage({ searchParams }: Props) {
   const dict = await getDictionary();
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <h1 className={ui.h1}>{dict.admin.title}</h1>
       <Suspense fallback={<p className={ui.muted}>{dict.common.loading}</p>}>
         <Queue />
+        <Members searchParams={searchParams} />
       </Suspense>
+    </div>
+  );
+}
+
+async function Members({ searchParams }: Pick<Props, "searchParams">) {
+  const [locale, dict, sp] = await Promise.all([getLocale(), getDictionary(), searchParams]);
+  const viewer = await requireArea(locale, "admin");
+  const t = dict.admin;
+  const q = typeof sp.q === "string" ? sp.q : "";
+  const db = getDb();
+  const [results, suspended] = await Promise.all([q ? findMembers(db, q) : [], listSuspended(db)]);
+
+  return (
+    <div className="space-y-8">
+      <section className="space-y-3">
+        <h2 className={ui.h2}>{t.membersTitle}</h2>
+        <form className="flex gap-2" action={`/${locale}/admin`}>
+          <label className="sr-only" htmlFor="q">
+            {t.searchLabel}
+          </label>
+          <input id="q" name="q" defaultValue={q} placeholder={t.searchLabel} className={ui.input} autoComplete="off" />
+          <button className={ui.buttonGhost}>{t.search}</button>
+        </form>
+        {q && results.length === 0 && <p className={ui.muted}>{t.noResults}</p>}
+        <ul className="space-y-2">
+          {results.map((m) => (
+            <li key={m.userId} className={`${ui.card} space-y-2`} data-testid="member-row">
+              <p className="text-sm">
+                <span className="font-medium">@{m.handle}</span> <span className={ui.badge}>{t.roles[m.role]}</span>{" "}
+                <span className={ui.badge}>{t.status[m.status]}</span>
+              </p>
+              {m.status === "suspended" ? (
+                <form action={unsuspendAction.bind(null, locale, m.userId)}>
+                  <button className={ui.buttonGhost}>{t.unsuspend}</button>
+                </form>
+              ) : (
+                m.role !== "admin" &&
+                m.userId !== viewer.userId && (
+                  <form action={suspendAction.bind(null, locale, m.userId)} className="flex flex-wrap gap-2">
+                    <input
+                      name="reason"
+                      placeholder={t.suspendReason}
+                      maxLength={500}
+                      className={`${ui.input} flex-1`}
+                    />
+                    <button className="rounded-xl border border-danger px-4 py-2 text-danger hover:bg-danger/10">
+                      {t.suspend}
+                    </button>
+                  </form>
+                )
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className={ui.h2}>{t.suspendedTitle}</h2>
+        {suspended.length === 0 && <p className={ui.muted}>{t.suspendedEmpty}</p>}
+        <ul className="space-y-2">
+          {suspended.map((m) => (
+            <li key={m.userId} className={`${ui.card} flex flex-wrap items-center justify-between gap-2`}>
+              <span>@{m.handle ?? "—"}</span>
+              <form action={unsuspendAction.bind(null, locale, m.userId)}>
+                <button className={ui.buttonGhost}>{t.unsuspend}</button>
+              </form>
+            </li>
+          ))}
+        </ul>
+      </section>
     </div>
   );
 }

@@ -4,10 +4,10 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db";
 import { format, getDictionary, getLocale } from "@/i18n/dictionaries";
 import { requireArea } from "@/lib/dal";
-import { listMembers, listOpenReports, listPendingRequests, loadCircle } from "@/lib/community";
+import { listBanned, listMembers, listOpenReports, listPendingRequests, loadCircle } from "@/lib/community";
 import { ui } from "@/components/ui";
 import { ReportList } from "@/components/report-list";
-import { decideJoinAction, setModeratorAction } from "../../actions";
+import { banAction, decideJoinAction, setModeratorAction, unbanAction } from "../../actions";
 
 type Props = PageProps<"/[locale]/c/[slug]/mod">;
 
@@ -30,10 +30,11 @@ async function ModView({ params }: Pick<Props, "params">) {
   const { circle: c } = loaded;
   const t = dict.mod;
   const isAdmin = viewer.profile.role === "admin";
-  const [requests, reports, members] = await Promise.all([
+  const [requests, reports, members, banned] = await Promise.all([
     listPendingRequests(db, c.id),
     listOpenReports(db, [c.id]),
     listMembers(db, c.id),
+    listBanned(db, c.id),
   ]);
 
   return (
@@ -84,13 +85,37 @@ async function ModView({ params }: Pick<Props, "params">) {
               <span>
                 @{m.handle} {m.role === "moderator" && <span className={ui.badge}>{t.moderator}</span>}
               </span>
-              {isAdmin && m.userId !== viewer.userId && (
-                <form action={setModeratorAction.bind(null, locale, c.id, m.userId, m.role !== "moderator")}>
-                  <button className="text-xs text-muted hover:text-ink">
-                    {m.role === "moderator" ? t.removeMod : t.makeMod}
-                  </button>
-                </form>
+              {m.userId !== viewer.userId && (
+                <span className="flex gap-3">
+                  {isAdmin && (
+                    <form action={setModeratorAction.bind(null, locale, c.id, m.userId, m.role !== "moderator")}>
+                      <button className="text-xs text-muted hover:text-ink">
+                        {m.role === "moderator" ? t.removeMod : t.makeMod}
+                      </button>
+                    </form>
+                  )}
+                  {(isAdmin || m.role !== "moderator") && (
+                    <form action={banAction.bind(null, locale, c.id, m.userId)}>
+                      <button className="text-xs text-danger hover:underline">{t.ban}</button>
+                    </form>
+                  )}
+                </span>
               )}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className={ui.h2}>{t.bannedTitle}</h2>
+        {banned.length === 0 && <p className={ui.muted}>{t.bannedEmpty}</p>}
+        <ul className="space-y-2">
+          {banned.map((b) => (
+            <li key={b.userId} className={`${ui.card} flex flex-wrap items-center justify-between gap-2`}>
+              <span>@{b.handle}</span>
+              <form action={unbanAction.bind(null, locale, c.id, b.userId)}>
+                <button className={ui.buttonGhost}>{t.unban}</button>
+              </form>
             </li>
           ))}
         </ul>

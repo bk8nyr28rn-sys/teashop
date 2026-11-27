@@ -10,7 +10,10 @@
   "nav": {
     "home": "Home",
     "responder": "Responder desk",
-    "admin": "Admin"
+    "admin": "Admin",
+    "settings": "Settings",
+    "mfaSetup": "Set up 2FA",
+    "mfaVerify": "Verify 2FA"
   },
   "landing": {
     "title": "A community for LGBTQ+ people, built around privacy.",
@@ -70,7 +73,8 @@
   },
   "suspended": {
     "title": "Your account is suspended",
-    "body": "If you believe this is a mistake, contact the moderation team."
+    "body": "If you believe this is a mistake, contact the moderation team.",
+    "deleteHint": "You can still delete your account and all your content in Settings."
   },
   "home": {
     "title": "Welcome, {name}",
@@ -113,7 +117,28 @@
     "reject": "Reject",
     "decisionNote": "Answers are deleted as soon as you decide.",
     "reportsTitle": "Open reports (all circles)",
-    "manage": "Moderate"
+    "manage": "Moderate",
+    "membersTitle": "Members",
+    "searchLabel": "Find by nickname",
+    "search": "Search",
+    "noResults": "No members found.",
+    "suspend": "Suspend",
+    "unsuspend": "Lift suspension",
+    "suspendReason": "Reason (internal note)",
+    "suspendedTitle": "Suspended accounts",
+    "suspendedEmpty": "No suspended accounts.",
+    "status": {
+      "new": "new",
+      "pending": "pending",
+      "approved": "active",
+      "rejected": "rejected",
+      "suspended": "suspended"
+    },
+    "roles": {
+      "member": "member",
+      "responder": "responder",
+      "admin": "admin"
+    }
   },
   "circle": {
     "join": "Join",
@@ -188,6 +213,57 @@
     "membersTitle": "Members",
     "makeMod": "Make moderator",
     "removeMod": "Remove moderator",
-    "moderator": "moderator"
+    "moderator": "moderator",
+    "ban": "Ban",
+    "unban": "Unban",
+    "bannedTitle": "Banned from this circle",
+    "bannedEmpty": "No one is banned."
+  },
+  "settings": {
+    "title": "Settings",
+    "accountTitle": "Account",
+    "handle": "Nickname",
+    "email": "Email (only you can see this)",
+    "sessionsTitle": "Devices",
+    "sessionsBody": "Signed in on a device you no longer trust, or someone saw your phone? Sign out everywhere else.",
+    "signOutOthers": "Sign out other devices",
+    "signedOutOthers": "Signed out of {n} other sessions.",
+    "securityLink": "Two-factor authentication",
+    "deleteTitle": "Delete account",
+    "deleteBody": "This permanently deletes your account. Your posts and comments are erased and shown as “deleted by the author”. This cannot be undone.",
+    "deleteConfirmLabel": "Type {word} to confirm",
+    "deleteButton": "Delete my account permanently",
+    "deleteNeedsFresh": "For your safety, please sign in again before deleting your account (sign-ins older than 15 minutes don't count).",
+    "signInAgain": "Sign out and sign in again",
+    "deleteMismatch": "That doesn't match."
+  },
+  "security": {
+    "title": "Two-factor authentication",
+    "intro": "Staff accounts (admins and responders) must use an authenticator app. Until you verify, you only have regular member access.",
+    "notStaff": "Two-factor authentication is currently required for staff accounts only.",
+    "setupTitle": "Set up your authenticator",
+    "setupSteps": "Scan the QR code with an authenticator app (for example 1Password, Google Authenticator or Authy), then enter the 6-digit code it shows.",
+    "manualKey": "Can't scan? Enter this key manually:",
+    "codeLabel": "Code",
+    "confirm": "Turn on 2FA",
+    "backupTitle": "Save your backup codes",
+    "backupBody": "Each code works once if you lose your phone. Store them somewhere safe — they won't be shown again.",
+    "backupDone": "I've saved them — continue",
+    "verifyTitle": "Verify it's you",
+    "verifyBody": "Enter the 6-digit code from your authenticator app, or one of your backup codes.",
+    "verify": "Verify",
+    "enabled": "Two-factor authentication is on and this session is verified.",
+    "backupLeft": "{n} backup codes left.",
+    "lostDevice": "Lost your phone and your backup codes? Ask another admin to reset your 2FA.",
+    "errors": {
+      "invalid-code": "That code didn't work. Check your app's clock and try the newest code.",
+      "locked": "Too many wrong codes. Please wait 15 minutes.",
+      "not-enrolled": "Two-factor authentication isn't set up yet.",
+      "already-enrolled": "Two-factor authentication is already on."
+    }
+  },
+  "goodbye": {
+    "title": "Your account has been deleted",
+    "body": "Your posts and comments have been erased. Thank you for being part of this community — take good care of yourself."
   }
 }

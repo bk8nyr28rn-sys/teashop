@@ -121,6 +121,7 @@ export const profile = pgTable(
     ageConfirmedAt: timestamp("age_confirmed_at", { withTimezone: true }),
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     invitedBy: text("invited_by").references(() => user.id, { onDelete: "set null" }),
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("trust_level_range", sql`${t.trustLevel} between 0 and 3`)],
@@ -229,9 +230,8 @@ export const post = pgTable(
     circleId: text("circle_id")
       .notNull()
       .references(() => circle.id, { onDelete: "cascade" }),
-    authorId: text("author_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    /** Null once the author deletes their account (the text is wiped first). */
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
     title: text("title").notNull(),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
@@ -249,9 +249,8 @@ export const comment = pgTable(
     postId: text("post_id")
       .notNull()
       .references(() => post.id, { onDelete: "cascade" }),
-    authorId: text("author_id")
-      .notNull()
-      .references(() => user.id, { onDelete: "cascade" }),
+    /** Null once the author deletes their account (the text is wiped first). */
+    authorId: text("author_id").references(() => user.id, { onDelete: "set null" }),
     body: text("body").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     removedAt: timestamp("removed_at", { withTimezone: true }),
@@ -300,6 +299,42 @@ export const report = pgTable(
     index("report_author_status_idx").on(t.authorId, t.status),
   ],
 );
+
+/* ------------------------------------------------------------------ */
+/* Staff two-factor authentication                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * TOTP enrolment for staff (admins, responders). Better Auth's two-factor
+ * plugin does not cover email-OTP sign-in, so step-up is enforced in the DAL.
+ */
+export const staffMfa = pgTable("staff_mfa", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => user.id, { onDelete: "cascade" }),
+  /** TOTP secret, encrypted with BETTER_AUTH_SECRET. */
+  secretEnc: text("secret_enc").notNull(),
+  /** Null while setup is pending confirmation. */
+  enabledAt: timestamp("enabled_at", { withTimezone: true }),
+  /** SHA-256 hashes of unused one-time backup codes. */
+  backupCodeHashes: jsonb("backup_code_hashes").$type<string[]>().notNull().default([]),
+  /** Highest TOTP time-step accepted so far — blocks code replay. */
+  lastCounter: integer("last_counter").notNull().default(0),
+  failedAttempts: integer("failed_attempts").notNull().default(0),
+  lockedUntil: timestamp("locked_until", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Sessions that passed the staff second factor. Dies with the session. */
+export const mfaSession = pgTable("mfa_session", {
+  sessionId: text("session_id")
+    .primaryKey()
+    .references(() => session.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /** Who did what, for moderation accountability (incl. every evidence view). */
 export const auditLog = pgTable(

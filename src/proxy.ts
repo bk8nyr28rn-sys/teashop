@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { defaultLocale, hasLocale, locales } from "@/i18n/config";
 
 /** Sections that need a signed-in user. Fine-grained checks happen on the server. */
-const PROTECTED = ["start", "onboarding", "pending", "suspended", "home", "responder", "admin", "c"];
+const PROTECTED = ["start", "onboarding", "pending", "suspended", "home", "responder", "admin", "c", "settings"];
 
 function preferredLocale(request: NextRequest): string {
   const languages = new Negotiator({

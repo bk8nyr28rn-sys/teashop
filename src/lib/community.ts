@@ -185,6 +185,63 @@ export async function setModerator(
   return { ok: true };
 }
 
+/**
+ * Ban someone from a circle (moderators). Bans stick even if they leave.
+ * Admins can't be banned; only admins can ban another moderator.
+ */
+export async function banFromCircle(
+  db: Db,
+  actor: Actor,
+  input: { circleId: string; userId: string },
+): Promise<Result> {
+  if (!(await requireModerator(db, actor, input.circleId))) return fail("forbidden");
+  if (input.userId === actor.userId) return fail("own-content");
+  const [target] = await db.select({ role: profile.role }).from(profile).where(eq(profile.userId, input.userId));
+  if (!target || target.role === "admin") return fail("forbidden");
+  const existing = await membershipOf(db, input.circleId, input.userId);
+  if (existing?.role === "moderator" && actor.profile.role !== "admin") return fail("forbidden");
+
+  await db
+    .insert(circleMember)
+    .values({ circleId: input.circleId, userId: input.userId, status: "banned", role: "member" })
+    .onConflictDoUpdate({
+      target: [circleMember.circleId, circleMember.userId],
+      set: { status: "banned", role: "member" },
+    });
+  await audit(db, actor.userId, "circle.banned", "circle", input.circleId, { userId: input.userId });
+  return { ok: true };
+}
+
+export async function unbanFromCircle(
+  db: Db,
+  actor: Actor,
+  input: { circleId: string; userId: string },
+): Promise<Result> {
+  if (!(await requireModerator(db, actor, input.circleId))) return fail("forbidden");
+  const rows = await db
+    .delete(circleMember)
+    .where(
+      and(
+        eq(circleMember.circleId, input.circleId),
+        eq(circleMember.userId, input.userId),
+        eq(circleMember.status, "banned"),
+      ),
+    )
+    .returning();
+  if (!rows.length) return fail("not-found");
+  await audit(db, actor.userId, "circle.unbanned", "circle", input.circleId, { userId: input.userId });
+  return { ok: true };
+}
+
+export async function listBanned(db: Db, circleId: string) {
+  return db
+    .select({ userId: circleMember.userId, handle: profile.handle })
+    .from(circleMember)
+    .innerJoin(profile, eq(profile.userId, circleMember.userId))
+    .where(and(eq(circleMember.circleId, circleId), eq(circleMember.status, "banned")))
+    .orderBy(profile.handle);
+}
+
 /* ------------------------------- Content -------------------------------- */
 
 function clean(text: unknown, max: number): string | null {
@@ -228,7 +285,7 @@ export async function loadPost(db: Db, actor: Actor, postId: string) {
   const [row] = await db
     .select({ post, authorHandle: profile.handle })
     .from(post)
-    .innerJoin(profile, eq(profile.userId, post.authorId))
+    .leftJoin(profile, eq(profile.userId, post.authorId))
     .where(eq(post.id, postId));
   if (!row) return null;
   const p = row.post;
@@ -330,7 +387,7 @@ export async function createReport(
   const details = (input.details ?? "").trim();
   if (details.length > LIMITS.reportDetailsMax) return fail("invalid-input");
   const where = await locate(db, input.targetType, input.targetId);
-  if (!where || where.removedAt) return fail("not-found");
+  if (!where || where.removedAt || !where.authorId) return fail("not-found");
   if (where.authorId === actor.userId) return fail("own-content");
   const loaded = await loadCircle(db, actor, { id: where.circleId });
   if (!loaded?.access.canRead) return fail("not-found");
@@ -460,7 +517,7 @@ export async function listComments(db: Db, postId: string, includeRemoved: boole
       removal: comment.removal,
     })
     .from(comment)
-    .innerJoin(profile, eq(profile.userId, comment.authorId))
+    .leftJoin(profile, eq(profile.userId, comment.authorId))
     .where(and(eq(comment.postId, postId), includeRemoved ? undefined : isNull(comment.removedAt)))
     .orderBy(comment.createdAt)
     .limit(500);

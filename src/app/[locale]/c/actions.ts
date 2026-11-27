@@ -7,6 +7,8 @@ import type { ReportTarget } from "@/db/schema";
 import { hasLocale } from "@/i18n/config";
 import { getViewer } from "@/lib/dal";
 import {
+  banFromCircle,
+  unbanFromCircle,
   createComment,
   createPost,
   createReport,
@@ -120,5 +122,15 @@ export async function resolveReportAction(locale: string, reportId: string, deci
 
 export async function setModeratorAction(locale: string, circleId: string, userId: string, moderator: boolean) {
   await setModerator(getDb(), await actor(locale), { circleId, userId, moderator });
+  refresh();
+}
+
+export async function banAction(locale: string, circleId: string, userId: string) {
+  await banFromCircle(getDb(), await actor(locale), { circleId, userId });
+  refresh();
+}
+
+export async function unbanAction(locale: string, circleId: string, userId: string) {
+  await unbanFromCircle(getDb(), await actor(locale), { circleId, userId });
   refresh();
 }

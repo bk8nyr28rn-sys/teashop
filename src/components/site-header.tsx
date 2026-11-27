@@ -35,6 +35,19 @@ export async function SiteHeader() {
               {dict.nav.admin}
             </Link>
           )}
+          {(viewer?.staffMfa === "setup" || viewer?.staffMfa === "verify") && (
+            <Link
+              className="whitespace-nowrap rounded-full border border-danger px-2 py-0.5 text-xs text-danger"
+              href={`/${locale}/settings/security`}
+            >
+              {viewer.staffMfa === "setup" ? dict.nav.mfaSetup : dict.nav.mfaVerify}
+            </Link>
+          )}
+          {viewer && (
+            <Link className={link} href={`/${locale}/settings`}>
+              {dict.nav.settings}
+            </Link>
+          )}
         </nav>
         <div className="ml-auto flex items-center gap-3">
           <LocaleSwitcher current={locale} label={dict.common.language} />

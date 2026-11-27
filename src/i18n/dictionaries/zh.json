@@ -10,7 +10,10 @@
   "nav": {
     "home": "首页",
     "responder": "答主工作台",
-    "admin": "管理后台"
+    "admin": "管理后台",
+    "settings": "设置",
+    "mfaSetup": "设置两步验证",
+    "mfaVerify": "完成两步验证"
   },
   "landing": {
     "title": "一个以隐私为核心的 LGBTQ+ 社群。",
@@ -70,7 +73,8 @@
   },
   "suspended": {
     "title": "你的账号已被停用",
-    "body": "如果你认为这是误判，请联系管理团队。"
+    "body": "如果你认为这是误判，请联系管理团队。",
+    "deleteHint": "你仍然可以在「设置」中注销账号并删除所有内容。"
   },
   "home": {
     "title": "欢迎，{name}",
@@ -113,7 +117,28 @@
     "reject": "拒绝",
     "decisionNote": "一旦你做出决定，申请回答会立即删除。",
     "reportsTitle": "待处理举报（全部圈子）",
-    "manage": "前往管理"
+    "manage": "前往管理",
+    "membersTitle": "成员管理",
+    "searchLabel": "按昵称查找",
+    "search": "搜索",
+    "noResults": "没有找到成员。",
+    "suspend": "停用账号",
+    "unsuspend": "解除停用",
+    "suspendReason": "原因（内部备注）",
+    "suspendedTitle": "已停用的账号",
+    "suspendedEmpty": "暂无停用的账号。",
+    "status": {
+      "new": "新用户",
+      "pending": "审核中",
+      "approved": "正常",
+      "rejected": "未通过",
+      "suspended": "已停用"
+    },
+    "roles": {
+      "member": "成员",
+      "responder": "答主",
+      "admin": "管理员"
+    }
   },
   "circle": {
     "join": "加入",
@@ -188,6 +213,57 @@
     "membersTitle": "成员",
     "makeMod": "设为版主",
     "removeMod": "取消版主",
-    "moderator": "版主"
+    "moderator": "版主",
+    "ban": "封禁",
+    "unban": "解除封禁",
+    "bannedTitle": "已封禁的成员",
+    "bannedEmpty": "暂无封禁的成员。"
+  },
+  "settings": {
+    "title": "设置",
+    "accountTitle": "账号",
+    "handle": "昵称",
+    "email": "邮箱（只有你自己能看到）",
+    "sessionsTitle": "登录设备",
+    "sessionsBody": "在不再信任的设备上登录过，或者手机被别人看到了？可以一键退出其他所有设备。",
+    "signOutOthers": "退出其他设备",
+    "signedOutOthers": "已退出其他 {n} 个登录。",
+    "securityLink": "两步验证",
+    "deleteTitle": "注销账号",
+    "deleteBody": "这会永久删除你的账号。你的帖子和评论内容会被抹除，显示为「作者已删除」。此操作无法撤销。",
+    "deleteConfirmLabel": "输入 {word} 以确认",
+    "deleteButton": "永久注销我的账号",
+    "deleteNeedsFresh": "为了你的安全，注销前请重新登录一次（超过 15 分钟的登录不算）。",
+    "signInAgain": "退出并重新登录",
+    "deleteMismatch": "输入内容不一致。"
+  },
+  "security": {
+    "title": "两步验证",
+    "intro": "工作人员账号（管理员和答主）必须使用身份验证器 App。完成验证前，你只有普通成员权限。",
+    "notStaff": "两步验证目前只对工作人员账号强制开启。",
+    "setupTitle": "设置身份验证器",
+    "setupSteps": "用身份验证器 App（例如 1Password、Google Authenticator 或 Authy）扫描二维码，然后输入它显示的 6 位数字。",
+    "manualKey": "无法扫码？请手动输入这个密钥：",
+    "codeLabel": "验证码",
+    "confirm": "开启两步验证",
+    "backupTitle": "保存你的备用码",
+    "backupBody": "手机丢失时，每个备用码可以使用一次。请妥善保存，它们只会显示这一次。",
+    "backupDone": "我已保存，继续",
+    "verifyTitle": "确认是你本人",
+    "verifyBody": "输入身份验证器 App 上的 6 位数字，或者一个备用码。",
+    "verify": "验证",
+    "enabled": "两步验证已开启，当前登录已通过验证。",
+    "backupLeft": "还剩 {n} 个备用码。",
+    "lostDevice": "手机和备用码都丢了？请联系其他管理员重置你的两步验证。",
+    "errors": {
+      "invalid-code": "验证码不正确。请检查手机时间，并输入最新的验证码。",
+      "locked": "错误次数过多，请 15 分钟后再试。",
+      "not-enrolled": "还没有设置两步验证。",
+      "already-enrolled": "两步验证已经开启了。"
+    }
+  },
+  "goodbye": {
+    "title": "你的账号已注销",
+    "body": "你的帖子和评论已被抹除。谢谢你曾经是这个社群的一员，请好好照顾自己。"
   }
 }
