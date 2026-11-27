@@ -11,10 +11,10 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx scripts/seed.ts",
     "admin:grant": "tsx scripts/grant-admin.ts",
     "format": "prettier --write src tests scripts",
-    "mfa:reset": "tsx scripts/reset-mfa.ts"
+    "mfa:reset": "tsx scripts/reset-mfa.ts",
+    "vercel-build": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@better-auth/utils": "^0.5.1",

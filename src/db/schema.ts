@@ -336,6 +336,20 @@ export const mfaSession = pgTable("mfa_session", {
   verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
+/**
+ * Auth rate-limit counters shared by every server instance (serverless-safe).
+ * Keys are HMAC hashes of "ip|path" — raw IP addresses are never written.
+ */
+export const rateLimit = pgTable(
+  "rate_limit",
+  {
+    keyHash: text("key_hash").primaryKey(),
+    count: integer("count").notNull(),
+    windowStart: timestamp("window_start", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("rate_limit_window_idx").on(t.windowStart)],
+);
+
 /** Who did what, for moderation accountability (incl. every evidence view). */
 export const auditLog = pgTable(
   "audit_log",

@@ -64,7 +64,8 @@
       "invalid-invite": "邀请码无效、已用完或已过期。",
       "invalid-answers": "请回答所有问题，并注意字数要求。",
       "not-allowed": "当前无法进行这个操作。"
-    }
+    },
+    "inviteOnlyNote": "目前是内测阶段，暂时只能通过邀请码加入。"
   },
   "pending": {
     "title": "谢谢，你的申请正在审核中",

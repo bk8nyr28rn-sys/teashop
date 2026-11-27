@@ -6,6 +6,7 @@ import { hasLocale } from "@/i18n/config";
 import { getViewer } from "@/lib/dal";
 import { redeemInvite, submitApplication, type JoinError } from "@/lib/membership";
 import { APPLICATION_QUESTIONS } from "@/lib/application-questions";
+import { applicationsOpen } from "@/lib/env";
 
 /** On error the submitted values are echoed back so the form can be refilled. */
 export type JoinFormState = { error?: JoinError; values?: Record<string, string> } | undefined;
@@ -45,6 +46,7 @@ export async function submitApplicationAction(
   formData: FormData,
 ): Promise<JoinFormState> {
   const viewer = await viewerOrRedirect(locale);
+  if (!applicationsOpen()) return { error: "not-allowed" };
   const answers = Object.fromEntries(
     APPLICATION_QUESTIONS.map((id) => [id, String(formData.get(`answer_${id}`) ?? "")]),
   );

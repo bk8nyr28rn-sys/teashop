@@ -43,7 +43,10 @@ export type ViewerContext = {
 const STAFF: Role[] = ["admin", "responder"];
 
 export const getViewer = cache(async (): Promise<ViewerContext | null> => {
-  const s = await getAuth().api.getSession({ headers: await headers() });
+  // Read request headers *before* touching auth/DB: during prerendering this
+  // is where Next.js stops, so builds never need a database connection.
+  const requestHeaders = await headers();
+  const s = await getAuth().api.getSession({ headers: requestHeaders });
   if (!s) return null;
   const db = getDb();
   let profile = await ensureProfile(db, s.user.id);

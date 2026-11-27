@@ -22,6 +22,20 @@
       "when": 1795745733774,
       "tag": "0002_young_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795746844073,
+      "tag": "0003_slippery_wallop",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795746872441,
+      "tag": "0004_seed_circles",
+      "breakpoints": true
     }
   ]
 }

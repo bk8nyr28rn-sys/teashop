@@ -16,6 +16,10 @@ A privacy-first community for LGBTQ+ people, with paid emotional-support Q&A ans
 
 > Next.js 16 differs from older versions: `middleware.ts` is now `src/proxy.ts`, and anything reading the session must render inside `<Suspense>`. Read `node_modules/next/dist/docs/` before changing routing or caching.
 
+## Deploying
+
+See **[docs/DEPLOY.md](docs/DEPLOY.md)** — Vercel + Neon + Resend, step by step, including the first admin and invite-only beta mode.
+
 ## Getting started
 
 Requires Node.js ≥ 22.12 and a PostgreSQL database.
@@ -23,8 +27,7 @@ Requires Node.js ≥ 22.12 and a PostgreSQL database.
 ```sh
 npm install
 cp .env.example .env.local     # fill in DATABASE_URL and BETTER_AUTH_SECRET
-npm run db:migrate             # create tables
-npm run db:seed                # starter circles (idempotent)
+npm run db:migrate             # create tables + starter circles
 npm run dev                    # http://localhost:3000
 ```
 
@@ -45,6 +48,7 @@ Without `RESEND_API_KEY`, sign-in codes are printed to the dev server log (`[dev
 | `npm run format` | Prettier |
 | `npm run admin:grant -- <email>` / `npm run mfa:reset -- <email>` | Bootstrap an admin / remove someone's 2FA enrolment |
 | `npm run db:generate` | Create a migration after editing `src/db/schema.ts` |
+| `npm run vercel-build` | What Vercel runs: migrations (production only) + build |
 
 ## How membership works
 
@@ -74,7 +78,7 @@ sign in (email code) → onboarding ─┬─ invite code ───────�
 
 - No orientation / gender-identity column anywhere. Belonging = circle membership.
 - Application answers are **deleted** when a decision is made; only the outcome is kept.
-- Sessions never store IP address or user agent (IPs are used in memory for rate limiting only).
+- Sessions never store IP address or user agent. Auth rate limiting is shared across serverless instances via Postgres, keyed by an HMAC of `ip|path` — never the raw IP.
 - Sign-in codes are stored hashed; emails use a neutral subject and sender.
 - No third-party fonts, trackers or analytics. `robots: noindex`, `Referrer-Policy: no-referrer`.
 - 18+ only (self-confirmed at onboarding).
@@ -95,9 +99,10 @@ src/
   lib/dal.ts           session → viewer; the only place that reads auth (applies the 2FA downgrade)
   i18n/                locale config and en/zh dictionaries
   proxy.ts             locale redirect + optimistic auth gate
-scripts/               seed, grant-admin, reset-mfa
+scripts/               grant-admin, reset-mfa, vercel-build
 tests/                 Vitest suites
-drizzle/               generated SQL migrations
+drizzle/               SQL migrations (0004 seeds the starter circles)
+docs/DEPLOY.md         production deployment guide
 ```
 
 ## Not built yet

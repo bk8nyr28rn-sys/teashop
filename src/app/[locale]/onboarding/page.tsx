@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getDictionary, getLocale } from "@/i18n/dictionaries";
 import { requireViewer } from "@/lib/dal";
 import { landingPathFor } from "@/lib/permissions";
+import { applicationsOpen } from "@/lib/env";
 import { ui } from "@/components/ui";
 import { ApplicationForm, InviteForm } from "./join-forms";
 
@@ -32,7 +33,11 @@ async function Forms() {
     <div className="space-y-6">
       {profile.status === "rejected" && <p className={ui.card}>{t.rejectedNote}</p>}
       <InviteForm locale={locale} t={t} defaultHandle={profile.handle} />
-      <ApplicationForm locale={locale} t={t} defaultHandle={profile.handle} />
+      {applicationsOpen() ? (
+        <ApplicationForm locale={locale} t={t} defaultHandle={profile.handle} />
+      ) : (
+        <p className={ui.card}>{t.inviteOnlyNote}</p>
+      )}
     </div>
   );
 }

@@ -64,7 +64,8 @@
       "invalid-invite": "This invite code is invalid, used up or expired.",
       "invalid-answers": "Please answer every question within the length limits.",
       "not-allowed": "You can't do that right now."
-    }
+    },
+    "inviteOnlyNote": "We're in a private beta — joining is by invitation only for now."
   },
   "pending": {
     "title": "Thanks — your application is in review",
