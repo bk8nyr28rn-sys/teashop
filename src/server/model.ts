@@ -107,8 +107,8 @@ export interface NightDoc {
 
 /**
  * 「林小家正在被鬼砸门！去帮忙吗？」弹给同族的人，每个人自己选（11-28 定）。
- * send = 派人去（他的人物由电脑操控）；skip = 不去。以后加 come = 亲自去（实时一起打）。
- * 没回答的按他设置里的「不在线时自动去帮忙」。主人点「喊人」时服务器当场定下喊的是谁，之后谁都改不了
+ * go = 去帮忙：两个人实时一起打（爽度优先，11-28 定。S0b 做实时；现在先按电脑操控他的人物算）；skip = 不去。
+ * 没回答的（多半不在线）按他设置里的「不在线时自动派我的人去帮忙」，他的人物由电脑操控来帮忙，保证大多数晚上有人能来。主人点「喊人」时服务器当场定下喊的是谁，之后谁都改不了
  */
 export interface HelpCall {
   id: string;
@@ -117,7 +117,7 @@ export interface HelpCall {
   houseId: string;
   realDate: string;
   kin: string[];
-  answers: Record<string, 'send' | 'skip'>;
+  answers: Record<string, 'go' | 'skip'>;
   used: string | null;
   status: 'open' | 'closed';
 }

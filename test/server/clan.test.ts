@@ -116,7 +116,7 @@ describe('族人被砸门：弹窗问去不去（11-28 定）', () => {
     return { s, a, b, kid };
   }
 
-  test('同族的人收到弹窗，点「派人去」；主人喊他，他的人物来帮忙，门守住了他也有赏', () => {
+  test('同族的人收到弹窗，点「去帮忙」；主人喊他，他来帮忙（实时一起打以前先由电脑操控），门守住了他也有赏', () => {
     const { s, a, kid } = kidNight();
     a.ok({ type: 'settings', autoHelpKin: false });
     const begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
@@ -135,7 +135,7 @@ describe('族人被砸门：弹窗问去不去（11-28 定）', () => {
     expect(a.life.person.purse).toBe(purse + CLAN.helpReward);
   });
 
-  test('点了「不去」就喊不来；不在线没回答的，按设置里的「不在线时自动去帮忙」', () => {
+  test('点了「不去」就喊不来；不在线没回答的，按设置里的「不在线时自动派我的人去」', () => {
     const { a, kid } = kidNight();
     let begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
     expect(begin.kin[0].ready).toBe(true);

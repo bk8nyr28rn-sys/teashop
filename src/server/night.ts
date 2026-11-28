@@ -65,7 +65,7 @@ export function nightBegin(ctx: Ctx, life: Life, mode: 'hand' | 'delegated') {
     night.helpCallId = callId = call.id;
     for (const k of kin) ctx.tell({ lifeId: k.id }, 'helpCall', `${life.name}家正在被鬼砸门！去帮忙吗？`);
   }
-  // ready：现在就能喊（他设置了不在线时自动去）；别的要等他点「派人去」
+  // ready：现在就能喊（他设置了不在线时自动派人）；别的要等他点「去帮忙」
   return { nightId: night.id, seed, options, start: night.start, callId,
     kin: kin.map(k => ({ ...k, ready: canSend(ctx, k.id, {}) })) };
 }
@@ -76,9 +76,9 @@ export function kinHelpers(ctx: Ctx, life: Life): Array<{ id: string; name: stri
     && l.phase !== 'dead').map(l => ({ id: l.id, name: l.name }));
 }
 
-/** 能不能派他的人来：他点了「派人去」，或者没回答、设置里开着「不在线时自动去帮忙」 */
+/** 他能不能来：他点了「去帮忙」，或者没回答、设置里开着「不在线时自动派我的人去」 */
 function canSend(ctx: Ctx, lifeId: string, answers: HelpCall['answers']): boolean {
-  if (answers[lifeId]) return answers[lifeId] === 'send';
+  if (answers[lifeId]) return answers[lifeId] === 'go';
   const accountId = ctx.w.lives[lifeId]?.accountId;
   return !!accountId && ctx.w.accounts[accountId]?.autoHelpKin !== false;
 }
@@ -89,12 +89,12 @@ function openCall(ctx: Ctx, callId: string): HelpCall {
   return call;
 }
 
-/** 族人看到弹窗：派人去，或者不去 */
+/** 族人看到弹窗：去帮忙（一起打），或者不去 */
 export function answerHelp(ctx: Ctx, life: Life, callId: string, go: boolean) {
   const call = openCall(ctx, callId);
   if (!call.kin.includes(life.id)) fail('没有喊你');
   if (call.used === life.id) fail('你的人已经过去了');
-  call.answers[life.id] = go ? 'send' : 'skip';
+  call.answers[life.id] = go ? 'go' : 'skip';
   return { answer: call.answers[life.id] };
 }
 
