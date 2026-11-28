@@ -9,6 +9,8 @@ import { Icon } from "@/components/icons";
 import { ui } from "@/components/ui";
 import { unlockQuestionAction } from "../../actions";
 import { QuestionMetaLine, qCode } from "../../ui";
+import { Handle } from "@/components/handle";
+import { ugc } from "@/lib/content-lang";
 
 type Props = PageProps<"/[locale]/admin/questions/[id]">;
 
@@ -53,29 +55,39 @@ async function Detail({ params, searchParams }: Pick<Props, "params" | "searchPa
           <dl className="space-y-3 text-sm">
             <div>
               <dt className={ui.eyebrow}>{c.asker}</dt>
-              <dd>@{content.askerHandle ?? "—"}</dd>
+              <dd>
+                <Handle>{content.askerHandle ?? "—"}</Handle>
+              </dd>
             </div>
             <div>
               <dt className={ui.eyebrow}>{c.question}</dt>
-              <dd className="font-semibold">{content.title}</dd>
-              <dd className="whitespace-pre-wrap break-words">{content.body}</dd>
+              <div {...ugc(content.title, content.body)}>
+                <dd className="font-semibold">{content.title}</dd>
+                <dd className="whitespace-pre-wrap break-words">{content.body}</dd>
+              </div>
             </div>
             {content.answer && (
               <div>
                 <dt className={ui.eyebrow}>{c.answer}</dt>
-                <dd className="whitespace-pre-wrap break-words">{content.answer}</dd>
+                <dd {...ugc(content.answer)} className="whitespace-pre-wrap break-words">
+                  {content.answer}
+                </dd>
               </div>
             )}
             {content.disputeReason && (
               <div>
                 <dt className={ui.eyebrow}>{c.disputeReason}</dt>
-                <dd className="whitespace-pre-wrap break-words">{content.disputeReason}</dd>
+                <dd {...ugc(content.disputeReason)} className="whitespace-pre-wrap break-words">
+                  {content.disputeReason}
+                </dd>
               </div>
             )}
             {content.feedback && (
               <div>
                 <dt className={ui.eyebrow}>{c.feedback}</dt>
-                <dd className="whitespace-pre-wrap break-words">{content.feedback}</dd>
+                <dd {...ugc(content.feedback)} className="whitespace-pre-wrap break-words">
+                  {content.feedback}
+                </dd>
               </div>
             )}
           </dl>

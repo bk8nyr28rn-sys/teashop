@@ -9,6 +9,9 @@ import { ui } from "@/components/ui";
 import { Avatar } from "@/components/avatar";
 import { deleteOwnAction, moderatorRemoveAction } from "../../../actions";
 import { CommentForm, ReportForm } from "../../../forms";
+import { Handle } from "@/components/handle";
+import { ugc } from "@/lib/content-lang";
+import { formatRich, NoTranslate } from "@/components/handle";
 
 type Props = PageProps<"/[locale]/c/[slug]/p/[postId]">;
 
@@ -34,6 +37,7 @@ async function PostView({ params }: Pick<Props, "params">) {
   const comments = await listComments(db, p.id, true);
   const dateFmt = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
   const mine = p.authorId === viewer.userId;
+  const postLang = ugc(p.title, p.body);
 
   return (
     <div className="space-y-6">
@@ -43,13 +47,19 @@ async function PostView({ params }: Pick<Props, "params">) {
 
       <article className={`${ui.card} space-y-3`}>
         {p.removedAt && <p className={`${ui.badge} inline-block`}>{t.moderatorView}</p>}
-        <h1 className={ui.h1}>{p.title}</h1>
+        <h1 {...postLang} className={ui.h1}>
+          {p.title}
+        </h1>
         <p className="flex items-center gap-2 text-xs text-muted">
           <Avatar name={authorHandle} size={28} />
-          <span className="font-medium text-ink">{format(dict.circle.by, { handle: authorHandle ?? "?" })}</span>·{" "}
-          {dateFmt.format(p.createdAt)}
+          <span className="font-medium text-ink">
+            {formatRich(dict.circle.by, { handle: <NoTranslate>{authorHandle ?? "?"}</NoTranslate> })}
+          </span>
+          · {dateFmt.format(p.createdAt)}
         </p>
-        <p className="whitespace-pre-wrap break-words">{p.body}</p>
+        <p {...postLang} className="whitespace-pre-wrap break-words">
+          {p.body}
+        </p>
         {!p.removedAt && (
           <div className="flex flex-wrap items-start gap-4">
             {mine && (
@@ -85,11 +95,15 @@ async function PostView({ params }: Pick<Props, "params">) {
                   ) : (
                     <>
                       <p className="text-xs text-muted">
-                        <span className="font-medium text-ink">@{cm.authorHandle}</span> ·{" "}
-                        {dateFmt.format(cm.createdAt)}
+                        <span className="font-medium text-ink">
+                          <Handle>{cm.authorHandle}</Handle>
+                        </span>{" "}
+                        · {dateFmt.format(cm.createdAt)}
                         {cm.removedAt && ` · ${t.moderatorView}`}
                       </p>
-                      <p className="mt-1 whitespace-pre-wrap break-words text-sm">{cm.body}</p>
+                      <p {...ugc(cm.body)} className="mt-1 whitespace-pre-wrap break-words text-sm">
+                        {cm.body}
+                      </p>
                       {!cm.removedAt && !p.removedAt && (
                         <div className="mt-2 flex flex-wrap items-start gap-4">
                           {own && (

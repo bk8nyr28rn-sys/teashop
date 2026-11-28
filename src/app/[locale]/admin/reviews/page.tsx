@@ -10,6 +10,8 @@ import { ui } from "@/components/ui";
 import { keepPaymentAction } from "../actions";
 import { RefundForm } from "../forms";
 import { qCode } from "../ui";
+import { Handle } from "@/components/handle";
+import { ugc } from "@/lib/content-lang";
 
 export default async function AdminReviewsPage() {
   const dict = await getDictionary();
@@ -46,15 +48,21 @@ async function Reviews() {
             <div className="min-w-0 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="flex items-center gap-2">
-                  <span className="font-mono text-sm font-semibold">#{qCode(d.id)}</span>
+                  <span translate="no" className="font-mono text-sm font-semibold">
+                    #{qCode(d.id)}
+                  </span>
                   <Avatar name={d.responderHandle} size={22} />
-                  <span className="text-sm">@{d.responderHandle ?? "—"}</span>
+                  <span className="text-sm">
+                    <Handle>{d.responderHandle ?? "—"}</Handle>
+                  </span>
                 </span>
                 <span className="text-sm font-semibold tabular-nums">{money(d.priceCents)}</span>
               </div>
               <div>
                 <p className={ui.eyebrow}>{c.reviews.reason}</p>
-                <p className="whitespace-pre-wrap break-words">“{d.disputeReason}”</p>
+                <p {...ugc(d.disputeReason)} className="whitespace-pre-wrap break-words">
+                  “{d.disputeReason}”
+                </p>
               </div>
               <p className="text-xs text-muted">
                 {d.disputedAt && dt.format(d.disputedAt)}

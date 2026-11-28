@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { Dictionary } from "@/i18n/dictionaries";
-import { format } from "@/i18n/dictionaries";
 import type { listOpenReports } from "@/lib/community";
 import { resolveReportAction } from "@/app/[locale]/c/actions";
 import { ui } from "./ui";
+import { ugc } from "@/lib/content-lang";
+import { formatRich, NoTranslate } from "./handle";
 
 type Reports = Awaited<ReturnType<typeof listOpenReports>>;
 
@@ -16,16 +17,25 @@ export function ReportList({ reports, locale, dict }: { reports: Reports; locale
       {reports.map((r) => (
         <li key={r.id} className={`${ui.card} space-y-2`} data-testid="report">
           <p className="text-sm font-medium">
-            {format(r.targetType === "post" ? t.reportedPost : t.reportedComment, { handle: r.authorHandle ?? "?" })}
+            {formatRich(r.targetType === "post" ? t.reportedPost : t.reportedComment, {
+              handle: <NoTranslate>{r.authorHandle ?? "?"}</NoTranslate>,
+            })}
             {" · "}
             <span className={r.reason === "self_harm" || r.reason === "outing" ? "text-danger" : ""}>
               {dict.post.reasons[r.reason]}
             </span>
           </p>
-          <blockquote className="whitespace-pre-wrap break-words border-l-2 border-line pl-3 text-sm text-muted">
+          <blockquote
+            {...ugc(r.targetType === "post" ? `${r.postTitle}\n${r.postBody}` : r.commentBody)}
+            className="whitespace-pre-wrap break-words border-l-2 border-line pl-3 text-sm text-muted"
+          >
             {r.targetType === "post" ? `${r.postTitle}\n${r.postBody}` : r.commentBody}
           </blockquote>
-          {r.details && <p className="text-sm">“{r.details}”</p>}
+          {r.details && (
+            <p {...ugc(r.details)} className="text-sm">
+              “{r.details}”
+            </p>
+          )}
           <div className="flex flex-wrap items-center gap-3">
             <form action={resolveReportAction.bind(null, locale, r.id, "upheld")}>
               <button className={ui.button}>{t.uphold}</button>

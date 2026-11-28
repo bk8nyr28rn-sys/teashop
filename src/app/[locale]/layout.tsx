@@ -2,11 +2,12 @@ import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "../globals.css";
 import { siteConfig } from "@/config/site";
-import { locales } from "@/i18n/config";
+import { htmlLang, locales } from "@/i18n/config";
 import { getDictionary, getLocale } from "@/i18n/dictionaries";
 import Link from "next/link";
 import { SiteHeader } from "@/components/site-header";
 import { Icon } from "@/components/icons";
+import { TranslationGuard } from "@/components/translation-guard";
 
 export async function generateStaticParams() {
   return locales.map((locale) => ({ locale }));
@@ -33,8 +34,9 @@ export const viewport: Viewport = {
 export default async function LocaleLayout({ children }: LayoutProps<"/[locale]">) {
   const [locale, dict] = await Promise.all([getLocale(), getDictionary()]);
   return (
-    <html lang={locale === "zh" ? "zh-Hans" : "en"} className="h-full">
+    <html lang={htmlLang(locale)} className="h-full">
       <body className="flex min-h-full flex-col">
+        <TranslationGuard />
         <Suspense fallback={<div className="h-14 border-b border-line/70" />}>
           <SiteHeader />
         </Suspense>

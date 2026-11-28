@@ -20,7 +20,7 @@ export function Logo() {
   return (
     <span className="inline-flex items-center gap-2 font-semibold tracking-tight">
       <LogoMark />
-      <span>{siteConfig.name}</span>
+      <span translate="no">{siteConfig.name}</span>
     </span>
   );
 }

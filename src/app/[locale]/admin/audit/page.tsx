@@ -5,6 +5,7 @@ import { requireArea } from "@/lib/dal";
 import { listAuditLog } from "@/lib/qa-admin";
 import { ui } from "@/components/ui";
 import { qCode } from "../ui";
+import { Handle } from "@/components/handle";
 
 export default async function AdminAuditPage() {
   const dict = await getDictionary();
@@ -45,7 +46,9 @@ async function Audit() {
         <li key={r.id} className="grid gap-1 px-5 py-3 sm:grid-cols-[9rem_1fr]">
           <span className="text-xs text-muted tabular-nums">{dt.format(r.createdAt)}</span>
           <span className="min-w-0 break-words">
-            <span className="font-medium">@{r.actorHandle ?? dict.console.audit.system}</span>{" "}
+            <span className="font-medium">
+              {r.actorHandle ? <Handle>{r.actorHandle}</Handle> : dict.console.audit.system}
+            </span>{" "}
             <span className="font-mono text-xs">{r.action}</span>{" "}
             <span className="text-muted">
               {r.targetType} #{qCode(r.targetId)}

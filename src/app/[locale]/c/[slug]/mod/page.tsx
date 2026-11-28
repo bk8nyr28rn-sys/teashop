@@ -8,6 +8,7 @@ import { listBanned, listMembers, listOpenReports, listPendingRequests, loadCirc
 import { ui } from "@/components/ui";
 import { ReportList } from "@/components/report-list";
 import { banAction, decideJoinAction, setModeratorAction, unbanAction } from "../../actions";
+import { Handle } from "@/components/handle";
 
 type Props = PageProps<"/[locale]/c/[slug]/mod">;
 
@@ -62,7 +63,8 @@ async function ModView({ params }: Pick<Props, "params">) {
               data-testid="join-request"
             >
               <span>
-                @{r.handle} <span className={ui.muted}>· {format(t.trust, { level: r.trustLevel })}</span>
+                <Handle>{r.handle}</Handle>{" "}
+                <span className={ui.muted}>· {format(t.trust, { level: r.trustLevel })}</span>
               </span>
               <span className="flex gap-2">
                 <form action={decideJoinAction.bind(null, locale, c.id, r.userId, true)}>
@@ -83,7 +85,7 @@ async function ModView({ params }: Pick<Props, "params">) {
           {members.map((m) => (
             <li key={m.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-sm">
               <span>
-                @{m.handle} {m.role === "moderator" && <span className={ui.badge}>{t.moderator}</span>}
+                <Handle>{m.handle}</Handle> {m.role === "moderator" && <span className={ui.badge}>{t.moderator}</span>}
               </span>
               {m.userId !== viewer.userId && (
                 <span className="flex gap-3">
@@ -112,7 +114,9 @@ async function ModView({ params }: Pick<Props, "params">) {
         <ul className="space-y-2">
           {banned.map((b) => (
             <li key={b.userId} className={`${ui.card} flex flex-wrap items-center justify-between gap-2`}>
-              <span>@{b.handle}</span>
+              <span>
+                <Handle>{b.handle}</Handle>
+              </span>
               <form action={unbanAction.bind(null, locale, c.id, b.userId)}>
                 <button className={ui.buttonGhost}>{t.unban}</button>
               </form>

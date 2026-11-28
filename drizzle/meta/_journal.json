@@ -57,6 +57,13 @@
       "when": 1795782880169,
       "tag": "0007_qa_settings_row",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1795872407885,
+      "tag": "0008_profile_locale",
+      "breakpoints": true
     }
   ]
 }

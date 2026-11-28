@@ -9,6 +9,8 @@ import { listAvailableResponders } from "@/lib/qa";
 import { Avatar } from "@/components/avatar";
 import { Icon } from "@/components/icons";
 import { ui } from "@/components/ui";
+import { Handle } from "@/components/handle";
+import { ugc } from "@/lib/content-lang";
 
 export default async function AskPage() {
   const dict = await getDictionary();
@@ -59,14 +61,24 @@ async function Responders() {
               <div className="flex items-start gap-3">
                 <Avatar name={r.handle} size={48} />
                 <div className="min-w-0 flex-1">
-                  <p className="font-semibold">@{r.handle}</p>
-                  {r.headline && <p className={ui.muted}>{r.headline}</p>}
+                  <p className="font-semibold">
+                    <Handle>{r.handle}</Handle>
+                  </p>
+                  {r.headline && (
+                    <p {...ugc(r.headline)} className={ui.muted}>
+                      {r.headline}
+                    </p>
+                  )}
                 </div>
                 <span className="text-right text-sm font-semibold">
                   {format(t.price, { price: formatMoney(r.priceCents, r.currency, locale) })}
                 </span>
               </div>
-              {r.bio && <p className="text-sm whitespace-pre-wrap">{r.bio}</p>}
+              {r.bio && (
+                <p {...ugc(r.bio)} className="text-sm whitespace-pre-wrap">
+                  {r.bio}
+                </p>
+              )}
               <div className="flex flex-wrap gap-1.5">
                 {r.topics.map((topic) => (
                   <span key={topic} className={ui.badgeAccent}>
@@ -80,7 +92,7 @@ async function Responders() {
                 ))}
               </div>
               <Link href={`/${locale}/ask/${r.userId}`} className={ui.button}>
-                {t.choose} @{r.handle}
+                {t.choose} <Handle>{r.handle}</Handle>
               </Link>
             </li>
           ))}

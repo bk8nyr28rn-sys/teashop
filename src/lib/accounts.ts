@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { and, eq, ilike, inArray, ne, sql } from "drizzle-orm";
 import type { Db } from "@/db";
+import { hasLocale, type Locale } from "@/i18n/config";
 import { auditLog, comment, post, profile, question, session, user, verification } from "@/db/schema";
 import { canEnterMemberArea, type Viewer } from "./permissions";
 import { releasePendingQuestionsFor } from "./qa";
@@ -194,4 +195,12 @@ export async function deleteAccount(db: Db, userId: string): Promise<{ ok: true 
     });
   });
   return { ok: true };
+}
+
+/* ------------------------------- Language ------------------------------- */
+
+/** Remembers the user's UI language on their account (used for emails and new devices). */
+export async function setPreferredLocale(db: Db, userId: string, locale: Locale): Promise<void> {
+  if (!hasLocale(locale)) throw new Error("Unsupported locale");
+  await db.update(profile).set({ locale }).where(eq(profile.userId, userId));
 }

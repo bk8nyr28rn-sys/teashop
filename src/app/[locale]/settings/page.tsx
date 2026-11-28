@@ -1,7 +1,9 @@
 import { Suspense } from "react";
 import Link from "next/link";
+import { Handle } from "@/components/handle";
 import { getDictionary, getLocale } from "@/i18n/dictionaries";
 import { isFreshSession, requireViewer } from "@/lib/dal";
+import { LanguagePicker } from "@/components/locale-switcher";
 import { ui } from "@/components/ui";
 import { DeleteAccountForm, SignOutOthersForm } from "./forms";
 
@@ -30,7 +32,7 @@ async function Settings() {
         <dl className="space-y-1 text-sm">
           <div>
             <dt className={ui.muted}>{t.handle}</dt>
-            <dd>{viewer.profile.handle ? `@${viewer.profile.handle}` : "—"}</dd>
+            <dd>{viewer.profile.handle ? <Handle>{viewer.profile.handle}</Handle> : "—"}</dd>
           </div>
           <div>
             <dt className={ui.muted}>{t.email}</dt>
@@ -42,6 +44,16 @@ async function Settings() {
             {t.securityLink}
           </Link>
         )}
+      </section>
+
+      <section className={`${ui.card} space-y-3`} data-testid="language-settings">
+        <h2 className={ui.h2}>{t.languageTitle}</h2>
+        <p className={ui.muted}>{t.languageBody}</p>
+        <LanguagePicker current={locale} label={t.languageTitle} />
+        <div className={`${ui.panel} space-y-1 text-sm`}>
+          <p>{t.translateTip}</p>
+          <p className="text-xs text-muted">{t.translatePrivacy}</p>
+        </div>
       </section>
 
       <section className={`${ui.card} space-y-2`}>

@@ -8,6 +8,8 @@ import { ReportList } from "@/components/report-list";
 import { ui } from "@/components/ui";
 import { findMembers, listSuspended } from "@/lib/accounts";
 import { decideApplicationAction, setResponderAction, suspendAction, unsuspendAction } from "../actions";
+import { Handle } from "@/components/handle";
+import { ugc } from "@/lib/content-lang";
 
 type Props = PageProps<"/[locale]/admin/community">;
 
@@ -48,7 +50,10 @@ async function Members({ searchParams }: Pick<Props, "searchParams">) {
           {results.map((m) => (
             <li key={m.userId} className={`${ui.card} space-y-2`} data-testid="member-row">
               <p className="text-sm">
-                <span className="font-medium">@{m.handle}</span> <span className={ui.badge}>{t.roles[m.role]}</span>{" "}
+                <span className="font-medium">
+                  <Handle>{m.handle}</Handle>
+                </span>{" "}
+                <span className={ui.badge}>{t.roles[m.role]}</span>{" "}
                 <span className={ui.badge}>{t.status[m.status]}</span>
               </p>
               {m.status === "suspended" ? (
@@ -91,7 +96,9 @@ async function Members({ searchParams }: Pick<Props, "searchParams">) {
         <ul className="space-y-2">
           {suspended.map((m) => (
             <li key={m.userId} className={`${ui.card} flex flex-wrap items-center justify-between gap-2`}>
-              <span>@{m.handle ?? "—"}</span>
+              <span>
+                <Handle>{m.handle ?? "—"}</Handle>
+              </span>
               <form action={unsuspendAction.bind(null, locale, m.userId)}>
                 <button className={ui.buttonGhost}>{t.unsuspend}</button>
               </form>
@@ -126,7 +133,9 @@ async function Queue() {
         {apps.map((app) => (
           <article key={app.id} className={`${ui.card} space-y-3`} data-testid="application">
             <header className="flex flex-wrap items-baseline justify-between gap-x-3">
-              <span className="font-medium">@{app.handle}</span>
+              <span className="font-medium">
+                <Handle>{app.handle}</Handle>
+              </span>
               <span className={ui.muted}>{format(t.submitted, { date: dateFmt.format(app.createdAt) })}</span>
             </header>
             <dl className="space-y-2 text-sm">
@@ -135,7 +144,9 @@ async function Queue() {
                   <dt className="font-medium">
                     {dict.onboarding.questions[a.questionId as keyof typeof dict.onboarding.questions] ?? a.questionId}
                   </dt>
-                  <dd className="whitespace-pre-wrap text-muted">{a.answer}</dd>
+                  <dd {...ugc(a.answer)} className="whitespace-pre-wrap text-muted">
+                    {a.answer}
+                  </dd>
                 </div>
               ))}
             </dl>

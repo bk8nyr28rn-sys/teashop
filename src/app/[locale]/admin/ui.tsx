@@ -7,6 +7,7 @@ import { netSplit } from "@/lib/qa-admin";
 import { Avatar } from "@/components/avatar";
 import { QuestionStatusBadge } from "@/components/question-status";
 import { ui } from "@/components/ui";
+import { Handle } from "@/components/handle";
 
 /** Short, stable code for a question (never its title). */
 export const qCode = (id: string) => id.replace(/-/g, "").slice(0, 6).toUpperCase();
@@ -33,9 +34,13 @@ export function QuestionMetaLine({ q, locale, dict }: { q: QuestionMeta; locale:
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="flex items-center gap-2">
-          <span className="font-mono text-sm font-semibold">#{qCode(q.id)}</span>
+          <span translate="no" className="font-mono text-sm font-semibold">
+            #{qCode(q.id)}
+          </span>
           <Avatar name={q.responderHandle} size={22} />
-          <span className="text-sm">@{q.responderHandle ?? "—"}</span>
+          <span className="text-sm">
+            <Handle>{q.responderHandle ?? "—"}</Handle>
+          </span>
         </span>
         <span className="flex flex-wrap gap-1.5">
           {q.crisisFlag && <span className={ui.badgeDanger}>{c.filters.crisis}</span>}

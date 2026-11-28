@@ -1,8 +1,7 @@
-import { match } from "@formatjs/intl-localematcher";
-import Negotiator from "negotiator";
 import { getSessionCookie } from "better-auth/cookies";
 import { NextResponse, type NextRequest } from "next/server";
-import { defaultLocale, hasLocale, locales } from "@/i18n/config";
+import { hasLocale, LOCALE_COOKIE } from "@/i18n/config";
+import { negotiateLocale } from "@/i18n/negotiate";
 
 /** Sections that need a signed-in user. Fine-grained checks happen on the server. */
 const PROTECTED = [
@@ -23,14 +22,10 @@ const PROTECTED = [
 ];
 
 function preferredLocale(request: NextRequest): string {
-  const languages = new Negotiator({
-    headers: { "accept-language": request.headers.get("accept-language") ?? "" },
-  }).languages();
-  try {
-    return match(languages, locales, defaultLocale);
-  } catch {
-    return defaultLocale;
-  }
+  return negotiateLocale({
+    cookie: request.cookies.get(LOCALE_COOKIE)?.value,
+    acceptLanguage: request.headers.get("accept-language"),
+  });
 }
 
 export function proxy(request: NextRequest) {

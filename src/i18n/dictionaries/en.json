@@ -257,7 +257,11 @@
     "deleteButton": "Delete my account permanently",
     "deleteNeedsFresh": "For your safety, please sign in again before deleting your account (sign-ins older than 15 minutes don't count).",
     "signInAgain": "Sign out and sign in again",
-    "deleteMismatch": "That doesn't match."
+    "deleteMismatch": "That doesn't match.",
+    "languageTitle": "Language",
+    "languageBody": "Used for menus, buttons and emails. It's saved on your account, so it follows you to other devices.",
+    "translateTip": "Posts in other languages? Your browser can translate them. Chrome: right-click → “Translate to…”. Safari on iPhone or iPad: tap aA → “Translate Website”.",
+    "translatePrivacy": "Browser translation is provided by Google or Apple, and the page text is sent to them."
   },
   "security": {
     "title": "Two-factor authentication",
@@ -606,5 +610,9 @@
       "not-eligible": "This question can't be opened.",
       "already-pending": "Already pending."
     }
+  },
+  "email": {
+    "subject": "Your code: {code}",
+    "body": "Your one-time code is {code}. It expires in 10 minutes.\n\nIf you did not request it, you can ignore this email."
   }
 }

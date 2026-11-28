@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { hasLocale } from "@/i18n/config";
 import { getDictionary, getLocale } from "@/i18n/dictionaries";
 import { getViewer } from "@/lib/dal";
 import { canEnterMemberArea } from "@/lib/permissions";
-import { LocaleSwitcher } from "./locale-switcher";
+import { LocaleCookieSync, LocaleSwitcher } from "./locale-switcher";
 import { Logo } from "./logo";
 import { BottomNav, TopNav, type NavItem } from "./nav";
 import { SignOutButton } from "./sign-out-button";
@@ -21,6 +22,7 @@ export async function SiteHeader() {
       ]
     : [];
   const needsMfa = viewer?.staffMfa === "setup" || viewer?.staffMfa === "verify";
+  const savedLocale = viewer?.profile.locale;
 
   return (
     <>
@@ -36,7 +38,8 @@ export async function SiteHeader() {
                 {viewer.staffMfa === "setup" ? dict.nav.mfaSetup : dict.nav.mfaVerify}
               </Link>
             )}
-            <LocaleSwitcher current={locale} label={dict.common.language} />
+            <LocaleSwitcher current={locale} label={dict.common.language} signedIn={!!viewer} />
+            {hasLocale(savedLocale) && <LocaleCookieSync locale={savedLocale} />}
             {!viewer && (
               <Link className={`${ui.button} min-h-9 px-4 text-sm`} href={`/${locale}/sign-in`}>
                 {dict.common.signIn}

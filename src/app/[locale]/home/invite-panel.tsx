@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import type { Dictionary } from "@/i18n/dictionaries";
 import { ui } from "@/components/ui";
 import { createInviteAction } from "./actions";
+import { formatRich, NoTranslate } from "@/components/handle";
 
 export function InvitePanel({ locale, t }: { locale: string; t: Dictionary["home"] }) {
   const [state, action, pending] = useActionState(createInviteAction.bind(null, locale), undefined);
@@ -14,7 +15,7 @@ export function InvitePanel({ locale, t }: { locale: string; t: Dictionary["home
       </button>
       {state?.code && (
         <p className="font-mono text-sm" data-testid="invite-code">
-          {t.inviteCreated.replace("{code}", state.code)}
+          {formatRich(t.inviteCreated, { code: <NoTranslate>{state.code}</NoTranslate> })}
         </p>
       )}
       {state?.error && <p className={ui.error}>{t.inviteLocked}</p>}

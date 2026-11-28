@@ -7,6 +7,8 @@ import { listResponderApplications, listRespondersForAdmin } from "@/lib/qa-admi
 import { Avatar } from "@/components/avatar";
 import { ui } from "@/components/ui";
 import { decideResponderAppAction, setResponderPausedAction } from "../actions";
+import { Handle } from "@/components/handle";
+import { ugc } from "@/lib/content-lang";
 
 export default async function AdminRespondersPage() {
   const dict = await getDictionary();
@@ -48,14 +50,18 @@ async function Responders() {
               <div className="flex items-center gap-3">
                 <Avatar name={a.handle} size={40} />
                 <div>
-                  <p className="font-semibold">@{a.handle}</p>
+                  <p className="font-semibold">
+                    <Handle>{a.handle}</Handle>
+                  </p>
                   <p className="text-xs text-muted">
                     {a.memberSince && format(r.memberSince, { d: date.format(a.memberSince) })} ·{" "}
                     {format(r.trust, { n: a.trustLevel })}
                   </p>
                 </div>
               </div>
-              <p className="whitespace-pre-wrap break-words text-sm">{a.experience}</p>
+              <p {...ugc(a.experience)} className="whitespace-pre-wrap break-words text-sm">
+                {a.experience}
+              </p>
               <div className="flex flex-wrap gap-1.5">
                 {a.topics.map((t) => (
                   <span key={t} className={ui.badgeAccent}>
@@ -87,8 +93,14 @@ async function Responders() {
                 <span className="flex items-center gap-3">
                   <Avatar name={x.handle} size={36} />
                   <span>
-                    <span className="block font-semibold">@{x.handle}</span>
-                    {x.headline && <span className="block text-xs text-muted">{x.headline}</span>}
+                    <span className="block font-semibold">
+                      <Handle>{x.handle}</Handle>
+                    </span>
+                    {x.headline && (
+                      <span {...ugc(x.headline)} className="block text-xs text-muted">
+                        {x.headline}
+                      </span>
+                    )}
                   </span>
                 </span>
                 <span className="flex flex-wrap gap-1.5">

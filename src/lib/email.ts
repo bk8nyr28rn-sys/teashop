@@ -1,4 +1,6 @@
 import "server-only";
+import type { Locale } from "@/i18n/config";
+import { format, getDictionary } from "@/i18n/dictionaries";
 
 type OtpType = "sign-in" | "email-verification" | "forget-password" | "change-email";
 
@@ -9,13 +11,17 @@ type OtpType = "sign-in" | "email-verification" | "forget-password" | "change-em
  * Subject and body are intentionally neutral: an email notification must not
  * reveal to anyone glancing at the inbox what kind of community this is.
  */
-export async function sendOtpEmail(email: string, otp: string, type: OtpType): Promise<void> {
+export async function sendOtpEmail(email: string, otp: string, type: OtpType, locale: Locale): Promise<void> {
+  const t = (await getDictionary(locale)).email;
+  const subject = format(t.subject, { code: otp });
+  const text = format(t.body, { code: otp });
+
   const key = process.env.RESEND_API_KEY;
   if (!key) {
     if (process.env.NODE_ENV === "production") {
       throw new Error("RESEND_API_KEY is required in production to send sign-in codes.");
     }
-    console.info(`[dev-email] ${type} code for ${email}: ${otp}`);
+    console.info(`[dev-email] ${type} code for ${email}: ${otp} (${locale}: "${subject}")`);
     return;
   }
 
@@ -28,8 +34,8 @@ export async function sendOtpEmail(email: string, otp: string, type: OtpType): P
     body: JSON.stringify({
       from,
       to: email,
-      subject: `Your code: ${otp}`,
-      text: `Your one-time code is ${otp}. It expires in 10 minutes.\n\nIf you did not request it, you can ignore this email.`,
+      subject,
+      text,
     }),
   });
   if (!res.ok) throw new Error(`Email provider responded ${res.status}`);

@@ -3,6 +3,8 @@ import type { Dictionary } from "@/i18n/dictionaries";
 import { format } from "@/i18n/dictionaries";
 import { Avatar } from "./avatar";
 import { ui } from "./ui";
+import { Handle } from "@/components/handle";
+import { ugc } from "@/lib/content-lang";
 
 export type PostSummary = {
   id: string;
@@ -30,11 +32,15 @@ export function PostCard({
       <Avatar name={post.authorHandle} size={40} />
       <div className="min-w-0 flex-1 space-y-1">
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted">
-          <span className="font-medium text-ink">@{post.authorHandle ?? "?"}</span>
+          <span className="font-medium text-ink">
+            <Handle>{post.authorHandle ?? "?"}</Handle>
+          </span>
           <span>{date}</span>
           {post.circleName && <span className={ui.badgeAccent}>{post.circleName}</span>}
         </p>
-        <h3 className="font-semibold leading-snug break-words">{post.title}</h3>
+        <h3 {...ugc(post.title)} className="font-semibold leading-snug break-words">
+          {post.title}
+        </h3>
         <p className="text-xs text-muted">{format(dict.circle.comments, { n: post.comments })}</p>
       </div>
     </Link>

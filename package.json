@@ -18,9 +18,9 @@
   },
   "dependencies": {
     "@better-auth/utils": "^0.5.1",
-    "@formatjs/intl-localematcher": "^0.10.3",
     "better-auth": "^1.7.28",
     "drizzle-orm": "^0.45.4",
+    "eld": "^2.1.1",
     "negotiator": "^1.1.0",
     "next": "16.4.6",
     "postgres": "^4.1.1",

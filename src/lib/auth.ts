@@ -7,6 +7,8 @@ import { after } from "next/server";
 import { getDb } from "@/db";
 import { account, session, user, verification } from "@/db/schema";
 import { siteConfig } from "@/config/site";
+import { LOCALE_COOKIE, UI_LOCALE_HEADER } from "@/i18n/config";
+import { negotiateLocale, readCookie } from "@/i18n/negotiate";
 import { sendOtpEmail } from "./email";
 import { resolveBaseUrl } from "./env";
 import { ensureProfile } from "./membership";
@@ -74,8 +76,15 @@ function createAuth() {
         expiresIn: 600,
         allowedAttempts: 5,
         storeOTP: "hashed",
-        sendVerificationOTP: async ({ email, otp, type }) => {
-          sendInBackground(() => sendOtpEmail(email, otp, type));
+        sendVerificationOTP: async ({ email, otp, type }, ctx) => {
+          // Same language as the page they're on (header from the sign-in form), else their saved choice / browser.
+          const h = ctx?.headers ?? ctx?.request?.headers;
+          const locale = negotiateLocale({
+            explicit: h?.get(UI_LOCALE_HEADER),
+            cookie: readCookie(h?.get("cookie"), LOCALE_COOKIE),
+            acceptLanguage: h?.get("accept-language"),
+          });
+          sendInBackground(() => sendOtpEmail(email, otp, type, locale));
         },
       }),
       nextCookies(), // must stay last

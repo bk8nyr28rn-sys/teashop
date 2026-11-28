@@ -12,6 +12,8 @@ import { QuestionStatusBadge } from "@/components/question-status";
 import { ui } from "@/components/ui";
 import { cancelQuestionAction } from "../actions";
 import { AnswerForm, DisputeForm, RateForm } from "../forms";
+import { ugc } from "@/lib/content-lang";
+import { formatRich, NoTranslate } from "@/components/handle";
 
 type Props = PageProps<"/[locale]/questions/[id]">;
 
@@ -70,8 +72,10 @@ async function Question({ params, searchParams }: Pick<Props, "params" | "search
           <p className={ui.eyebrow}>{isResponder ? t.anonymousAsker : t.yourQuestion}</p>
           <QuestionStatusBadge status={q.status} t={t} />
         </div>
-        <h1 className="text-xl font-semibold tracking-tight break-words">{q.title}</h1>
-        <p className="whitespace-pre-wrap break-words">{q.body}</p>
+        <div {...ugc(q.title, q.body)} className="space-y-3">
+          <h1 className="text-xl font-semibold tracking-tight break-words">{q.title}</h1>
+          <p className="whitespace-pre-wrap break-words">{q.body}</p>
+        </div>
         <p className="text-xs text-muted">
           {dt.format(q.createdAt)} · {money(q.priceCents)}
           {q.status === "open" && q.deadlineAt && ` · ${format(t.dueBy, { date: dt.format(q.deadlineAt) })}`}
@@ -85,9 +89,13 @@ async function Question({ params, searchParams }: Pick<Props, "params" | "search
         <article className="space-y-3 rounded-3xl border border-accent/25 bg-accent-soft/60 p-5" data-testid="answer">
           <p className="flex items-center gap-2 text-sm font-medium">
             {q.responderHandle && <Avatar name={q.responderHandle} size={28} />}
-            {q.responderHandle ? format(t.from, { handle: q.responderHandle }) : t.answer}
+            {q.responderHandle
+              ? formatRich(t.from, { handle: <NoTranslate>{q.responderHandle}</NoTranslate> })
+              : t.answer}
           </p>
-          <p className="whitespace-pre-wrap break-words">{q.answer}</p>
+          <p {...ugc(q.answer)} className="whitespace-pre-wrap break-words">
+            {q.answer}
+          </p>
           {q.answeredAt && <p className="text-xs text-muted">{dt.format(q.answeredAt)}</p>}
         </article>
       ) : (

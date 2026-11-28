@@ -80,7 +80,7 @@ export function ConfirmSetupForm({ locale, t, next }: { locale: string; t: Secur
       <div className="space-y-3" data-testid="backup-codes">
         <h2 className={ui.h2}>{t.backupTitle}</h2>
         <p className={ui.muted}>{t.backupBody}</p>
-        <ul className="grid grid-cols-2 gap-2 rounded-xl border border-line bg-bg p-3 font-mono text-sm">
+        <ul translate="no" className="grid grid-cols-2 gap-2 rounded-xl border border-line bg-bg p-3 font-mono text-sm">
           {state.backupCodes.map((c) => (
             <li key={c}>{c}</li>
           ))}

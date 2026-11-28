@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or, sql } from "drizzle-orm";
 import type { Db } from "@/db";
 import { auditLog, profile, qaSettings, question, responderProfile, type QaSettings, type Question } from "@/db/schema";
 import { platformFee, qaConfig } from "@/config/qa";
@@ -359,7 +359,8 @@ export async function expireOverdue(db: Db, provider: PaymentProvider, now = new
       deadlineAt: question.deadlineAt,
     })
     .from(question)
-    .where(and(eq(question.status, "open"), lt(question.deadlineAt, now)))
+    // lte: a deadline set to "now" (holds released on suspension) must count in the same millisecond.
+    .where(and(eq(question.status, "open"), lte(question.deadlineAt, now)))
     .limit(100);
 
   let expired = 0;

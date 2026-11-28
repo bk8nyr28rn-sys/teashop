@@ -122,6 +122,8 @@ export const profile = pgTable(
     approvedAt: timestamp("approved_at", { withTimezone: true }),
     invitedBy: text("invited_by").references(() => user.id, { onDelete: "set null" }),
     suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    /** Preferred UI language ("en", "zh"…), for emails and for new devices. Null until known. */
+    locale: text("locale"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [check("trust_level_range", sql`${t.trustLevel} between 0 and 3`)],

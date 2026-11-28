@@ -7,6 +7,7 @@ import { requireArea } from "@/lib/dal";
 import { getFinance } from "@/lib/qa-admin";
 import { ui } from "@/components/ui";
 import { Kpi } from "../ui";
+import { Handle } from "@/components/handle";
 
 type Props = PageProps<"/[locale]/admin/finance">;
 const RANGES = [7, 30, 90];
@@ -71,7 +72,9 @@ async function Finance({ searchParams }: Pick<Props, "searchParams">) {
               <tbody>
                 {fin.byResponder.map((r) => (
                   <tr key={r.handle ?? "—"} className="border-b border-line last:border-0">
-                    <td className="py-2.5 pr-3 whitespace-nowrap">@{r.handle ?? "—"}</td>
+                    <td className="py-2.5 pr-3 whitespace-nowrap">
+                      <Handle>{r.handle ?? "—"}</Handle>
+                    </td>
                     <td className="px-3 py-2.5 text-right">{r.answered}</td>
                     <td className="px-3 py-2.5 text-right">{money(r.charged)}</td>
                     <td className="px-3 py-2.5 text-right">{r.refunded ? `−${money(r.refunded)}` : "—"}</td>

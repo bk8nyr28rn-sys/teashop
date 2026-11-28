@@ -257,7 +257,11 @@
     "deleteButton": "永久注销我的账号",
     "deleteNeedsFresh": "为了你的安全，注销前请重新登录一次（超过 15 分钟的登录不算）。",
     "signInAgain": "退出并重新登录",
-    "deleteMismatch": "输入内容不一致。"
+    "deleteMismatch": "输入内容不一致。",
+    "languageTitle": "语言",
+    "languageBody": "菜单、按钮和邮件都会使用这个语言。它保存在你的账号上，换设备也一样。",
+    "translateTip": "看到其他语言的帖子？浏览器可以帮你翻译：Chrome 右键 →「翻译成中文」；iPhone / iPad 的 Safari 点地址栏的 aA →「翻译网站」。",
+    "translatePrivacy": "浏览器翻译由 Google 或 Apple 提供，页面文字会发送给它们处理。"
   },
   "security": {
     "title": "两步验证",
@@ -602,5 +606,9 @@
       "not-eligible": "这个问题不能打开。",
       "already-pending": "已在处理中。"
     }
+  },
+  "email": {
+    "subject": "你的验证码：{code}",
+    "body": "你的一次性验证码是 {code}，10 分钟内有效。\n\n如果不是你本人操作，可以忽略这封邮件。"
   }
 }

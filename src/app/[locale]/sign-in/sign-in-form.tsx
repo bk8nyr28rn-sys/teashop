@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { authClient } from "@/lib/auth-client";
+import { UI_LOCALE_HEADER } from "@/i18n/config";
 import type { Dictionary } from "@/i18n/dictionaries";
 import { ui } from "@/components/ui";
 
@@ -19,7 +20,12 @@ export function SignInForm({ locale, t }: Props) {
   const sendCode = () =>
     start(async () => {
       setError(null);
-      const { error } = await authClient.emailOtp.sendVerificationOtp({ email, type: "sign-in" });
+      const { error } = await authClient.emailOtp.sendVerificationOtp({
+        email,
+        type: "sign-in",
+        // So the email arrives in the language of this page.
+        fetchOptions: { headers: { [UI_LOCALE_HEADER]: locale } },
+      });
       if (error) setError(t.errorGeneric);
       else setStep("code");
     });

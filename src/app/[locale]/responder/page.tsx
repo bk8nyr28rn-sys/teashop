@@ -9,6 +9,7 @@ import { expireOverdue, getResponderProfile, getResponderStanding, listResponder
 import { Icon } from "@/components/icons";
 import { QuestionStatusBadge } from "@/components/question-status";
 import { ui } from "@/components/ui";
+import { ugc } from "@/lib/content-lang";
 
 export default async function ResponderPage() {
   const dict = await getDictionary();
@@ -75,7 +76,9 @@ async function Desk() {
               >
                 <div className="flex flex-wrap items-center gap-2">
                   {q.crisisFlag && <span className={ui.badgeDanger}>!</span>}
-                  <span className="min-w-0 flex-1 truncate font-semibold">{q.title}</span>
+                  <span {...ugc(q.title)} className="min-w-0 flex-1 truncate font-semibold">
+                    {q.title}
+                  </span>
                   <span className={ui.badgeSuccess}>{formatMoney(q.priceCents - q.feeCents, q.currency, locale)}</span>
                 </div>
                 {q.deadlineAt && (
@@ -97,7 +100,9 @@ async function Desk() {
                   href={`/${locale}/questions/${q.id}`}
                   className="flex items-center gap-3 px-5 py-3 hover:bg-surface-2"
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm">{q.title}</span>
+                  <span {...ugc(q.title)} className="min-w-0 flex-1 truncate text-sm">
+                    {q.title}
+                  </span>
                   <QuestionStatusBadge status={q.status} t={t} />
                 </Link>
               </li>

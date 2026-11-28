@@ -8,6 +8,7 @@ import { Avatar } from "@/components/avatar";
 import { Icon, type IconName } from "@/components/icons";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ui } from "@/components/ui";
+import { Handle } from "@/components/handle";
 
 export default async function MePage() {
   const dict = await getDictionary();
@@ -62,7 +63,9 @@ async function Me() {
       <header className="flex items-center gap-4">
         <Avatar name={profile.handle} size={64} />
         <div>
-          <h1 className={ui.h1}>@{profile.handle}</h1>
+          <h1 className={ui.h1}>
+            <Handle>{profile.handle}</Handle>
+          </h1>
           <p className={ui.muted}>{format(dict.home.trust, { level: profile.trustLevel })}</p>
         </div>
       </header>

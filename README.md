@@ -10,7 +10,7 @@ A privacy-first community for LGBTQ+ people, with paid emotional-support Q&A ans
 | Framework | Next.js 16 (App Router, Cache Components) + TypeScript |
 | Database | PostgreSQL + Drizzle ORM (Neon recommended in production) |
 | Auth | Better Auth, passwordless email one-time codes; TOTP step-up for staff |
-| i18n | Built-in dictionaries + `next/root-params` (`/en`, `/zh`) |
+| i18n | Built-in dictionaries + `next/root-params` (`/en`, `/zh`); choice remembered per device and per account |
 | Styling | Tailwind CSS 4, system fonts only |
 | Payments | Stripe Connect (Express), manual-capture destination charges; fake provider in dev |
 | Tests | Vitest (unit + real-Postgres integration + Stripe SDK against a mock server) |
@@ -92,6 +92,18 @@ Admins only, with 2FA. Sections: **Overview** (7-day KPIs, daily chart, needs-at
 - **Responder applications.** Members (trust ≥ 1) apply from *Me*; admins approve or decline; the application text is wiped after the decision.
 - **Settings in the database** (`qa_settings`): fee, answer window, price range, open questions per member, warning/pause thresholds. Every change is logged with before/after values and only affects new questions (fee and window are snapshotted per question).
 
+## Languages
+
+- **Which language a page opens in:** the language the user picked (`locale` cookie, set by the header switch or *Settings → Language*), else the browser's languages matched on the base language (`zh-TW`, `zh-HK` → Chinese; `en-GB` → English), else English (`src/i18n/negotiate.ts`).
+- **Saved on the account** (`profile.locale`): the first sign-in stores the language used; signing in on a new device switches to it and remembers it there too.
+- **Sign-in emails** are sent in the language of the page the code was requested from (header `x-ui-locale`), falling back to the cookie and the browser.
+- **Browser translation** (Chrome, Safari, Edge) is the zero-cost way to read posts in other languages:
+  - user-written text gets `lang` (detected locally with `eld`, conservatively: short or ambiguous text stays untagged) and `dir="auto"` for right-to-left scripts (`lib/content-lang.ts`);
+  - nicknames, codes and the brand name are `translate="no"` (`components/handle.tsx`);
+  - `components/translation-guard.tsx` keeps React from crashing when a translator rewrites text nodes (facebook/react#11538). It is a precaution; our simulated test didn't crash without it either.
+  - Settings tells users that browser translation sends page text to Google or Apple.
+- **Adding a language:** add it to `locales` in `src/i18n/config.ts` and add `src/i18n/dictionaries/<code>.json` (a test checks every key and placeholder matches English). Also add crisis keywords and local hotlines in `src/lib/crisis.ts`, and someone who can moderate that language. Right-to-left UI languages would also need the layout mirrored.
+
 ## Privacy decisions (do not regress)
 
 - No orientation / gender-identity column anywhere. Belonging = circle membership.
@@ -116,10 +128,11 @@ src/
   lib/accounts.ts      suspension, sign-out-others, account deletion
   lib/qa.ts            paid Q&A lifecycle (ask, authorise, answer+capture, expire, dispute, missed deadlines)
   lib/qa-admin.ts      admin console: stats, logged content unlock, responders, applications, finance, settings
+  lib/content-lang.ts  local language detection for user-written text (lang / dir attributes)
   lib/payments/        PaymentProvider interface, Stripe and fake implementations
   lib/crisis.ts        crisis-language detection and support lines
   lib/dal.ts           session → viewer; the only place that reads auth (applies the 2FA downgrade)
-  i18n/                locale config and en/zh dictionaries
+  i18n/                locale config, negotiation (cookie → browser), en/zh dictionaries
   proxy.ts             locale redirect + optimistic auth gate
 scripts/               grant-admin, reset-mfa, vercel-build
 tests/                 Vitest suites
@@ -129,4 +142,4 @@ docs/DEPLOY.md         production deployment guide
 
 ## Not built yet
 
-Editing posts, notifications, 2FA for circle moderators, a data export, follow-up messages on paid questions, payout dashboards for responders, optional evidence upload (schema fields exist; must auto-delete after review), passkeys, and the low-profile ("discreet") mode.
+In-app "See translation" for posts (planned: translate once and cache per language, mock mode until an API key is set, per-user and monthly caps), editing posts, notifications, 2FA for circle moderators, a data export, follow-up messages on paid questions, payout dashboards for responders, optional evidence upload (schema fields exist; must auto-delete after review), passkeys, and the low-profile ("discreet") mode.

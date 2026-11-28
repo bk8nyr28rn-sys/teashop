@@ -8,6 +8,8 @@ import { expireOverdue, listMyQuestions } from "@/lib/qa";
 import { Avatar } from "@/components/avatar";
 import { QuestionStatusBadge } from "@/components/question-status";
 import { ui } from "@/components/ui";
+import { Handle } from "@/components/handle";
+import { ugc } from "@/lib/content-lang";
 
 export default async function MyQuestionsPage() {
   const dict = await getDictionary();
@@ -48,9 +50,11 @@ async function List() {
           <Link href={`/${locale}/questions/${q.id}`} className={`${ui.cardLink} flex items-center gap-3`}>
             <Avatar name={q.responderHandle} size={36} />
             <div className="min-w-0 flex-1">
-              <p className="truncate font-semibold">{q.title}</p>
+              <p {...ugc(q.title)} className="truncate font-semibold">
+                {q.title}
+              </p>
               <p className="text-xs text-muted">
-                @{q.responderHandle ?? "?"} · {dateFmt.format(q.createdAt)}
+                <Handle>{q.responderHandle ?? "?"}</Handle> · {dateFmt.format(q.createdAt)}
               </p>
             </div>
             <QuestionStatusBadge status={q.status} t={t} />

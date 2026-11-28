@@ -70,7 +70,7 @@ async function Security() {
       <img src={qr} alt="" width={220} height={220} className="rounded-lg bg-white p-2" />
       <div>
         <p className="text-xs text-muted">{t.manualKey}</p>
-        <code className="break-all font-mono text-sm" data-testid="totp-secret">
+        <code translate="no" className="break-all font-mono text-sm" data-testid="totp-secret">
           {setup.secret}
         </code>
       </div>
