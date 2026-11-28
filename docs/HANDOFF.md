@@ -63,7 +63,8 @@ scripts/
   proto-tests/            样机和捏人台的浏览器测试、难度模拟
   sync-shared-draw.mjs    画人代码同步
   build-web.mjs、subset-fonts.py、raid-balance.ts …  旧原型用的
-src/core/                 旧原型的规则核心（纯 TypeScript，不能用 window / document / process / Node 模块）
+src/core/                 规则核心（纯 TypeScript，不能用 window / document / process / Node 模块）；新方向的在 src/core/loop/
+src/server/               本地假服务器（S0a）：家族 → 房 → 人、opId 去重、守夜重放、分家、投胎、真人厉鬼
 src/sim/                  旧原型的模拟器
 src/web/                  旧原型的网页壳
 test/                     旧原型的测试
@@ -165,7 +166,7 @@ design/                   11 月 14 日的旧设计稿画布（有已删掉的�
 | 野外地图 | 还是平涂的圈，没有雾 |
 | 声音 | 没有；捏人台里的浏览器朗读只是占位 |
 | 画人 | 捏人台和样机用 SVG 画人；正式版在 Cocos 里要重写渲染，只有参数和规则能直接搬 |
-| 服务器 | 还没有。设计初稿在 `docs/SERVER_SPEC.md`：第一版用微信云开发，手机只发操作，服务器用规则核心算结果、重放守夜。第一步是本地假服务器（`src/server/`，不花钱），等产品负责人定完四件待定的事再开工 |
+| 服务器 | **本地假服务器（S0a）做好了**：`src/server/`，只用规则核心、不碰数据库，测试在 `test/server/`。设计在 `docs/SERVER_SPEC.md`：第一版用微信云开发，手机只发操作，服务器用规则核心算结果、重放守夜和当厉鬼。下一步 S0b：页面连上假服务器（守夜、当厉鬼要按固定步长走） |
 
 ## 7. 改完怎么验证
 
