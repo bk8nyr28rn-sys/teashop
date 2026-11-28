@@ -1,0 +1,1091 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>一起守夜</title>
+<link rel="stylesheet" href="../assets/fonts/prototype.css">
+<script src="../assets/avatar.js"></script>
+<script src="../assets/loop-core.js"></script>
+<style>
+/* 一起守夜（试玩）：族人被砸门，点「去帮忙」就进来两个人一起打（11-28 定，爽度优先）。
+   守夜直接跑规则核心：主人这边算，援兵的点击记进同一份记录，打完像服务器那样重放核对。 */
+:root {
+  --bg: #0E1424; --panel: #182035; --panel-2: #1F2942; --ink: #E6ECF5; --muted: #9AA8C0; --line: #2A3552;
+  --seal: #E0654F; --on-seal: #1A1010; --gold: #E8BE5C; --accent: #7FD6C2; --good: #8FE0A8;
+  --font-display: 'ZCOOL KuaiLe', 'Songti SC', 'STSong', serif;
+  --font-body: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  color-scheme: dark;
+}
+/* 守夜永远是夜里：亮色系统下也用同一套深色 */
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { color-scheme: dark; } }
+:root[data-theme="light"], :root[data-theme="dark"] { color-scheme: dark; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5; -webkit-tap-highlight-color: transparent; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+.app { max-width: 540px; margin: 0 auto; padding: max(12px, env(safe-area-inset-top, 0px)) 16px 28px; display: flex; flex-direction: column; gap: 10px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: 26px; margin: 4px 0 0; }
+h2 { font-family: var(--font-display); font-weight: 400; font-size: 21px; margin: 0; }
+.muted { color: var(--muted); }
+.note { color: var(--muted); font-size: 12.5px; margin: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.card p, .card h2 { margin: 0; }
+.big { min-height: 52px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel-2); padding: 8px 14px; text-align: left; display: flex; flex-direction: column; justify-content: center; }
+.big b { font-size: 16px; }
+.big small { color: var(--muted); font-size: 12px; }
+.big.main { background: var(--seal); color: var(--on-seal); border-color: transparent; }
+.big.main small { color: rgba(26, 16, 16, 0.78); }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; min-width: 0; }
+.hud { display: flex; align-items: center; gap: 10px; }
+.doorbar { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 12.5px; }
+.bar { flex: 1; height: 10px; border-radius: 99px; background: #0B0F1E; border: 1px solid var(--line); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--good); transition: width 0.15s; }
+.bar.low i { background: var(--seal); }
+.wave { font-family: var(--font-display); font-size: 17px; white-space: nowrap; }
+.stage { width: 100%; height: auto; display: block; border-radius: 16px; background: #0B1022; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.items { display: flex; gap: 8px; }
+.item { flex: 1; min-height: 50px; border-radius: 12px; border: 1px solid var(--line); background: var(--panel); display: flex; align-items: center; justify-content: center; gap: 6px; font-size: 15px; }
+.item[aria-pressed="true"] { border-color: var(--gold); box-shadow: inset 0 0 0 2px var(--gold); }
+.item i { width: 12px; height: 12px; border-radius: 50%; }
+.status { font-size: 13px; color: var(--muted); min-height: 20px; margin: 0; }
+.status b { color: var(--ink); }
+.pick { position: fixed; inset: 0; background: rgba(5, 8, 18, 0.62); display: flex; align-items: flex-end; justify-content: center; padding: 16px; z-index: 5; }
+.pick .card { width: 100%; max-width: 508px; }
+.perk small { display: block; }
+.popup { border-color: var(--seal); box-shadow: 0 0 0 2px rgba(224, 101, 79, 0.35); animation: pulse 1.2s ease-in-out infinite alternate; }
+@keyframes pulse { from { box-shadow: 0 0 0 2px rgba(224, 101, 79, 0.2); } to { box-shadow: 0 0 0 5px rgba(224, 101, 79, 0.45); } }
+@media (prefers-reduced-motion: reduce) { .popup { animation: none; } }
+.toast { position: fixed; left: 50%; top: 14px; transform: translateX(-50%); background: var(--panel-2); border: 1px solid var(--gold); color: var(--ink); padding: 8px 14px; border-radius: 99px; font-size: 13.5px; z-index: 9; max-width: calc(100% - 32px); }
+.verify { font-size: 13.5px; padding: 10px 12px; border-radius: 12px; background: var(--panel-2); margin: 0; }
+.verify.ok { border: 1px solid var(--good); }
+.verify.bad { border: 1px solid var(--seal); }
+.stat { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; }
+.stat dd { margin: 0; font-variant-numeric: tabular-nums; text-align: right; }
+.dmg { font-size: 13px; font-weight: 700; fill: #FFE7A8; paint-order: stroke; stroke: #0B0F1E; stroke-width: 3px; pointer-events: none; }
+.dmg.guest { fill: #A8E6FF; }
+.dmg.good { fill: var(--good); }
+</style>
+</head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="nsky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0B1022"/><stop offset="1" stop-color="#22304E"/></linearGradient>
+    <linearGradient id="lane" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#121A30"/><stop offset="1" stop-color="#2E3A58"/></linearGradient>
+    <radialGradient id="lampg"><stop offset="0" stop-color="#FFB45E" stop-opacity="0.5"/><stop offset="1" stop-color="#FFB45E" stop-opacity="0"/></radialGradient>
+    <radialGradient id="gglow"><stop offset="0" stop-color="#BFD3FF" stop-opacity="0.32"/><stop offset="1" stop-color="#BFD3FF" stop-opacity="0"/></radialGradient>
+    <linearGradient id="gfade" gradientUnits="userSpaceOnUse" x1="0" y1="225" x2="0" y2="372"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
+    <mask id="gmask" maskUnits="userSpaceOnUse" maskContentUnits="userSpaceOnUse" x="-80" y="-60" width="400" height="480"><rect x="-80" y="-60" width="400" height="480" fill="url(#gfade)"/></mask>
+  </defs>
+</svg>
+<main class="app" id="app"></main>
+<script>
+// @@shared-begin
+// ---------------- 调色 ----------------
+function hsl2hex(h, s, l) {
+  const a = (s / 100) * Math.min(l / 100, 1 - l / 100);
+  const f = (n) => { const k = (n + h / 30) % 12; const c = l / 100 - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)); return Math.round(c * 255).toString(16).padStart(2, '0'); };
+  return ('#' + f(0) + f(8) + f(4)).toUpperCase();
+}
+function hex2hsl(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); const n = m ? parseInt(m[1], 16) : 0;
+  const r = ((n >> 16) & 255) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  let h = 0; if (d) { h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+  return { h: Math.round(h), s: Math.round(d ? (d / (1 - Math.abs(2 * l - 1))) * 100 : 0), l: Math.round(l * 100) };
+}
+const PRESETS = {
+  skin: ['#FBE3D3', '#F6D2BA', '#E9B996', '#D29A73', '#A9724D', '#7A4E33'],
+  hair: ['#1F1A22', '#4A3125', '#8A5A36', '#C9A066', '#9AA0B8', '#E6E4DE', '#A33A33', '#3E5C86'],
+  cloth: ['#3E6E8E', '#C8402E', '#7FA36B', '#E3A33B', '#E9ECF2', '#2A2D36', '#9B5DA8', '#D97A8E', '#5A3A2E', '#7FC4C9'],
+  eye: ['#2B2233', '#5A3A2E', '#3E6E8E', '#7FA36B', '#B8402F', '#9B5DA8', '#C9A066'],
+  accent: ['#E3A33B', '#E9ECF2', '#C8402E', '#7FA36B', '#2A2D36', '#9B5DA8', '#C9D2E2'],
+  brush: ['#2B2233', '#FFFFFF', '#C8402E', '#E3A33B', '#7FA36B', '#3E6E8E', '#9B5DA8', '#FF8FA3', '#7FC8FF', '#F6D2BA'],
+};
+
+// ---------------- 部件和参数 ----------------
+const OPT = {
+  faceShape: [['round', '圆脸'], ['oval', '鹅蛋'], ['square', '方脸'], ['pointed', '尖脸']],
+  eyes: [['round', '圆眼'], ['almond', '杏眼'], ['phoenix', '丹凤眼'], ['droopy', '下垂眼'], ['smile', '笑眼'], ['sleepy', '慵懒眼'], ['cat', '猫眼'], ['sparkle', '星星眼']],
+  brows: [['sword', '剑眉'], ['willow', '柳叶眉'], ['flat', '平眉'], ['thick', '一字眉'], ['droopy', '八字眉'], ['short', '短眉']],
+  mouth: [['smile', '微笑'], ['o', '小圆嘴'], ['flat', '抿嘴'], ['grin', '咧嘴笑'], ['cat', '猫嘴'], ['smirk', '坏笑']],
+  beard: [['none', '无'], ['mustache', '八字胡'], ['goatee', '山羊胡'], ['full', '络腮胡']],
+  mark: [['none', '无'], ['tearmole', '泪痣'], ['huadian', '花钿'], ['scar', '刀疤'], ['freckles', '雀斑'], ['paint', '面纹']],
+  nose: [['none', '无'], ['dot', '鼻孔'], ['small', '小鼻'], ['hook', '侧影'], ['button', '圆头'], ['line', '直线'], ['round', '大鼻头']],
+  glasses: [['none', '无'], ['round', '圆框'], ['square', '方框'], ['half', '半框'], ['sun', '墨镜'], ['monocle', '单片镜']],
+  hairFront: [['qi', '齐刘海'], ['middle', '中分'], ['side', '偏分'], ['messy', '碎发'], ['air', '空气刘海'], ['bare', '无刘海'], ['longside', '长侧刘海'], ['curly', '卷刘海']],
+  hairBack: [['highpony', '高马尾'], ['lowpony', '低马尾'], ['long', '长直发'], ['buns', '双髻'], ['topknot', '道髻'], ['short', '短发'], ['twintails', '双马尾'], ['halfup', '半扎发']],
+  streak: [['none', '无'], ['left', '左边挑染'], ['right', '右边挑染'], ['tips', '发梢挑染']],
+  top: [['jin', '劲装'], ['changshan', '长衫'], ['duangua', '短褂'], ['daopao', '广袖袍'], ['vest', '背心短打'], ['ru', '上襦'], ['armor', '轻甲'], ['yuanling', '圆领袍']],
+  sleeve: [['narrow', '窄袖'], ['wide', '广袖']],
+  pattern: [['none', '无'], ['cloud', '云纹'], ['check', '格纹'], ['floral', '碎花'], ['dots', '圆点'], ['custom', '手绘花纹']],
+  bottom: [['pants', '长裤'], ['wrap', '绑腿裤'], ['skirt', '长裙'], ['pleat', '马面裙']],
+  shoes: [['cloth', '布鞋'], ['boots', '靴子'], ['straw', '草鞋']],
+  cape: [['none', '无'], ['short', '短披风'], ['long', '长披风']],
+  head: [['none', '无'], ['band', '发带'], ['pin', '发簪'], ['crown', '发冠'], ['hat', '斗笠'], ['veil', '面纱'], ['flower', '簪花']],
+  ear: [['none', '无'], ['stud', '耳钉'], ['drop', '耳坠']],
+  neck: [['none', '无'], ['scarf', '围巾'], ['pendant', '玉佩项链']],
+  weapon: [['none', '无'], ['sword', '剑'], ['saber', '刀'], ['fan', '折扇'], ['umbrella', '油纸伞'], ['gourd', '葫芦'], ['flute', '竹笛'], ['bow', '弓']],
+  weaponPos: [['back', '背着'], ['hand', '拿着']],
+};
+
+const DEFAULT = {
+  heads: 0.45, build: 0.35, height: 0.5, skin: '#F6D2BA',
+  faceShape: 'oval', faceWidth: 0.45, eyes: 'almond', eyeSize: 0.5, eyeGap: 0.45, eyeY: 0.5, eyeColor: '#2B2233',
+  brows: 'sword', browThick: 0.45, browTilt: 0.15, browFollow: true, browColor: '#1F1A22',
+  mouth: 'smile', mouthY: 0.5, blush: 0.55, blushColor: '#FF8FA3', beard: 'none', mark: 'none', markColor: '#C8402E',
+  hairFront: 'side', hairBack: 'highpony', hairLen: 0.55, hairColor: '#1F1A22', streak: 'none', streakColor: '#A33A33',
+  top: 'jin', topColor: '#3E6E8E', trimColor: '#E3A33B', sleeve: 'narrow', pattern: 'none', patternColor: '#E9ECF2', beltColor: '#2A2D36',
+  bottom: 'pants', bottomColor: '#2E3446', shoes: 'boots', shoeColor: '#3A2C26', cape: 'none', capeColor: '#C8402E',
+  head: 'band', headColor: '#C8402E', ear: 'none', earColor: '#E3A33B', neck: 'none', neckColor: '#7FA36B',
+  weapon: 'sword', weaponPos: 'back', weaponColor: '#C9D2E2',
+  eyeRot: 0, eyeSquash: 0.5, browY: 0.5, browGap: 0.5, browSize: 0.5, nose: 'small', noseY: 0.5, noseSize: 0.5,
+  mouthSize: 0.5, mouthSquash: 0.5, mole: false, moleX: 0.45, moleY: 0.35, moleSize: 0.4,
+  glasses: 'none', glassesColor: '#2A2D36', glassesSize: 0.5, glassesY: 0.5,
+  pMove: 3, pTalk: 3, pExpr: 3, pAttitude: 3, pQuirk: 3, vPitch: 0.5, vRate: 0.5,
+  brushColor: '#2B2233', brushSize: 0.05, tileSize: 0.5,
+};
+
+const INSPIRE = [
+  ['剑客', {}],
+  ['书生', { top: 'changshan', topColor: '#E9ECF2', trimColor: '#3E6E8E', hairBack: 'topknot', hairFront: 'bare', head: 'pin', headColor: '#3E6E8E', weapon: 'fan', weaponPos: 'hand', eyes: 'round', brows: 'willow', mouth: 'smile', pattern: 'cloud', patternColor: '#9AB4C8', shoes: 'cloth', build: 0.2 }],
+  ['医者', { top: 'ru', topColor: '#7FA36B', trimColor: '#F4ECDD', bottom: 'skirt', bottomColor: '#E8D7B5', hairBack: 'long', hairFront: 'qi', head: 'flower', headColor: '#D97A8E', weapon: 'gourd', weaponPos: 'hand', eyes: 'droopy', brows: 'willow', mark: 'huadian', shoes: 'cloth' }],
+  ['镖师', { top: 'armor', topColor: '#C8402E', trimColor: '#C9A066', hairBack: 'short', hairFront: 'messy', head: 'hat', headColor: '#C9A066', weapon: 'saber', skin: '#D29A73', eyes: 'phoenix', brows: 'thick', beard: 'goatee', build: 0.85, mark: 'scar', markColor: '#A9724D' }],
+  ['侠女', { top: 'jin', topColor: '#9B5DA8', trimColor: '#E9ECF2', bottom: 'pleat', bottomColor: '#3A2C46', hairBack: 'twintails', hairFront: 'longside', hairColor: '#4A3125', head: 'veil', headColor: '#E9ECF2', weapon: 'umbrella', weaponPos: 'hand', eyes: 'cat', brows: 'sword', cape: 'short', capeColor: '#E9ECF2', ear: 'drop' }],
+  ['小乞儿', { top: 'vest', topColor: '#8A6A4C', trimColor: '#5A3A2E', bottom: 'wrap', bottomColor: '#6B5A48', shoes: 'straw', hairBack: 'buns', hairFront: 'messy', head: 'none', weapon: 'flute', weaponPos: 'hand', eyes: 'sparkle', mouth: 'grin', mark: 'freckles', markColor: '#A9724D', heads: 0.15 }],
+];
+
+// ---------------- 表情：不画死，用五官状态组合 ----------------
+// eye: open（用玩家选的眼睛）| wide | arc | closed | half | cry | star
+// mouth: base（用玩家选的嘴）| smile | grin | open | flat | o | frown | wavy | tongue | smirk
+// brow: 0 正常 | up 上扬 | knit 皱眉 | down 下垂
+const EXPR_PARTS = {
+  eye: [['open', '睁眼'], ['wide', '瞪大'], ['arc', '弯弯'], ['closed', '闭眼'], ['half', '半睁'], ['cry', '泪眼'], ['star', '星星']],
+  mouth: [['base', '原本的嘴'], ['smile', '微笑'], ['grin', '咧嘴'], ['open', '张嘴'], ['flat', '抿嘴'], ['o', '圆嘴'], ['frown', '撇嘴'], ['wavy', '波浪'], ['tongue', '吐舌'], ['smirk', '坏笑']],
+  brow: [['normal', '正常'], ['up', '上扬'], ['knit', '皱眉'], ['down', '下垂']],
+  fx: [['blush', '红晕'], ['sweat', '汗滴'], ['anger', '怒气'], ['tears', '眼泪'], ['sparkle', '闪光'], ['zzz', '困意'], ['heart', '爱心'], ['gloom', '阴影']],
+};
+const EXPRESSIONS = [
+  ['calm', '平静', { eye: 'open', mouth: 'base', brow: 'normal', fx: [] }],
+  ['happy', '开心', { eye: 'arc', mouth: 'grin', brow: 'normal', fx: [] }],
+  ['laugh', '大笑', { eye: 'closed', mouth: 'open', brow: 'up', fx: ['sparkle'] }],
+  ['shy', '害羞', { eye: 'half', mouth: 'wavy', brow: 'down', fx: ['blush', 'sweat'] }],
+  ['love', '心动', { eye: 'arc', mouth: 'smile', brow: 'up', fx: ['heart', 'blush'] }],
+  ['smug', '得意', { eye: 'half', mouth: 'smirk', brow: 'up', fx: ['sparkle'] }],
+  ['angry', '生气', { eye: 'open', mouth: 'flat', brow: 'knit', fx: ['anger'] }],
+  ['rage', '暴怒', { eye: 'wide', mouth: 'open', brow: 'knit', fx: ['anger', 'gloom'] }],
+  ['sad', '难过', { eye: 'open', mouth: 'frown', brow: 'down', fx: ['tears'] }],
+  ['cry', '大哭', { eye: 'cry', mouth: 'open', brow: 'down', fx: ['tears'] }],
+  ['pout', '委屈', { eye: 'half', mouth: 'wavy', brow: 'down', fx: ['tears'] }],
+  ['surprised', '吃惊', { eye: 'wide', mouth: 'o', brow: 'up', fx: [] }],
+  ['helpless', '无奈', { eye: 'half', mouth: 'flat', brow: 'down', fx: ['sweat'] }],
+  ['sleepy', '犯困', { eye: 'closed', mouth: 'o', brow: 'normal', fx: ['zzz'] }],
+  ['starry', '星星眼', { eye: 'star', mouth: 'grin', brow: 'up', fx: ['sparkle'] }],
+  ['cheeky', '调皮', { eye: 'arc', mouth: 'tongue', brow: 'up', fx: [] }],
+  ['gloomy', '郁闷', { eye: 'half', mouth: 'frown', brow: 'knit', fx: ['gloom'] }],
+];
+let myExpr = { eye: 'arc', mouth: 'tongue', brow: 'up', fx: ['blush'] };
+function exprOf(id, draw) {
+  if (id === 'mine') return myExpr;
+  if (HAND_SLOTS.includes(id)) {
+    const base = EXPRESSIONS.find(([key]) => key === draw?.baseExpr?.[id]) || EXPRESSIONS[0];
+    return { ...base[2], hand: id };
+  }
+  const e = EXPRESSIONS.find((x) => x[0] === id); return e ? e[2] : EXPRESSIONS[0][2];
+}
+// 笔画转成 SVG
+function strokesSvg(list) {
+  return (list || []).map((st) => {
+    const pts = st.p || [];
+    if (!pts.length) return '';
+    const d = pts.length === 1 ? `M${pts[0][0]} ${pts[0][1]} l0.0001 0` : 'M' + pts.map((q) => `${q[0]} ${q[1]}`).join(' L');
+    return `<path d="${d}${st.fill ? ' Z' : ''}" stroke="${st.w ? st.c : 'none'}" stroke-width="${st.w}" fill="${st.fill || 'none'}" fill-rule="evenodd" stroke-linecap="round" stroke-linejoin="round"/>`;
+  }).join('');
+}
+
+// v2 笔画以部位画布为单位。绑定名随存档导出，袖子的第二份渲染在右臂上。
+const HAND_SLOTS = Array.from({ length: 8 }, (_, i) => 'h' + (i + 1));
+const DRAW_LAYERS = [
+  ['hairFront', '前发', 'head'], ['hairBack', '后发', 'head'], ['head', '头饰', 'head'],
+  ['face', '脸上（一直显示）', 'head'], ...HAND_SLOTS.map(key => [key, '手绘表情 ' + key.slice(1), 'head']),
+  ['top', '上衣', 'torso'], ['back', '背后', 'torso'], ['sleeve', '袖子', 'armLeft'],
+  ['bottom', '下装', 'legs'], ['shoes', '鞋', 'legs'], ['cloth', '衣服花纹', 'torso'], ['emblem', '胸前图案', 'torso'],
+];
+function emptyDraw() {
+  const draw = { v: 2, hide: {}, customOnly: {}, baseExpr: {}, omitExpr: {}, bindings: {} };
+  for (const [k,, bone] of DRAW_LAYERS) {
+    draw[k] = [];
+    draw.bindings[k] = bone;
+    draw.customOnly[k] = false;
+  }
+  for (const k of HAND_SLOTS) { draw.hide[k] = true; draw.omitExpr[k] = []; }
+  return draw;
+}
+function hasDrawExpression(draw, key) {
+  return HAND_SLOTS.includes(key) && Boolean(draw?.[key]?.length || draw?.baseExpr?.[key]);
+}
+function normDraw(draw) { return validatedDraw(draw); }
+function encode(s) { return 'WULIN1:' + btoa(unescape(encodeURIComponent(JSON.stringify(s)))); }
+function decode(t) { const m = /WULIN1:([A-Za-z0-9+/=]+)/.exec(t.trim()); if (!m) throw new Error('bad'); return JSON.parse(decodeURIComponent(escape(atob(m[1])))); }
+
+// ---------------- 画人（画板 240 × 400，脚底 y = 392） ----------------
+function headGeom(s) { const h = 372 / (3 + s.heads); return { cx: 120, hcy: 20 + h / 2, ry: h / 2 }; }
+const INK = '#2B2233';
+const lerp = (a, b, t) => a + (b - a) * t;
+
+function bodyGeom(s) {
+  const { cx, hcy, ry } = headGeom(s);
+  const rx = ry * (0.9 + 0.2 * s.faceWidth);
+  const shoulderY = hcy + ry + 2;
+  const bodyLen = 392 - shoulderY;
+  const torso = bodyLen * (0.5 - 0.1 * s.height);
+  const waistY = shoulderY + torso * 0.72, hipY = shoulderY + torso;
+  const sw = rx * 0.6 + s.build * 14, hw = sw * 0.92 + s.build * 4;
+  const legW = 15 + s.build * 6, legGap = 5;
+  return { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw, legW, legGap };
+}
+
+function layerBox(s, key, geometry = bodyGeom(s)) {
+  const { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw } = geometry;
+  const centered = (halfWidth, y, bottom) => ({ x: cx - halfWidth, y, w: halfWidth * 2, h: bottom - y });
+  switch (key) {
+    case 'hairFront': return centered(rx * 1.38, 0, hcy + ry * 1.3);
+    case 'hairBack': return centered(rx * 1.65, 0, hcy + ry * 4);
+    case 'head': return centered(rx * 1.75, 0, hcy + ry * 1.4);
+    case 'top': return centered(Math.max(sw, hw) + 25, shoulderY - 8, 392);
+    case 'back': return centered(108, Math.max(0, shoulderY - 85), 392);
+    case 'sleeve': return { x: cx - sw - 36, y: shoulderY - 4, w: 52, h: hipY - shoulderY + 25 };
+    case 'bottom': return centered(hw + 28, waistY - 8, 392);
+    case 'shoes': return centered(hw + 12, 348, 398);
+    case 'emblem': {
+      const e = sw * 0.95;
+      return centered(e / 2, lerp(shoulderY, waistY, 0.22), lerp(shoulderY, waistY, 0.22) + e);
+    }
+    case 'cloth': {
+      const tile = 16 + 48 * s.tileSize;
+      return centered(tile / 2, shoulderY, shoulderY + tile);
+    }
+    default: return { x: cx - 1.45 * ry, y: hcy - 1.5 * ry, w: 2.9 * ry, h: 2.9 * ry };
+  }
+}
+
+function drawPerson(s0, expr, age, opt = {}) {
+  const U = opt.uid || '';
+  const s = { ...s0 };
+  const D = s.draw?.v === 2 && s.draw.bindings ? s.draw : normDraw(s.draw);
+  const only = D.customOnly || {};
+  if (only.head) { s.head = 'none'; s.ear = 'none'; s.neck = 'none'; }
+  if (only.back) { s.cape = 'none'; s.weapon = 'none'; }
+  if (only.face) { s.blush = 0; s.beard = 'none'; s.mark = 'none'; s.mole = false; s.nose = 'none'; s.glasses = 'none'; }
+  if (age === 'elder') { s.hairColor = '#E6E4DE'; s.streak = 'none'; }
+  const browColor = age === 'elder' ? '#D8D4CC' : s.browFollow ? s.hairColor : s.browColor;
+  const geometry = bodyGeom(s);
+  const { cx, hcy, ry, rx, shoulderY, waistY, hipY, sw, hw, legW, legGap } = geometry;
+  function inkLayer(key, mirrored = false) {
+    if (key === opt.skip || !D[key]?.length) return '';
+    const { x, y, w, h } = layerBox(s, key, geometry);
+    const flip = mirrored ? `translate(${2 * cx} 0) scale(-1 1) ` : '';
+    const bone = mirrored ? 'armRight' : D.bindings[key];
+    return `<g data-draw-layer="${key}" data-bone="${bone}" transform="${flip}translate(${x} ${y}) scale(${w} ${h})">${strokesSvg(D[key])}</g>`;
+  }
+
+  // ---- 身体的各层 ----
+  const behind = []; // 披风、背着的兵器
+  const body = [];
+  const front = []; // 手里的兵器、拐杖
+  const hand = { lx: cx - sw - 10, rx: cx + sw + 10, y: hipY + 4 };
+
+  // 披风
+  if (s.cape !== 'none') {
+    const bottom = s.cape === 'long' ? 378 : lerp(shoulderY, 392, 0.55);
+    behind.push(`<path d="M${cx - sw - 2} ${shoulderY + 6} Q${cx - sw - 26} ${lerp(shoulderY, bottom, 0.6)} ${cx - sw - 18} ${bottom} Q${cx} ${bottom + 10} ${cx + sw + 18} ${bottom} Q${cx + sw + 26} ${lerp(shoulderY, bottom, 0.6)} ${cx + sw + 2} ${shoulderY + 6} Z" fill="${s.capeColor}"/>`);
+  }
+  // 背着的兵器
+  const W = s.weapon;
+  const onBack = s.weaponPos === 'back' && ['sword', 'saber', 'umbrella', 'flute', 'bow'].includes(W);
+  if (onBack) behind.push(weaponBack(W, cx, shoulderY, hipY, s.weaponColor, s.trimColor));
+  behind.push(inkLayer('back'));
+
+  // 腿和鞋
+  const legTop = hipY - 8, legBot = 382;
+  const lx1 = cx - legGap / 2 - legW, lx2 = cx + legGap / 2;
+  const longRobe = !only.top && ['changshan', 'daopao'].includes(s.top);
+  const skirt = !only.bottom && ['skirt', 'pleat'].includes(s.bottom);
+  const shoe = (x) => {
+    const c = s.shoeColor;
+    if (s.shoes === 'boots') return `<path d="M${x - 1} ${legBot - 14} h${legW + 2} v10 q8 2 8 9 h-${legW + 10} Z" fill="${c}"/>`;
+    if (s.shoes === 'straw') return `<ellipse cx="${x + legW / 2 + 2}" cy="${legBot + 5}" rx="${legW / 2 + 6}" ry="5" fill="#C9A86A"/><path d="M${x + 2} ${legBot + 1} L${x + legW} ${legBot - 6}" stroke="#8A6A3C" stroke-width="2"/>`;
+    return `<ellipse cx="${x + legW / 2 + 2}" cy="${legBot + 4}" rx="${legW / 2 + 5}" ry="6" fill="${c}"/>`;
+  };
+  if (only.top || only.bottom) {
+    body.push(`<path d="M${cx - sw} ${shoulderY + 9} Q${cx} ${shoulderY - 8} ${cx + sw} ${shoulderY + 9} Q${cx + hw * 0.7} ${waistY} ${cx + hw * 0.8} ${hipY - 7} Q${cx} ${hipY + 15} ${cx - hw * 0.8} ${hipY - 7} Q${cx - hw * 0.7} ${waistY} ${cx - sw} ${shoulderY + 9} Z" fill="${s.skin}"/>`);
+  }
+  if (!skirt) {
+    const legColor = only.bottom ? s.skin : s.bottomColor;
+    body.push(`<rect x="${lx1}" y="${legTop}" width="${legW}" height="${legBot - legTop + 4}" rx="7" fill="${legColor}"/><rect x="${lx2}" y="${legTop}" width="${legW}" height="${legBot - legTop + 4}" rx="7" fill="${legColor}"/>`);
+    if (!only.bottom && s.bottom === 'wrap') {
+      for (const x of [lx1, lx2]) for (let y = legBot - 40; y < legBot - 6; y += 7) body.push(`<path d="M${x} ${y + 5} L${x + legW} ${y}" stroke="#F4ECDD" stroke-width="2.4" opacity="0.8"/>`);
+    }
+  }
+  if (only.shoes) {
+    for (const x of [lx1, lx2]) body.push(`<ellipse cx="${x + legW / 2 + 1}" cy="385" rx="${legW / 2 + 2}" ry="6" fill="${s.skin}"/>`);
+  } else body.push(shoe(lx1 - 3) + shoe(lx2 - 1));
+  body.push(inkLayer('shoes'));
+  if (skirt) {
+    const top = waistY - 2;
+    body.push(`<path d="M${cx - hw} ${top} L${cx + hw} ${top} L${cx + hw + 22} ${legBot} Q${cx} ${legBot + 6} ${cx - hw - 22} ${legBot} Z" fill="${s.bottomColor}"/>`);
+    if (s.bottom === 'pleat') for (let i = -3; i <= 3; i++) body.push(`<path d="M${cx + i * hw * 0.28} ${top + 8} L${cx + i * (hw + 22) * 0.28} ${legBot - 2}" stroke="#000" stroke-opacity="0.15" stroke-width="1.5"/>`);
+  }
+  body.push(inkLayer('bottom'));
+
+  // 上衣
+  let topBottom = hipY + 6;
+  if (longRobe) topBottom = 376;
+  else if (s.top === 'yuanling') topBottom = lerp(hipY, 382, 0.5);
+  else if (s.top === 'ru') topBottom = waistY + 2;
+  else if (s.top === 'duangua' || s.top === 'vest') topBottom = hipY;
+  const flare = longRobe ? 20 : s.top === 'yuanling' ? 12 : 3;
+  const torsoPath = `M${cx - sw} ${shoulderY + 8} Q${cx} ${shoulderY - 6} ${cx + sw} ${shoulderY + 8} L${cx + hw + flare} ${topBottom} Q${cx} ${topBottom + (longRobe ? 6 : 2)} ${cx - hw - flare} ${topBottom} Z`;
+
+  // 袖子（先画，衣身压在上面）
+  const wide = s.sleeve === 'wide' || (!only.top && s.top === 'daopao');
+  const sleeveColor = !only.top && s.top === 'vest' ? lighten(s.topColor, 0.55) : s.topColor;
+  const sleeve = (side) => {
+    const sx = cx + side * (sw - 3), sy = shoulderY + 10, hx = side < 0 ? hand.lx : hand.rx;
+    if (wide) return `<path d="M${sx} ${sy - 4} Q${sx + side * 24} ${lerp(sy, hand.y, 0.5)} ${hx + side * 10} ${hand.y + 6} L${hx - side * 16} ${hand.y + 8} Q${sx - side * 2} ${lerp(sy, hand.y, 0.55)} ${sx - side * 10} ${sy + 8} Z" fill="${sleeveColor}"/><path d="M${hx + side * 10} ${hand.y + 6} L${hx - side * 16} ${hand.y + 8}" stroke="${s.trimColor}" stroke-width="4" stroke-linecap="round"/>`;
+    return `<path d="M${sx} ${sy - 4} Q${sx + side * 14} ${lerp(sy, hand.y, 0.5)} ${hx + side * 6} ${hand.y - 4} L${hx - side * 8} ${hand.y - 2} Q${sx - side * 2} ${lerp(sy, hand.y, 0.5)} ${sx - side * 9} ${sy + 8} Z" fill="${sleeveColor}"/>`
+      + (s.top === 'jin' || s.top === 'armor' ? `<rect x="${Math.min(hx + side * 6, hx - side * 8) - 1}" y="${hand.y - 14}" width="16" height="10" rx="3" fill="#2A2A33"/>` : '');
+  };
+  if (only.sleeve) {
+    for (const side of [-1, 1]) {
+      const wrist = side < 0 ? hand.lx : hand.rx;
+      body.push(`<path d="M${cx + side * (sw - 4)} ${shoulderY + 13} Q${wrist} ${waistY} ${wrist} ${hand.y + 4}" fill="none" stroke="${s.skin}" stroke-width="14" stroke-linecap="round"/>`);
+    }
+  } else body.push(sleeve(-1), sleeve(1));
+  body.push(inkLayer('sleeve'), inkLayer('sleeve', true));
+  body.push(`<circle cx="${hand.lx}" cy="${hand.y + 6}" r="8" fill="${s.skin}"/><circle cx="${hand.rx}" cy="${hand.y + 6}" r="8" fill="${s.skin}"/>`);
+  body.push(`<rect x="${cx - 9}" y="${hcy + ry * 0.7}" width="18" height="${shoulderY - hcy - ry * 0.7 + 6}" fill="${s.skin}"/>`);
+  if (!only.top) body.push(`<path d="${torsoPath}" fill="${s.topColor}"/>`);
+  // 花纹（剪在衣身里）
+  const customPattern = (s.pattern === 'custom' || only.cloth) && opt.skip !== 'cloth' && D.cloth.length;
+  if (customPattern) {
+    const T = 16 + 48 * s.tileSize;
+    body.push(`<defs><pattern id="cp${U}" patternUnits="userSpaceOnUse" x="${cx - T / 2}" y="${shoulderY}" width="${T}" height="${T}"><g data-draw-layer="cloth" data-bone="torso" transform="scale(${T})">${strokesSvg(D.cloth)}</g></pattern></defs>`);
+    if (!only.top) body.push(`<clipPath id="tc2${U}"><path d="${torsoPath}"/></clipPath><rect clip-path="url(#tc2${U})" x="${cx - hw - 40}" y="${shoulderY - 10}" width="${(hw + 40) * 2}" height="${topBottom - shoulderY + 20}" fill="url(#cp${U})"/>`);
+  } else if (!only.top && !only.cloth && s.pattern !== 'custom' && s.pattern !== 'none') body.push(`<clipPath id="tc${U}"><path d="${torsoPath}"/></clipPath><g clip-path="url(#tc${U})" opacity="0.55">${pattern(s.pattern, s.patternColor, cx - hw - 30, shoulderY - 10, (hw + 30) * 2, topBottom - shoulderY + 20)}</g>`);
+  // 领口
+  if (!only.top) {
+    if (s.top === 'yuanling') body.push(`<path d="M${cx - 16} ${shoulderY + 2} Q${cx} ${shoulderY + 18} ${cx + 16} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
+    else if (s.top === 'duangua') body.push(`<path d="M${cx} ${shoulderY + 4} V${topBottom}" stroke="${s.trimColor}" stroke-width="3"/>${[0.35, 0.55, 0.75].map((t) => `<rect x="${cx - 7}" y="${lerp(shoulderY, topBottom, t)}" width="14" height="4" rx="2" fill="${s.trimColor}"/>`).join('')}`);
+    else if (s.top === 'vest') body.push(`<path d="M${cx - 10} ${shoulderY + 2} L${cx} ${hipY - 6} L${cx + 10} ${shoulderY + 2}" fill="${lighten(s.topColor, 0.55)}"/><path d="M${cx - 10} ${shoulderY + 2} L${cx} ${hipY - 6} L${cx + 10} ${shoulderY + 2}" stroke="${s.trimColor}" stroke-width="3" fill="none"/>`);
+    else body.push(`<path d="M${cx - 12} ${shoulderY + 2} L${cx + 10} ${lerp(shoulderY, waistY, 0.95)}" stroke="#F4ECDD" stroke-width="6" stroke-linecap="round"/><path d="M${cx + 12} ${shoulderY + 2} L${cx - 1} ${lerp(shoulderY, waistY, 0.55)}" stroke="#F4ECDD" stroke-width="6" stroke-linecap="round"/><path d="M${cx - 12} ${shoulderY + 2} L${cx + 10} ${lerp(shoulderY, waistY, 0.95)}" stroke="${s.trimColor}" stroke-width="2" stroke-linecap="round"/>`);
+    if (s.top === 'daopao') body.push(`<path d="M${cx - hw - flare} ${topBottom} Q${cx} ${topBottom + 6} ${cx + hw + flare} ${topBottom}" stroke="${s.trimColor}" stroke-width="5" fill="none"/>`);
+    if (s.top === 'armor') {
+      for (let i = 0; i < 3; i++) body.push(`<path d="M${cx - sw + 6} ${shoulderY + 22 + i * 14} Q${cx} ${shoulderY + 30 + i * 14} ${cx + sw - 6} ${shoulderY + 22 + i * 14}" stroke="${s.trimColor}" stroke-width="7" fill="none"/>`);
+      body.push(`<ellipse cx="${cx - sw}" cy="${shoulderY + 10}" rx="14" ry="9" fill="${s.trimColor}"/><ellipse cx="${cx + sw}" cy="${shoulderY + 10}" rx="14" ry="9" fill="${s.trimColor}"/>`);
+    }
+    // 腰带
+    if (s.top !== 'duangua' && s.top !== 'vest') body.push(`<rect x="${cx - hw - (longRobe ? 4 : 2)}" y="${waistY - 5}" width="${(hw + (longRobe ? 4 : 2)) * 2}" height="10" rx="4" fill="${s.beltColor}"/>`);
+  }
+  const customTop = inkLayer('top');
+  if (customTop && customPattern) {
+    // 由手绘上衣的不透明区域裁出花纹，镂空、衣摆和轮廓均保留。
+    body.push(`<g id="drawnTop${U}">${customTop}</g><mask id="drawnTopMask${U}" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="0" y="0" width="240" height="400"><use href="#drawnTop${U}"/></mask><rect width="240" height="400" fill="url(#cp${U})" mask="url(#drawnTopMask${U})"/>`);
+  } else body.push(customTop);
+  body.push(inkLayer('emblem'));
+  // 颈饰
+  if (s.neck === 'scarf') body.push(`<path d="M${cx - 18} ${shoulderY} Q${cx} ${shoulderY + 14} ${cx + 18} ${shoulderY} L${cx + 16} ${shoulderY + 12} Q${cx} ${shoulderY + 22} ${cx - 16} ${shoulderY + 12} Z" fill="${s.neckColor}"/><path d="M${cx + 8} ${shoulderY + 14} q6 22 -2 40 l10 -2 q6 -20 2 -38 Z" fill="${s.neckColor}"/>`);
+  if (s.neck === 'pendant') body.push(`<path d="M${cx - 12} ${shoulderY} Q${cx} ${shoulderY + 30} ${cx + 12} ${shoulderY}" stroke="#2A2A33" stroke-width="1.5" fill="none"/><circle cx="${cx}" cy="${shoulderY + 24}" r="7" fill="${s.neckColor}"/><circle cx="${cx}" cy="${shoulderY + 24}" r="2.5" fill="${s.topColor}"/>`);
+  // 披风前襟
+  if (s.cape !== 'none') body.push(`<path d="M${cx - sw - 2} ${shoulderY + 6} Q${cx} ${shoulderY + 22} ${cx + sw + 2} ${shoulderY + 6}" stroke="${s.capeColor}" stroke-width="8" fill="none" stroke-linecap="round"/><circle cx="${cx}" cy="${shoulderY + 16}" r="5" fill="${s.trimColor}"/>`);
+  // 手里或腰间的兵器
+  if (W !== 'none' && !onBack) front.push(weaponHand(W, hand, waistY, hipY, s.weaponColor, s.trimColor, cx, hcy - ry * (s.head === 'hat' ? 1.5 : 1.2)));
+  if (age === 'elder') front.push(`<path d="M${hand.lx} ${hand.y + 4} L${hand.lx - 8} 392" stroke="#8A5A3C" stroke-width="6" stroke-linecap="round"/><path d="M${hand.lx} ${hand.y + 4} q4 -10 -8 -12" stroke="#8A5A3C" stroke-width="6" fill="none" stroke-linecap="round"/>`);
+
+  // ---- 头 ----
+  const backHair = [];
+  const headParts = [];
+  const hc = s.hairColor;
+  const len = s.hairLen;
+  // 头发底（盖住头顶，画在脸后面）
+  if (!only.hairBack) backHair.push(`<ellipse cx="${cx}" cy="${hcy - ry * 0.08}" rx="${rx * 1.07}" ry="${ry * 1.04}" fill="${hc}"/>`);
+  if (!only.hairBack) switch (s.hairBack) {
+    case 'highpony': backHair.unshift(`<path d="M${cx + rx * 0.35} ${hcy - ry * 0.85} Q${cx + rx * 1.5} ${hcy - ry * 0.9} ${cx + rx * 1.25} ${hcy + ry * 0.2} Q${cx + rx * 1.05} ${hcy + ry * (0.8 + 1.8 * len)} ${cx + rx * 1.35} ${hcy + ry * (1 + 2.2 * len)} Q${cx + rx * 0.6} ${hcy + ry * (0.8 + 1.8 * len)} ${cx + rx * 0.7} ${hcy + ry * 0.2} Q${cx + rx * 0.6} ${hcy - ry * 0.4} ${cx + rx * 0.2} ${hcy - ry * 0.55} Z" fill="${hc}"/>`); headParts.push(`<circle cx="${cx + rx * 0.45}" cy="${hcy - ry * 0.88}" r="${ry * 0.14}" fill="${s.trimColor}"/>`); break;
+    case 'lowpony': backHair.unshift(`<path d="M${cx - rx * 0.3} ${hcy + ry * 0.5} Q${cx} ${hcy + ry * (1.2 + 2.6 * len)} ${cx + rx * 0.3} ${hcy + ry * 0.5} Z" fill="${hc}"/>`); break;
+    case 'long': backHair.unshift(`<path d="M${cx - rx * 1.05} ${hcy} Q${cx - rx * 1.2} ${hcy + ry * (1 + 2.4 * len)} ${cx - rx * 0.7} ${hcy + ry * (1.3 + 2.6 * len)} L${cx + rx * 0.7} ${hcy + ry * (1.3 + 2.6 * len)} Q${cx + rx * 1.2} ${hcy + ry * (1 + 2.4 * len)} ${cx + rx * 1.05} ${hcy} Z" fill="${hc}"/>`); break;
+    case 'buns': backHair.push(`<circle cx="${cx - rx * 0.78}" cy="${hcy - ry * 0.82}" r="${ry * 0.38}" fill="${hc}"/><circle cx="${cx + rx * 0.78}" cy="${hcy - ry * 0.82}" r="${ry * 0.38}" fill="${hc}"/>`); headParts.push(`<path d="M${cx - rx * 0.98} ${hcy - ry * 0.62} q${rx * 0.2} ${ry * 0.12} ${rx * 0.4} 0 M${cx + rx * 0.58} ${hcy - ry * 0.62} q${rx * 0.2} ${ry * 0.12} ${rx * 0.4} 0" stroke="${s.trimColor}" stroke-width="3" fill="none"/>`); break;
+    case 'topknot': backHair.push(`<circle cx="${cx}" cy="${hcy - ry * 1.08}" r="${ry * 0.34}" fill="${hc}"/>`); headParts.push(`<rect x="${cx - ry * 0.3}" y="${hcy - ry * 0.86}" width="${ry * 0.6}" height="${ry * 0.12}" rx="3" fill="${s.trimColor}"/>`); break;
+    case 'short': break;
+    case 'twintails': for (const sd of [-1, 1]) backHair.unshift(`<path d="M${cx + sd * rx * 0.8} ${hcy - ry * 0.4} Q${cx + sd * rx * 1.7} ${hcy + ry * 0.2} ${cx + sd * rx * 1.3} ${hcy + ry * (0.8 + 2 * len)} Q${cx + sd * rx * 1.05} ${hcy + ry * 0.3} ${cx + sd * rx * 0.8} ${hcy - ry * 0.1} Z" fill="${hc}"/>`); break;
+    case 'halfup': backHair.unshift(`<path d="M${cx - rx * 1.05} ${hcy} Q${cx - rx * 1.15} ${hcy + ry * (1 + 2 * len)} ${cx - rx * 0.6} ${hcy + ry * (1.2 + 2.2 * len)} L${cx + rx * 0.6} ${hcy + ry * (1.2 + 2.2 * len)} Q${cx + rx * 1.15} ${hcy + ry * (1 + 2 * len)} ${cx + rx * 1.05} ${hcy} Z" fill="${hc}"/>`); backHair.push(`<circle cx="${cx}" cy="${hcy - ry * 1.02}" r="${ry * 0.26}" fill="${hc}"/>`); break;
+  }
+  // 发梢挑染：用头发自己的形状做剪切，只给末端上色
+  if (!only.hairBack && s.streak === 'tips') {
+    const longStyle = ['highpony', 'lowpony', 'long', 'twintails', 'halfup'].includes(s.hairBack);
+    const tipY = longStyle ? hcy + ry * (0.75 + 1.7 * len) : hcy + ry * 0.55;
+    backHair.push(`<clipPath id="bh${U}">${backHair.join('').replace(/ fill="[^"]*"/g, '')}</clipPath><rect clip-path="url(#bh${U})" x="-100" y="${tipY}" width="440" height="400" fill="${s.streakColor}"/>`);
+  }
+
+  backHair.push(inkLayer('hairBack'));
+
+  // 脸
+  const facePath = (() => {
+    const t = hcy - ry, b = hcy + ry, l = cx - rx, r = cx + rx;
+    switch (s.faceShape) {
+      case 'round': return `M${l} ${hcy} A${rx} ${ry} 0 1 0 ${r} ${hcy} A${rx} ${ry} 0 1 0 ${l} ${hcy} Z`;
+      case 'square': return `M${l} ${hcy - ry * 0.2} Q${l} ${t} ${cx} ${t} Q${r} ${t} ${r} ${hcy - ry * 0.2} L${r - rx * 0.06} ${hcy + ry * 0.62} Q${r - rx * 0.12} ${b} ${cx} ${b} Q${l + rx * 0.12} ${b} ${l + rx * 0.06} ${hcy + ry * 0.62} Z`;
+      case 'pointed': return `M${l} ${hcy - ry * 0.1} Q${l} ${t} ${cx} ${t} Q${r} ${t} ${r} ${hcy - ry * 0.1} Q${r - rx * 0.08} ${hcy + ry * 0.6} ${cx} ${b + ry * 0.02} Q${l + rx * 0.08} ${hcy + ry * 0.6} ${l} ${hcy - ry * 0.1} Z`;
+      default: return `M${l} ${hcy - ry * 0.05} Q${l} ${t} ${cx} ${t} Q${r} ${t} ${r} ${hcy - ry * 0.05} Q${r} ${hcy + ry * 0.75} ${cx} ${b} Q${l} ${hcy + ry * 0.75} ${l} ${hcy - ry * 0.05} Z`;
+    }
+  })();
+  headParts.unshift(`<path d="${facePath}" fill="${s.skin}"/>`);
+
+  // 表情
+  const X = typeof expr === 'string' ? exprOf(expr, D) : expr;
+  let eyeStyle = s.eyes, mouthStyle = X.mouth === 'base' ? s.mouth : X.mouth, tilt = s.browTilt, browLift = 0, eyeScale = 1, eyeState = X.eye;
+  if (X.brow === 'up') { browLift = 5; tilt = Math.min(1, tilt + 0.2); }
+  if (X.brow === 'knit') { tilt = 1; browLift = -2; }
+  if (X.brow === 'down') { tilt = -0.9; }
+  if (eyeState === 'wide') eyeScale = 1.22;
+  if (eyeState === 'arc') eyeStyle = 'smile';
+  if (eyeState === 'star') eyeStyle = 'sparkle';
+  const omit = D.omitExpr?.[X.hand] || [];
+  const hideSlot = X.hand && (D.hide[X.hand] || only[X.hand]) && (hasDrawExpression(D, X.hand) || opt.forceHide);
+  const hideFace = only.face || hideSlot;
+  const fx = new Set(hideSlot || omit.includes('fx') ? [] : X.fx);
+  const es = (0.72 + 0.6 * s.eyeSize) * (ry / 52) * eyeScale;
+  const egap = rx * (0.28 + 0.2 * s.eyeGap);
+  const ey = hcy + ry * (0.06 + 0.24 * (s.eyeY - 0.5));
+  // 腮红
+  if (s.blush > 0.02) headParts.push(`<ellipse cx="${cx - egap - 2}" cy="${ey + 16 * es + 4}" rx="${10 * es + 2}" ry="${5.5 * es + 1}" fill="${s.blushColor}" opacity="${(0.15 + 0.6 * s.blush).toFixed(2)}"/><ellipse cx="${cx + egap + 2}" cy="${ey + 16 * es + 4}" rx="${10 * es + 2}" ry="${5.5 * es + 1}" fill="${s.blushColor}" opacity="${(0.15 + 0.6 * s.blush).toFixed(2)}"/>`);
+  // 面饰
+  const mc = s.markColor;
+  if (s.mark === 'tearmole') headParts.push(`<circle cx="${cx + egap + 7 * es}" cy="${ey + 11 * es}" r="${1.8 * es + 0.6}" fill="${INK}"/>`);
+  if (s.mark === 'huadian') headParts.push(`<path transform="translate(${cx} ${hcy - ry * 0.42}) scale(${ry / 52})" d="M0 -8 Q4 -2 0 6 Q-4 -2 0 -8 Z M-6 -2 Q0 0 -1 5 Q-6 3 -6 -2 Z M6 -2 Q0 0 1 5 Q6 3 6 -2 Z" fill="${mc}"/>`);
+  if (s.mark === 'scar') headParts.push(`<path d="M${cx - egap - 10 * es} ${ey + 8 * es} L${cx - egap + 6 * es} ${ey + 24 * es}" stroke="${mc}" stroke-width="2.4" stroke-linecap="round"/><path d="M${cx - egap - 6 * es} ${ey + 18 * es} L${cx - egap + 2 * es} ${ey + 13 * es}" stroke="${mc}" stroke-width="1.6"/>`);
+  if (s.mark === 'freckles') for (const [dx, dy] of [[-1.3, 1.3], [-0.9, 1.6], [-0.5, 1.4], [0.5, 1.4], [0.9, 1.6], [1.3, 1.3]]) headParts.push(`<circle cx="${cx + dx * egap * 0.9}" cy="${ey + dy * 10 * es + 6}" r="1.4" fill="${mc}" opacity="0.8"/>`);
+  if (s.mark === 'paint') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 2)} ${ey + 14 * es} l${sd * 14} -4 M${cx + sd * (egap + 2)} ${ey + 20 * es} l${sd * 14} -4" stroke="${mc}" stroke-width="3" stroke-linecap="round"/>`);
+  // 眼睛
+  const eyeRotDeg = (s.eyeRot || 0) * 25, esq = 0.7 + 0.6 * (s.eyeSquash ?? 0.5);
+  if (!hideFace && !omit.includes('eyes')) for (const sd of [-1, 1]) headParts.push(`<g transform="translate(${cx + sd * egap} ${ey}) rotate(${-sd * eyeRotDeg}) scale(${sd * es} ${es * esq})">${eyeWithState(eyeState, eyeStyle, s.eyeColor, s.skin)}</g>`);
+  if (age === 'elder') for (const sd of [-1, 1]) headParts.push(`<path d="M${cx + sd * (egap + 12 * es)} ${ey - 2} l${sd * 6} -3 M${cx + sd * (egap + 12 * es)} ${ey + 3} l${sd * 6} 2" stroke="#C9A58F" stroke-width="1.2"/>`);
+  // 表情特效
+  if (fx.has('blush')) for (const sd of [-1, 1]) headParts.push(`<ellipse cx="${cx + sd * (egap + 2)}" cy="${ey + 16 * es + 4}" rx="${12 * es + 2}" ry="${6 * es + 1}" fill="#FF6B81" opacity="0.55"/><path d="M${cx + sd * (egap - 4)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 2)} ${ey + 14 * es + 4} l${sd * 3} 5 M${cx + sd * (egap + 8)} ${ey + 14 * es + 4} l${sd * 3} 5" stroke="#E2475F" stroke-width="1.6" opacity="0.7"/>`);
+  if (fx.has('tears')) headParts.push(`<path d="M${cx + egap + 4 * es} ${ey + 8 * es} q-3 6 0 9 q3 -3 0 -9 Z" fill="#7FC8FF"/>${eyeState === 'cry' ? `<path d="M${cx - egap} ${ey + 4} q-2 ${ry * 0.5} 2 ${ry * 0.8} M${cx + egap} ${ey + 4} q2 ${ry * 0.5} -2 ${ry * 0.8}" stroke="#7FC8FF" stroke-width="${4 * es + 1}" fill="none" stroke-linecap="round" opacity="0.85"/>` : ''}`);
+  // 眉毛
+  const bth = 1.6 + 4.2 * s.browThick;
+  // 眉毛画在头发上层（Q 版常见画法），刘海再厚表情也看得出来
+  const bgap = egap * (0.8 + 0.4 * (s.browGap ?? 0.5)), byy = ey - 15 * es - 4 - browLift - ((s.browY ?? 0.5) - 0.5) * ry * 0.45, bsz = 0.7 + 0.6 * (s.browSize ?? 0.5);
+  const browsSvg = [-1, 1].map((sd) => `<g transform="translate(${cx + sd * bgap} ${byy}) scale(${sd} 1) rotate(${-tilt * 18})">${brow(s.brows, browColor, bth, es * bsz)}</g>`).join('');
+  // 嘴
+  const my = hcy + ry * (0.5 + 0.2 * (s.mouthY - 0.5));
+  const ny = hcy + ry * (0.3 + 0.22 * ((s.noseY ?? 0.5) - 0.5)), nk = (ry / 52) * (0.7 + 0.6 * (s.noseSize ?? 0.5));
+  if (s.nose && s.nose !== 'none') headParts.push(`<g transform="translate(${cx} ${ny}) scale(${nk})">${nose(s.nose, shade(s.skin, -22))}</g>`);
+  const mw = 0.7 + 0.6 * (s.mouthSize ?? 0.5), mh = mw * (0.7 + 0.6 * (s.mouthSquash ?? 0.5));
+  if (!hideFace && !omit.includes('mouth')) headParts.push(`<g transform="translate(${cx} ${my}) scale(${(ry / 52) * mw} ${(ry / 52) * mh})">${mouth(mouthStyle)}</g>`);
+  // 痣：脸上任意位置
+  if (s.mole) headParts.push(`<circle cx="${cx + (s.moleX ?? 0.45) * rx * 0.85}" cy="${hcy + (s.moleY ?? 0.35) * ry * 0.85}" r="${(1.3 + 3 * (s.moleSize ?? 0.4)) * (ry / 52)}" fill="${INK}"/>`);
+  // 胡子
+  const bc = age === 'elder' ? '#E6E4DE' : hc;
+  if (s.beard === 'mustache') headParts.push(`<path d="M${cx} ${my - 6} q-8 -4 -16 2 q8 0 16 -1 q8 1 16 1 q-8 -6 -16 -2 Z" fill="${bc}"/>`);
+  if (s.beard === 'goatee') headParts.push(`<path d="M${cx - 6} ${my + 6} Q${cx} ${my + 26} ${cx + 6} ${my + 6} Z" fill="${bc}"/><path d="M${cx} ${my - 6} q-8 -4 -14 2 q7 0 14 -1 q7 1 14 1 q-6 -6 -14 -2 Z" fill="${bc}"/>`);
+  if (s.beard === 'full') headParts.push(`<path d="M${cx - rx * 0.92} ${hcy + ry * 0.1} Q${cx - rx * 0.8} ${hcy + ry * 1.05} ${cx} ${hcy + ry * 1.12} Q${cx + rx * 0.8} ${hcy + ry * 1.05} ${cx + rx * 0.92} ${hcy + ry * 0.1} Q${cx + rx * 0.6} ${hcy + ry * 0.75} ${cx} ${my + 4} Q${cx - rx * 0.6} ${hcy + ry * 0.75} ${cx - rx * 0.92} ${hcy + ry * 0.1} Z" fill="${bc}"/>`);
+  // 前发
+  if (!only.hairFront) headParts.push(frontHair(s.hairFront, cx, hcy, rx, ry, hc));
+  if (!hideFace && !omit.includes('brows')) headParts.push(browsSvg);
+  if (s.glasses && s.glasses !== 'none') headParts.push(glasses(s.glasses, s.glassesColor, cx, egap, ey + ((s.glassesY ?? 0.5) - 0.5) * ry * 0.25, (11 + 8 * (s.glassesSize ?? 0.5)) * (ry / 52)));
+  // 手绘：脸上一直显示的层 + 当前手绘表情的层，画在头发上面，画什么就是什么
+  headParts.push(inkLayer('face'));
+  if (X.hand) headParts.push(inkLayer(X.hand));
+  if (!only.hairFront && (s.streak === 'left' || s.streak === 'right')) {
+    const sd = s.streak === 'left' ? -1 : 1;
+    headParts.push(`<path d="M${cx + sd * rx * 0.25} ${hcy - ry * 1.02} Q${cx + sd * rx * 0.75} ${hcy - ry * 0.7} ${cx + sd * rx * 0.62} ${hcy - ry * 0.22} L${cx + sd * rx * 0.46} ${hcy - ry * 0.3} Q${cx + sd * rx * 0.5} ${hcy - ry * 0.75} ${cx + sd * rx * 0.1} ${hcy - ry * 1.0} Z" fill="${s.streakColor}"/>`);
+  }
+  headParts.push(inkLayer('hairFront'));
+  // 头饰、耳饰
+  const hd = s.headColor;
+  if (s.head === 'band') headParts.push(`<path d="M${cx - rx * 1.02} ${hcy - ry * 0.42} Q${cx} ${hcy - ry * 0.72} ${cx + rx * 1.02} ${hcy - ry * 0.42}" stroke="${hd}" stroke-width="${ry * 0.14}" fill="none"/><path d="M${cx + rx * 1.0} ${hcy - ry * 0.44} q${rx * 0.5} ${ry * 0.2} ${rx * 0.4} ${ry * 0.8} M${cx + rx * 1.0} ${hcy - ry * 0.44} q${rx * 0.3} ${ry * 0.4} ${rx * 0.1} ${ry * 0.95}" stroke="${hd}" stroke-width="${ry * 0.08}" fill="none" stroke-linecap="round"/>`);
+  if (s.head === 'pin') headParts.push(`<path d="M${cx + rx * 0.1} ${hcy - ry * 0.95} L${cx + rx * 0.95} ${hcy - ry * 1.3}" stroke="${hd}" stroke-width="4" stroke-linecap="round"/><circle cx="${cx + rx * 0.95}" cy="${hcy - ry * 1.3}" r="5" fill="${hd}"/><path d="M${cx + rx * 0.92} ${hcy - ry * 1.26} v14" stroke="${hd}" stroke-width="1.5"/><circle cx="${cx + rx * 0.92}" cy="${hcy - ry * 1.26 + 16}" r="2.5" fill="${hd}"/>`);
+  if (s.head === 'crown') headParts.push(`<path d="M${cx - ry * 0.32} ${hcy - ry * 0.95} L${cx - ry * 0.36} ${hcy - ry * 1.28} L${cx - ry * 0.12} ${hcy - ry * 1.12} L${cx} ${hcy - ry * 1.36} L${cx + ry * 0.12} ${hcy - ry * 1.12} L${cx + ry * 0.36} ${hcy - ry * 1.28} L${cx + ry * 0.32} ${hcy - ry * 0.95} Z" fill="${hd}"/><circle cx="${cx}" cy="${hcy - ry * 1.08}" r="${ry * 0.06}" fill="#7FE0FF"/><path d="M${cx - rx * 0.7} ${hcy - ry * 1.0} H${cx + rx * 0.7}" stroke="${hd}" stroke-width="3" stroke-linecap="round"/>`);
+  if (s.head === 'hat') headParts.push(`<path d="M${cx - rx * 1.7} ${hcy - ry * 0.55} Q${cx} ${hcy - ry * 2.0} ${cx + rx * 1.7} ${hcy - ry * 0.55} Q${cx} ${hcy - ry * 0.8} ${cx - rx * 1.7} ${hcy - ry * 0.55} Z" fill="${hd}"/><path d="M${cx - rx * 1.7} ${hcy - ry * 0.55} Q${cx} ${hcy - ry * 0.8} ${cx + rx * 1.7} ${hcy - ry * 0.55}" stroke="#000" stroke-opacity="0.25" stroke-width="2" fill="none"/>`);
+  if (s.head === 'veil') headParts.push(`<path d="M${cx - rx * 0.92} ${ey + 10 * es} Q${cx} ${ey + 6 * es} ${cx + rx * 0.92} ${ey + 10 * es} L${cx + rx * 0.8} ${hcy + ry * 1.05} Q${cx} ${hcy + ry * 1.2} ${cx - rx * 0.8} ${hcy + ry * 1.05} Z" fill="${hd}" opacity="0.72"/>`);
+  if (s.head === 'flower') headParts.push(`<g transform="translate(${cx - rx * 0.82} ${hcy - ry * 0.62})">${[0, 72, 144, 216, 288].map((a) => `<ellipse cx="0" cy="-7" rx="5" ry="8" fill="${hd}" transform="rotate(${a})"/>`).join('')}<circle r="4" fill="#F4E3A0"/></g>`);
+  if (s.ear !== 'none') for (const sd of [-1, 1]) {
+    const ex = cx + sd * rx * 0.98, eyy = hcy + ry * 0.28;
+    headParts.push(s.ear === 'stud' ? `<circle cx="${ex}" cy="${eyy}" r="3" fill="${s.earColor}"/>` : `<path d="M${ex} ${eyy} v12" stroke="${s.earColor}" stroke-width="1.5"/><circle cx="${ex}" cy="${eyy + 15}" r="4" fill="${s.earColor}"/>`);
+  }
+  headParts.push(inkLayer('head'));
+  const defs = '';
+  if (fx.has('sweat')) headParts.push(`<path d="M${cx + rx * 0.82} ${hcy - ry * 0.55} q-6 10 0 14 q6 -4 0 -14 Z" fill="#9CD8FF" stroke="#5AA9D6" stroke-width="1"/>`);
+  if (fx.has('anger')) headParts.push(`<g transform="translate(${cx + rx * 0.62} ${hcy - ry * 0.62})" stroke="#E23B3B" stroke-width="3" stroke-linecap="round"><path d="M-7 -2 q5 0 5 -5 M7 -2 q-5 0 -5 -5 M-7 2 q5 0 5 5 M7 2 q-5 0 -5 5" fill="none"/></g>`);
+  if (fx.has('gloom')) headParts.push(`<path d="M${cx - rx * 0.5} ${hcy - ry * 0.55} v${ry * 0.3} M${cx - rx * 0.25} ${hcy - ry * 0.6} v${ry * 0.35} M${cx} ${hcy - ry * 0.62} v${ry * 0.36} M${cx + rx * 0.25} ${hcy - ry * 0.6} v${ry * 0.35} M${cx + rx * 0.5} ${hcy - ry * 0.55} v${ry * 0.3}" stroke="#5B6BB0" stroke-width="2.5" opacity="0.55"/>`);
+  if (fx.has('sparkle')) headParts.push(`<g fill="#FFD45E">${[[-1.25, -0.9, 1], [1.3, -0.6, 0.8], [1.05, -1.25, 0.6]].map(([dx, dy, k]) => `<path transform="translate(${cx + dx * rx} ${hcy + dy * ry}) scale(${k})" d="M0 -9 L2.5 -2.5 L9 0 L2.5 2.5 L0 9 L-2.5 2.5 L-9 0 L-2.5 -2.5 Z"/>`).join('')}</g>`);
+  if (fx.has('heart')) headParts.push(`<path transform="translate(${cx + rx * 1.15} ${hcy - ry * 0.95}) scale(${ry / 40})" d="M0 6 C-10 -2 -8 -10 -2 -9 C0 -9 0 -7 0 -6 C0 -7 0 -9 2 -9 C8 -10 10 -2 0 6 Z" fill="#FF5C8A"/>`);
+  if (fx.has('zzz')) headParts.push(`<g fill="#5B6BB0" font-family="sans-serif" font-weight="700"><text x="${cx + rx * 0.9}" y="${hcy - ry * 0.9}" font-size="${ry * 0.3}">z</text><text x="${cx + rx * 1.15}" y="${hcy - ry * 1.15}" font-size="${ry * 0.4}">z</text><text x="${cx + rx * 1.45}" y="${hcy - ry * 1.45}" font-size="${ry * 0.5}">Z</text></g>`);
+
+  // ---- 组合（孩子：身体缩小、头大一点并下移；老人：微微前倾） ----
+  const shadow = `<ellipse cx="${cx}" cy="392" rx="${hw + 28}" ry="7" fill="#000" opacity="0.18"/>`;
+  let headT = '', bodyT = '', allT = '';
+  if (age === 'child') {
+    const k = 0.66;
+    const newShoulder = 392 - (392 - shoulderY) * k;
+    bodyT = `transform="translate(${cx} 392) scale(${k}) translate(${-cx} -392)"`;
+    headT = `transform="translate(0 ${newShoulder - shoulderY}) translate(${cx} ${hcy}) scale(1.04) translate(${-cx} ${-hcy})"`;
+  }
+  if (age === 'elder') allT = `transform="rotate(3 ${cx} 392)"`;
+  return `${defs}${shadow}<g ${allT}><g ${bodyT}>${behind.join('')}</g><g ${headT}>${backHair.join('')}</g><g ${bodyT}>${body.join('')}</g><g ${headT}>${headParts.join('')}</g><g ${bodyT}>${front.join('')}</g></g>`;
+}
+
+function lighten(hex, t) { const { h, s, l } = hex2hsl(hex); return hsl2hex(h, s * 0.7, l + (100 - l) * t); }
+
+function pattern(kind, c, x, y, w, h) {
+  const out = [];
+  if (kind === 'cloud') for (let yy = y; yy < y + h; yy += 26) for (let xx = x + ((yy / 26) % 2) * 14; xx < x + w; xx += 28) out.push(`<path d="M${xx} ${yy} q6 -8 12 0 q6 -8 12 0 M${xx + 6} ${yy} q0 6 6 6" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round"/>`);
+  if (kind === 'check') { for (let xx = x; xx < x + w; xx += 16) out.push(`<path d="M${xx} ${y} V${y + h}" stroke="${c}" stroke-width="3"/>`); for (let yy = y; yy < y + h; yy += 16) out.push(`<path d="M${x} ${yy} H${x + w}" stroke="${c}" stroke-width="3"/>`); }
+  if (kind === 'floral') for (let yy = y + 8; yy < y + h; yy += 22) for (let xx = x + ((yy / 22) % 2) * 11 + 6; xx < x + w; xx += 22) out.push(`<g transform="translate(${xx} ${yy})">${[0, 90, 180, 270].map((a) => `<circle cx="0" cy="-3.5" r="3" fill="${c}" transform="rotate(${a})"/>`).join('')}</g>`);
+  if (kind === 'dots') for (let yy = y + 6; yy < y + h; yy += 14) for (let xx = x + ((yy / 14) % 2) * 7 + 4; xx < x + w; xx += 14) out.push(`<circle cx="${xx}" cy="${yy}" r="2.6" fill="${c}"/>`);
+  return out.join('');
+}
+
+// 眼睛：以眼睛中心为原点，右眼方向画，左眼由外面镜像
+function eyeWithState(state, style, c, skin) {
+  if (state === 'closed') return `<path d="M-8 -1 Q0 4 8 -1" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  if (state === 'cry') return `<path d="M-8 2 Q0 -6 8 2" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+  if (state === 'half') return `${eye(style, c)}<path d="M-12 -12 H12 V-1 Q0 -3 -12 -1 Z" fill="${skin}"/><path d="M-10 -1 Q0 -3 10 -1" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+  return eye(style, c);
+}
+function eye(style, c) {
+  const hl = '<circle cx="2.5" cy="-3" r="2" fill="#fff"/>';
+  switch (style) {
+    case 'round': return `<circle r="7" fill="${c}"/><circle r="3.6" fill="${INK}"/>${hl}`;
+    case 'almond': return `<ellipse rx="8" ry="6.5" fill="${c}"/><circle r="3.4" fill="${INK}"/>${hl}<path d="M-9 -3 Q0 -10 9 -4" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    case 'phoenix': return `<path d="M-9 1 Q-2 -7 10 -5 Q4 4 -9 1 Z" fill="${c}"/><circle cx="1" cy="-1.5" r="3" fill="${INK}"/><circle cx="2.5" cy="-3" r="1.4" fill="#fff"/><path d="M-9 1 Q-2 -8 11 -6" stroke="${INK}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    case 'droopy': return `<path d="M-8 -3 Q2 -9 9 2 Q0 6 -8 -3 Z" fill="${c}"/><circle cx="0" cy="-1" r="3.2" fill="${INK}"/><circle cx="1.5" cy="-2.5" r="1.4" fill="#fff"/><path d="M-8 -4 Q2 -10 10 2" stroke="${INK}" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
+    case 'smile': return `<path d="M-8 2 Q0 -7 8 2" stroke="${INK}" stroke-width="3" fill="none" stroke-linecap="round"/>`;
+    case 'sleepy': return `<ellipse cy="1" rx="7.5" ry="5" fill="${c}"/><circle cy="2" r="3" fill="${INK}"/><path d="M-9 -1 H9" stroke="${INK}" stroke-width="3" stroke-linecap="round"/><path d="M-8 -1 Q0 -3 8 -1 L8 -6 L-8 -6 Z" fill="var(--skin)"/>`;
+    case 'cat': return `<path d="M-8 2 Q-2 -6 9 -6 Q6 4 -8 2 Z" fill="${c}"/><ellipse cx="1" cy="-1" rx="1.8" ry="3.8" fill="${INK}"/><path d="M-9 2 Q-2 -7 10 -7 L14 -10" stroke="${INK}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    case 'sparkle': return `<ellipse rx="8.5" ry="9" fill="${c}"/><circle r="4" fill="${INK}"/><path d="M3 -5 l1 -3 l1 3 l3 1 l-3 1 l-1 3 l-1 -3 l-3 -1 Z" fill="#fff"/><circle cx="-3" cy="4" r="1.4" fill="#fff"/>`;
+  }
+  return '';
+}
+function brow(style, c, th, es) {
+  const w = 10 * es + 4;
+  switch (style) {
+    case 'sword': return `<path d="M${-w} 2 L${w} -3" stroke="${c}" stroke-width="${th}" stroke-linecap="round"/><path d="M${w - 3} -3 L${w + 2} -6" stroke="${c}" stroke-width="${th * 0.7}" stroke-linecap="round"/>`;
+    case 'willow': return `<path d="M${-w} 1 Q0 -${4 + th} ${w + 2} 0" stroke="${c}" stroke-width="${Math.max(1.4, th * 0.55)}" fill="none" stroke-linecap="round"/>`;
+    case 'flat': return `<path d="M${-w} 0 H${w}" stroke="${c}" stroke-width="${th}" stroke-linecap="round"/>`;
+    case 'thick': return `<rect x="${-w}" y="${-th}" width="${w * 2}" height="${th * 2}" rx="${th}" fill="${c}"/>`;
+    case 'droopy': return `<path d="M${-w} -2 Q0 -4 ${w} 3" stroke="${c}" stroke-width="${th}" fill="none" stroke-linecap="round"/>`;
+    case 'short': return `<path d="M${-w * 0.4} 0 H${w * 0.4}" stroke="${c}" stroke-width="${th + 1}" stroke-linecap="round"/>`;
+  }
+  return '';
+}
+function shade(hex, dl) { const { h, s, l } = hex2hsl(hex); return hsl2hex(h, Math.min(100, s + 8), Math.max(5, Math.min(95, l + dl))); }
+function nose(style, c) {
+  switch (style) {
+    case 'dot': return `<circle cx="-2.5" cy="0" r="1.3" fill="${c}"/><circle cx="2.5" cy="0" r="1.3" fill="${c}"/>`;
+    case 'small': return `<path d="M-2.5 1 Q0 3 2.5 1" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round"/>`;
+    case 'hook': return `<path d="M0 -7 Q4 -1 1 2 L-1 2" stroke="${c}" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    case 'button': return `<circle r="3" fill="${c}" opacity="0.55"/>`;
+    case 'line': return `<path d="M0 -7 V1" stroke="${c}" stroke-width="2" stroke-linecap="round"/>`;
+    case 'round': return `<ellipse rx="5" ry="4" fill="${c}" opacity="0.4"/><circle cx="-2.5" cy="1.5" r="1.2" fill="${c}"/><circle cx="2.5" cy="1.5" r="1.2" fill="${c}"/>`;
+  }
+  return '';
+}
+function glasses(style, c, cx, gap, y, r) {
+  const L = cx - gap, R = cx + gap;
+  const bridge = `<path d="M${L + r} ${y} Q${cx} ${y - r * 0.35} ${R - r} ${y}" stroke="${c}" stroke-width="2" fill="none"/>`;
+  switch (style) {
+    case 'round': return `<circle cx="${L}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><circle cx="${R}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/>${bridge}`;
+    case 'square': return `<rect x="${L - r * 1.1}" y="${y - r * 0.8}" width="${r * 2.2}" height="${r * 1.6}" rx="${r * 0.3}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><rect x="${R - r * 1.1}" y="${y - r * 0.8}" width="${r * 2.2}" height="${r * 1.6}" rx="${r * 0.3}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/>${bridge}`;
+    case 'half': return `<path d="M${L - r} ${y} Q${L} ${y + r * 1.1} ${L + r} ${y} M${R - r} ${y} Q${R} ${y + r * 1.1} ${R + r} ${y}" stroke="${c}" stroke-width="2.4" fill="none"/><path d="M${L - r} ${y - 1} H${L + r} M${R - r} ${y - 1} H${R + r}" stroke="${c}" stroke-width="1.2"/>${bridge}`;
+    case 'sun': return `<ellipse cx="${L}" cy="${y}" rx="${r * 1.1}" ry="${r * 0.85}" fill="${c}" stroke="${c}" stroke-width="2"/><ellipse cx="${R}" cy="${y}" rx="${r * 1.1}" ry="${r * 0.85}" fill="${c}" stroke="${c}" stroke-width="2"/><path d="M${L - r * 0.5} ${y - r * 0.35} l${r * 0.4} -${r * 0.2} M${R - r * 0.5} ${y - r * 0.35} l${r * 0.4} -${r * 0.2}" stroke="#fff" stroke-width="2" stroke-linecap="round" opacity="0.6"/>${bridge}`;
+    case 'monocle': return `<circle cx="${R}" cy="${y}" r="${r}" fill="#fff" fill-opacity="0.18" stroke="${c}" stroke-width="2.4"/><path d="M${R + r * 0.7} ${y + r * 0.7} Q${R + r * 1.6} ${y + r * 3} ${R + r * 0.4} ${y + r * 4.5}" stroke="${c}" stroke-width="1.2" fill="none"/>`;
+  }
+  return '';
+}
+function mouth(style) {
+  const lip = '#9C3D46';
+  switch (style) {
+    case 'smile': return `<path d="M-6 0 Q0 5 6 0" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    case 'o': return `<ellipse rx="4" ry="5" fill="${lip}"/>`;
+    case 'flat': return `<path d="M-6 1 H6" stroke="${lip}" stroke-width="2.6" stroke-linecap="round"/>`;
+    case 'grin': return `<path d="M-9 -2 Q0 12 9 -2 Z" fill="${lip}"/><path d="M-7 -1 H7 V2 H-7 Z" fill="#fff"/>`;
+    case 'cat': return `<path d="M-7 -1 Q-3.5 4 0 0 Q3.5 4 7 -1" stroke="${lip}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    case 'smirk': return `<path d="M-6 1 Q2 3 7 -3" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    case 'frown': return `<path d="M-6 3 Q0 -3 6 3" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/>`;
+    case 'open': return `<path d="M-8 -3 Q0 -4 8 -3 Q7 10 0 11 Q-7 10 -8 -3 Z" fill="${lip}"/><ellipse cy="7" rx="4.5" ry="2.5" fill="#E8828F"/>`;
+    case 'wavy': return `<path d="M-8 1 q2 -3 4 0 q2 3 4 0 q2 -3 4 0 q2 3 4 0" stroke="${lip}" stroke-width="2.4" fill="none" stroke-linecap="round"/>`;
+    case 'tongue': return `<path d="M-7 -1 Q0 6 7 -1" stroke="${lip}" stroke-width="2.6" fill="none" stroke-linecap="round"/><path d="M1 2 q3 6 6 0 Z" fill="#E8828F"/>`;
+  }
+  return '';
+}
+function frontHair(style, cx, hcy, rx, ry, c) {
+  const L = cx - rx * 1.04, R = cx + rx * 1.04, T = hcy - ry * 1.08, temple = hcy - ry * 0.05;
+  const cap = (inner) => `<path d="M${L} ${temple} Q${L} ${T} ${cx} ${T} Q${R} ${T} ${R} ${temple} ${inner} Z" fill="${c}"/>`;
+  const locks = `<path d="M${L + 2} ${temple - 8} Q${L - 4} ${hcy + ry * 0.45} ${L + rx * 0.14} ${hcy + ry * 0.7} L${L + rx * 0.2} ${hcy + ry * 0.2} Z M${R - 2} ${temple - 8} Q${R + 4} ${hcy + ry * 0.45} ${R - rx * 0.14} ${hcy + ry * 0.7} L${R - rx * 0.2} ${hcy + ry * 0.2} Z" fill="${c}"/>`;
+  const f = hcy - ry * 0.32; // 刘海下沿
+  switch (style) {
+    case 'qi': return cap(`L${R - rx * 0.08} ${f} L${L + rx * 0.08} ${f}`) + locks;
+    case 'middle': return cap(`Q${cx + rx * 0.5} ${hcy - ry * 0.2} ${cx} ${hcy - ry * 0.78} Q${cx - rx * 0.5} ${hcy - ry * 0.2} ${L} ${temple}`) + locks;
+    case 'side': return cap(`Q${R - rx * 0.2} ${hcy - ry * 0.55} ${cx + rx * 0.3} ${hcy - ry * 0.82} Q${cx - rx * 0.3} ${hcy - ry * 0.25} ${L + rx * 0.05} ${hcy - ry * 0.12}`) + locks;
+    case 'messy': { let d = ''; const n = 7; for (let i = n; i >= 0; i--) { const x = L + rx * 0.08 + ((R - L - rx * 0.16) * i) / n; d += `L${x} ${i % 2 ? f + ry * 0.06 : f - ry * 0.16} `; } return cap(d) + locks; }
+    case 'air': return cap(`L${R - rx * 0.1} ${hcy - ry * 0.6} L${L + rx * 0.1} ${hcy - ry * 0.6}`) + `<path d="M${cx - rx * 0.5} ${hcy - ry * 0.62} q-2 ${ry * 0.2} -4 ${ry * 0.3} M${cx - rx * 0.15} ${hcy - ry * 0.62} q-1 ${ry * 0.22} -2 ${ry * 0.34} M${cx + rx * 0.2} ${hcy - ry * 0.62} q1 ${ry * 0.22} 2 ${ry * 0.32} M${cx + rx * 0.52} ${hcy - ry * 0.62} q2 ${ry * 0.2} 3 ${ry * 0.28}" stroke="${c}" stroke-width="3" fill="none" stroke-linecap="round"/>` + locks;
+    case 'bare': return cap(`Q${cx + rx * 0.7} ${hcy - ry * 0.72} ${cx} ${hcy - ry * 0.74} Q${cx - rx * 0.7} ${hcy - ry * 0.72} ${L} ${temple}`);
+    case 'longside': return cap(`Q${R - rx * 0.2} ${hcy - ry * 0.55} ${cx + rx * 0.3} ${hcy - ry * 0.82} Q${cx - rx * 0.3} ${hcy - ry * 0.25} ${L + rx * 0.05} ${hcy - ry * 0.12}`) + locks + `<path d="M${cx - rx * 0.3} ${hcy - ry * 0.75} Q${L - rx * 0.1} ${hcy - ry * 0.1} ${L + rx * 0.05} ${hcy + ry * 0.95} L${L + rx * 0.3} ${hcy + ry * 0.2} Q${L + rx * 0.3} ${hcy - ry * 0.4} ${cx - rx * 0.2} ${hcy - ry * 0.7} Z" fill="${c}"/>`;
+    case 'curly': { let d = ''; const n = 6; for (let i = n; i >= 0; i--) { const x = L + rx * 0.1 + ((R - L - rx * 0.2) * i) / n; d += `Q${x + rx * 0.06} ${f + ry * 0.14} ${x} ${f} `; } return cap(d) + locks; }
+  }
+  return '';
+}
+function weaponBack(w, cx, sy, hy, c, trim) {
+  const x1 = cx + 46, y1 = sy - 34, x2 = cx - 56, y2 = hy + 40;
+  if (w === 'sword') return `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="${c}" stroke-width="7" stroke-linecap="round"/><path d="M${x1 - 10} ${y1 + 2} L${x1 + 4} ${y1 + 14}" stroke="${trim}" stroke-width="7" stroke-linecap="round"/><path d="M${x1 + 4} ${y1 - 12} L${x1 - 2} ${y1 + 4}" stroke="#5A3A2E" stroke-width="7" stroke-linecap="round"/>`;
+  if (w === 'saber') return `<path d="M${x1} ${y1} Q${cx - 4} ${sy - 6} ${x2} ${y2}" stroke="${c}" stroke-width="11" fill="none" stroke-linecap="round"/><path d="M${x1 - 10} ${y1 + 2} L${x1 + 4} ${y1 + 14}" stroke="${trim}" stroke-width="7" stroke-linecap="round"/><path d="M${x1 + 4} ${y1 - 14} L${x1 - 2} ${y1 + 4}" stroke="#5A3A2E" stroke-width="7" stroke-linecap="round"/>`;
+  if (w === 'umbrella') return `<path d="M${x1} ${y1} L${x2} ${y2}" stroke="#5A3A2E" stroke-width="3"/><path d="M${x1 - 6} ${y1 + 10} L${x2 + 16} ${y2 - 30} L${x2 + 30} ${y2 - 22} Z" fill="${trim}"/>`;
+  if (w === 'flute') return `<path d="M${x1} ${y1 + 10} L${x2 + 20} ${y2 - 20}" stroke="#7FA36B" stroke-width="6" stroke-linecap="round"/>`;
+  if (w === 'bow') return `<path d="M${x1 + 4} ${y1} Q${cx - 70} ${sy - 10} ${x2 - 4} ${y2}" stroke="#8A5A3C" stroke-width="5" fill="none"/><path d="M${x1 + 4} ${y1} L${x2 - 4} ${y2}" stroke="#E9ECF2" stroke-width="1.4"/>`;
+  return '';
+}
+function weaponHand(w, hand, wy, hy, c, trim, cx, headTop) {
+  const x = hand.rx, y = hand.y + 6;
+  if (w === 'sword') return `<path d="M${x} ${y} L${x + 18} ${y - 92}" stroke="${c}" stroke-width="6" stroke-linecap="round"/><path d="M${x - 8} ${y - 6} L${x + 10} ${y - 2}" stroke="${trim}" stroke-width="6" stroke-linecap="round"/><path d="M${x} ${y} L${x - 3} ${y + 14}" stroke="#5A3A2E" stroke-width="6" stroke-linecap="round"/>`;
+  if (w === 'saber') return `<path d="M${x} ${y} Q${x + 34} ${y - 50} ${x + 14} ${y - 90}" stroke="${c}" stroke-width="10" fill="none" stroke-linecap="round"/><path d="M${x - 8} ${y - 6} L${x + 10} ${y - 2}" stroke="${trim}" stroke-width="6" stroke-linecap="round"/>`;
+  if (w === 'fan') return `<path d="M${x} ${y} L${x + 34} ${y - 30} A46 46 0 0 1 ${x + 40} ${y + 6} Z" fill="#F4ECDD" stroke="${trim}" stroke-width="2"/><path d="M${x} ${y} L${x + 40} ${y - 18} M${x} ${y} L${x + 44} ${y - 6}" stroke="${trim}" stroke-width="1"/>`;
+  if (w === 'umbrella') {
+    // 伞举过头顶：伞杆从手到头顶上方，伞面罩在头上
+    const tx = cx + 26, ty = headTop - 10, sp = 74;
+    return `<path d="M${x} ${y + 4} L${tx} ${ty}" stroke="#5A3A2E" stroke-width="3"/><path d="M${tx - sp} ${ty + 22} Q${tx} ${ty - 34} ${tx + sp} ${ty + 22} Q${tx} ${ty + 8} ${tx - sp} ${ty + 22} Z" fill="${trim}"/><path d="M${tx} ${ty - 6} L${tx - sp * 0.6} ${ty + 16} M${tx} ${ty - 6} V${ty + 12} M${tx} ${ty - 6} L${tx + sp * 0.6} ${ty + 16}" stroke="#000" stroke-opacity="0.15" stroke-width="1.5"/><circle cx="${tx}" cy="${ty - 8}" r="3" fill="#5A3A2E"/>`;
+  }
+  if (w === 'gourd') return `<path d="M${hand.lx + 30} ${wy} v10" stroke="#5A3A2E" stroke-width="2"/><circle cx="${hand.lx + 30}" cy="${wy + 16}" r="7" fill="#D9A441"/><circle cx="${hand.lx + 30}" cy="${wy + 30}" r="10" fill="#D9A441"/>`;
+  if (w === 'flute') return `<path d="M${x - 14} ${y - 4} L${x + 40} ${y - 30}" stroke="#7FA36B" stroke-width="6" stroke-linecap="round"/><circle cx="${x + 20}" cy="${y - 20}" r="1.5" fill="#2A2A33"/><circle cx="${x + 28}" cy="${y - 24}" r="1.5" fill="#2A2A33"/>`;
+  if (w === 'bow') return `<path d="M${x + 6} ${y - 80} Q${x + 46} ${y} ${x + 6} ${y + 60}" stroke="#8A5A3C" stroke-width="5" fill="none"/><path d="M${x + 6} ${y - 80} L${x + 6} ${y + 60}" stroke="#E9ECF2" stroke-width="1.4"/>`;
+  return '';
+}
+
+// ---------------- 背景 ----------------
+function background(kind) {
+  if (kind === 'night') return `<defs><radialGradient id="lg"><stop offset="0" stop-color="#FF9A4D" stop-opacity="0.45"/><stop offset="1" stop-color="#FF9A4D" stop-opacity="0"/></radialGradient></defs>
+    <rect x="-600" y="-40" width="1440" height="440" fill="#18222F"/><circle cx="250" cy="50" r="22" fill="#F3EBD0"/>
+    <rect x="-600" y="170" width="1440" height="70" fill="#5E6874"/><rect x="-600" y="160" width="1440" height="14" fill="#232831"/>
+    <rect x="-600" y="240" width="1440" height="160" fill="#3A4652"/><circle cx="-20" cy="200" r="46" fill="url(#lg)"/><circle cx="260" cy="200" r="46" fill="url(#lg)"/>
+    <ellipse cx="-20" cy="200" rx="11" ry="14" fill="#D9402E"/><ellipse cx="260" cy="200" rx="11" ry="14" fill="#D9402E"/>
+    <rect x="-600" y="300" width="1440" height="40" fill="#DDE6EF" opacity="0.12"/>`;
+  if (kind === 'plain') return `<rect x="-600" y="-40" width="1440" height="440" fill="var(--stage)"/>`;
+  return `<rect x="-600" y="-40" width="1440" height="440" fill="#F5ECDB"/><path d="M-600 150 Q20 120 100 140 Q180 112 300 136 Q560 120 840 140 V180 H-600Z" fill="#C9D3C0" opacity="0.7"/>
+    <rect x="-600" y="170" width="1440" height="70" fill="#F4EEE2"/><rect x="-600" y="160" width="1440" height="14" fill="#4A4F5C"/>
+    <rect x="-600" y="240" width="1440" height="160" fill="#D8CDB9"/><path d="M-600 290 H840 M-600 340 H840" stroke="#C4B8A2" stroke-width="2"/>`;
+}
+
+// @@shared-end
+
+// ================= 一起守夜 =================
+const $ = (id) => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+const L = LoopCore;
+const STEP = L.NIGHT.step;
+const ITEMS = [['sword', '剑', '#C9D2E2'], ['bow', '弓', '#E0B46A'], ['lamp', '灯', '#FF9A4D']];
+const ITEM = Object.fromEntries(ITEMS.map(([k, g, c]) => [k, { g, c }]));
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------- 画人：捏人台的画人代码 + 几个小工具 ----------
+function lookOf(o) { return { ...DEFAULT, ...(o || {}), draw: normDraw(o && o.draw) }; }
+function seeded(seed) {
+  let s = seed >>> 0 || 1;
+  return () => { s = (s + 0x6d2b79f5) >>> 0; let t = Math.imul(s ^ (s >>> 15), s | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+// 鬼的长相由规则核心给的 lookSeed 定：两个标签页看到的是同一张脸
+function lookFromSeed(seed) {
+  const r = seeded(seed), pick = (a) => a[Math.floor(r() * a.length)];
+  const o = { ...DEFAULT };
+  for (const k of ['faceShape', 'eyes', 'brows', 'mouth', 'hairFront', 'hairBack', 'top', 'bottom', 'head', 'beard']) o[k] = pick(OPT[k])[0];
+  o.hairColor = pick(PRESETS.hair); o.topColor = pick(PRESETS.cloth); o.skin = pick(PRESETS.skin); o.headColor = pick(PRESETS.accent);
+  o.heads = 0.25 + r() * 0.45; o.build = 0.2 + r() * 0.6; o.weapon = 'none'; o.cape = 'none';
+  return { look: lookOf(o), expr: pick(['angry', 'rage', 'gloomy']), age: r() < 0.5 ? 'elder' : 'adult' };
+}
+function mixHex(a, b, t) {
+  const p = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+  const x = p(a), y = p(b);
+  return '#' + x.map((v, i) => Math.round(v + (y[i] - v) * t).toString(16).padStart(2, '0')).join('');
+}
+function ghostOf(s) {
+  const g = { ...s, weapon: 'none', blush: 0 };
+  for (const k of Object.keys(g)) if ((k === 'skin' || /Color$/.test(k)) && /^#[0-9a-f]{6}$/i.test(g[k])) g[k] = mixHex(g[k], '#DCE8F7', 0.62);
+  g.draw = normDraw(null);
+  return g;
+}
+let uidN = 0;
+function placed(x, y, k, inner) { return `<g transform="translate(${(x - 120 * k).toFixed(1)} ${(y - 392 * k).toFixed(1)}) scale(${k})">${inner}</g>`; }
+function personSvg(s, expr, age) { return `<g style="--skin:${s.skin}">${drawPerson(s, expr, age, { uid: 'c' + ++uidN })}</g>`; }
+function person(s, expr, age, x, y, k) { return placed(x, y, k, personSvg(s, expr, age)); }
+function ghostSvg(s, expr, age, x, y, k) {
+  return placed(x, y, k, `<g mask="url(#gmask)" opacity="0.9">${personSvg(ghostOf(s), expr, age)}</g><path d="M84 236 C70 300 96 352 118 394 C122 362 128 372 138 398 C150 358 170 330 158 236 Z" fill="#DCE8F7" opacity="0.3"/>`);
+}
+
+// ---------- 两个人 ----------
+const HOST = { id: 'host', name: '林小', house: '林小家', look: lookOf(INSPIRE[0][1]) };
+const GUEST = { id: 'kin-1', name: '林大', look: lookOf(INSPIRE[2][1]), power: 1.05, hp: 3, day: 3, item: 'bow' };
+
+// ---------- 两个标签页之间传话（浏览器自带，不用服务器）----------
+const ROOM = 'wulin-coop-v1';
+const TAB = Math.random().toString(36).slice(2, 10);
+let chan = null;
+try { chan = new BroadcastChannel(ROOM); } catch (e) { chan = null; }
+function send(msg) {
+  const m = { ...msg, from: TAB };
+  if (chan) { try { chan.postMessage(m); } catch (e) {} }
+  else { try { localStorage.setItem(ROOM, JSON.stringify({ ...m, nonce: Math.random() })); } catch (e) {} }
+}
+function listen(fn) {
+  if (chan) chan.onmessage = (e) => fn(e.data);
+  window.addEventListener('storage', (e) => { if (e.key === ROOM && e.newValue) { try { fn(JSON.parse(e.newValue)); } catch (err) {} } });
+}
+
+// ---------- 状态 ----------
+let role = 'menu';      // menu | host | waiting | guest | end
+let H = null;           // 主人这边：规则核心的一夜、记录、等着进记录的操作
+let view = null;        // 两边都按这份画面状态画
+let ghostEls = new Map();
+let raf = 0, callTimer = 0, toastTimer = 0;
+let declined = null;    // 族人点了「不去」的那一夜
+
+function toast(text) {
+  let el = $('toast');
+  if (!el) { el = document.createElement('div'); el.id = 'toast'; el.className = 'toast'; el.setAttribute('role', 'status'); document.body.append(el); }
+  el.textContent = text; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2600);
+}
+
+// ---------- 开头 ----------
+function renderMenu() {
+  role = 'menu';
+  cancelAnimationFrame(raf); clearInterval(callTimer);
+  $('app').innerHTML = `<h1>一起守夜</h1>
+    <p class="muted">族人家被鬼砸门时，同族的人会收到「去帮忙吗？」。点了「去帮忙」，就进来<b>两个人一起打</b>：各拿各的家伙，一个提灯照隐身鬼，一个拿弓射飞鬼。援兵到了以后，下一波起鬼会变多，守住一波两个人各挑一个本事。</p>
+    <div class="card">
+      <button type="button" class="big main" data-a="host"><b>我来守夜（主人）</b><small>你是${HOST.name}，天黑了，鬼来砸门</small></button>
+      <button type="button" class="big" data-a="wait"><b>我等族人喊（族人）</b><small>你是${GUEST.name}，收到弹窗再决定去不去</small></button>
+      <p class="note">在<b>同一台电脑</b>上开两个标签页：一个点「主人」，一个点「族人」。两台手机一起打要等以后有了服务器。</p>
+    </div>
+    <div class="card">
+      <button type="button" class="big" data-a="bot"><b>一个人试（电脑当族人）</b><small>只有一台手机：${GUEST.name}由电脑操控，过一会儿进来帮你</small></button>
+    </div>`;
+  $('app').querySelector('[data-a=host]').onclick = () => startHost(false);
+  $('app').querySelector('[data-a=bot]').onclick = () => startHost(true);
+  $('app').querySelector('[data-a=wait]').onclick = renderWaiting;
+}
+
+// ---------- 主人：规则核心跑一夜 ----------
+function startHost(bot) {
+  role = 'host';
+  const house = { ...L.makeHouse(), door: 1, traps: { crossbow: 1, lamp: 0, talisman: 0 }, chest: 120 };
+  const person = { ...L.makePerson(), day: 3, time: 1080 };
+  const seed = crypto.getRandomValues(new Uint32Array(1))[0] || 1;
+  const options = { seed, helpEnabled: false };
+  const start = JSON.parse(JSON.stringify({ house, person, options }));
+  H = { start, n: L.startNight(JSON.parse(JSON.stringify(house)), JSON.parse(JSON.stringify(person)), options),
+    queue: [], log: [], call: 0, acc: 0, last: performance.now(), guestTab: null, bot, nightKey: TAB + ':' + seed, botCd: 0, joinedAt: null };
+  buildNight('host');
+  if (bot) toast(`等${GUEST.name}赶过来……`);
+  else {
+    const ring = () => { if (H && !H.guestTab && !H.n.over) send({ t: 'call', key: H.nightKey, host: HOST.name, house: HOST.house }); };
+    ring(); callTimer = setInterval(ring, 1000);
+  }
+  raf = requestAnimationFrame(hostLoop);
+}
+
+// 电脑当族人：三秒后进来；像人一样一秒点四下，挑克鬼的家伙；挑本事拿主人没挑的那个
+function botActions(n, call) {
+  const acts = [];
+  if (!H.joinedAt && call === 60) { acts.push({ type: 'join', by: GUEST.id, item: GUEST.item, power: GUEST.power, hp: GUEST.hp, day: GUEST.day }); return acts; }
+  const me = (n.guests || []).find((g) => g.id === GUEST.id);
+  if (!me) return acts;
+  if (n.picking) {
+    if (n.pickers && n.pickers.includes(GUEST.id) && !n.pickedBy.includes(GUEST.id) && n.pickedBy.includes('host')) {
+      const id = n.offer.find((p) => !(n.pk[p] && !L.PERKS[p].stack)) || n.offer[0];
+      acts.push({ type: 'perk', id, by: GUEST.id });
+    }
+    return acts;
+  }
+  if (call % 5) return acts;
+  const g = L.nearestGhost(n, false);
+  if (!g) return acts;
+  const want = g.type === 'shade' && n.item !== 'lamp' ? 'lamp' : g.type === 'fly' ? 'bow' : 'sword';
+  if (me.item !== want) acts.push({ type: 'item', item: want, by: GUEST.id });
+  const c = L.ghostCenter(g);
+  acts.push({ type: 'hitAt', x: c.x, y: c.y, by: GUEST.id });
+  return acts;
+}
+
+function hostLoop(now) {
+  if (role !== 'host' || !H) return;
+  H.acc += Math.min(0.1, (now - H.last) / 1000);
+  H.last = now;
+  let steps = 0;
+  while (H.acc >= STEP && steps < 6 && !H.n.over) {
+    const actions = H.queue.splice(0);
+    if (H.bot) actions.push(...botActions(H.n, H.call));
+    if (actions.some((a) => a.type === 'join') && !H.joinedAt) { H.joinedAt = H.call; toast(`${GUEST.name}来帮忙了！下一波起鬼会变多`); }
+    if (actions.length) H.log.push([H.call, actions]);
+    L.nightStep(H.n, actions);
+    H.call++; H.acc -= STEP; steps++;
+  }
+  view = snapshot(H.n);
+  drawView(view);
+  if (H.guestTab) send({ t: 'state', key: H.nightKey, s: view });
+  if (H.n.over) return finishHost();
+  raf = requestAnimationFrame(hostLoop);
+}
+
+function snapshot(n) {
+  return {
+    door: n.door, doorMax: n.doorMax, wave: n.wave, waves: L.NIGHT.waves, picking: n.picking, offer: n.offer,
+    pickers: n.pickers || [], pickedBy: n.pickedBy || [], pk: n.pk, item: n.item, guests: n.guests || [],
+    kills: n.kills, coins: n.coins, over: n.over, won: n.result ? n.result.won : null, bows: n.bows.length,
+    ghosts: n.ghosts.map((g) => ({ id: g.id, type: g.type, x: +g.x.toFixed(1), y: +g.y.toFixed(1), ox: +g.ox.toFixed(1), k: +g.k.toFixed(3),
+      hp: +g.hp.toFixed(1), max: +g.max.toFixed(1), vis: L.revealed(n, g) ? 1 : 0, name: g.name, seed: g.lookSeed })),
+  };
+}
+
+// 像服务器那样：从开打那一刻起照记录重放，看结果是不是一样
+function replayCheck(start, log) {
+  const n = L.startNight(JSON.parse(JSON.stringify(start.house)), JSON.parse(JSON.stringify(start.person)), start.options);
+  const byCall = new Map(log);
+  const last = log.length ? log[log.length - 1][0] : 0;
+  for (let call = 0; call <= last + 20000 && !n.over; call++) L.nightStep(n, byCall.get(call) || []);
+  return n.result;
+}
+
+function finishHost() {
+  clearInterval(callTimer);
+  const result = H.n.result;
+  const replayed = replayCheck(H.start, H.log);
+  const ok = JSON.stringify(replayed) === JSON.stringify(result);
+  const ops = H.log.reduce((s, [, a]) => s + a.length, 0);
+  const guestIn = (H.n.guests || []).length > 0;
+  const summary = { won: result.won, kills: result.kills, coins: result.coins, ok, calls: H.call, ops, guestIn, bot: H.bot };
+  if (H.guestTab) send({ t: 'end', key: H.nightKey, summary });
+  renderEnd(summary, 'host');
+}
+
+// ---------- 族人：等弹窗 ----------
+function renderWaiting(popup) {
+  role = 'waiting';
+  cancelAnimationFrame(raf);
+  $('app').innerHTML = `<h1>一起守夜</h1>
+    <div class="card" id="waitcard"><h2>你是${GUEST.name}</h2><p class="muted" id="waittext">在自己家里忙着。族人家被砸门，这里会弹出来。</p></div>
+    <div id="popup"></div>
+    <button type="button" class="big" data-a="back"><b>回到开头</b></button>`;
+  $('app').querySelector('[data-a=back]').onclick = renderMenu;
+  if (popup) showPopup(popup);
+}
+function showPopup(msg) {
+  const box = $('popup');
+  if (!box || box.dataset.key === msg.key) return;
+  box.dataset.key = msg.key;
+  box.innerHTML = `<div class="card popup" role="alertdialog" aria-labelledby="pt"><h2 id="pt">${esc(msg.house)}正在被鬼砸门！</h2>
+    <p class="muted">去帮忙吗？去了就进${esc(msg.host)}的夜里，两个人一起打。你拿弓，射天上的飞鬼正好。</p>
+    <div class="row"><button type="button" class="big main" data-a="go"><b>去帮忙</b></button><button type="button" class="big" data-a="no"><b>不去</b></button></div></div>`;
+  box.querySelector('[data-a=go]').onclick = () => {
+    send({ t: 'go', key: msg.key, name: GUEST.name, item: GUEST.item, power: GUEST.power, hp: GUEST.hp, day: GUEST.day });
+    box.innerHTML = '<div class="card"><p class="muted">正在赶过去……</p></div>';
+  };
+  box.querySelector('[data-a=no]').onclick = () => { declined = msg.key; box.innerHTML = ''; box.dataset.key = ''; $('waittext').textContent = '这回没去。下回族人再被砸门，还会弹出来。'; };
+  box.querySelector('[data-a=go]').focus({ preventScroll: true });
+}
+
+// ---------- 两边共用：守夜画面 ----------
+function buildNight(me) {
+  ghostEls = new Map();
+  drawnPlayers = ''; pickKey = '';
+  $('app').innerHTML = `<div class="hud"><span class="wave" id="nwave">第 1 波</span>
+      <div class="doorbar"><span>门</span><div class="bar" id="nd-bar"><i></i></div><b id="nd-num"></b></div></div>
+    <svg viewBox="0 0 360 500" class="stage" id="nsvg" role="application" aria-label="守夜：点鬼打它">${stageSvg()}</svg>
+    <p class="status" id="nstatus"></p>
+    <div class="items" role="group" aria-label="你手里拿什么">${ITEMS.map(([k, g, c]) => `<button type="button" class="item" data-item="${k}" aria-pressed="false"><i style="background:${c}"></i>${g}</button>`).join('')}</div>
+    <p class="note" id="perkline"></p>
+    <div id="pickbox"></div>`;
+  const svg = $('nsvg');
+  svg.addEventListener('pointerdown', (e) => {
+    if (!view || view.over) return;
+    e.preventDefault();
+    const p = toSvg(svg, e);
+    act({ type: 'hitAt', x: p.x, y: p.y });
+    slash(p.x, p.y, me === 'host' ? '#FFE7A8' : '#A8E6FF');
+  });
+  $('app').querySelectorAll('[data-item]').forEach((b) => { b.onclick = () => act({ type: 'item', item: b.dataset.item }); });
+}
+// 自己点的：主人直接排进下一步；族人传给主人那边
+function act(action) {
+  if (role === 'host' && H && !H.n.over) H.queue.push(action);
+  else if (role === 'guest') send({ t: 'act', key: guestKey, action });
+}
+function toSvg(svg, e) { const pt = svg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY; return pt.matrixTransform(svg.getScreenCTM().inverse()); }
+
+function stageSvg() {
+  const lane = L.NIGHT.lane;
+  const far = lane.farWidth, near = lane.farWidth + lane.extraWidth;
+  return `<rect width="360" height="500" fill="url(#nsky)"/>
+    <polygon points="${180 - far},${lane.depthStart} ${180 + far},${lane.depthStart} ${180 + near},${lane.gateY} ${180 - near},${lane.gateY}" fill="url(#lane)"/>
+    <path d="M0 60 L${180 - far} ${lane.depthStart} L${180 - near} ${lane.gateY} L0 ${lane.gateY} Z" fill="#0A0F1E"/>
+    <path d="M360 60 L${180 + far} ${lane.depthStart} L${180 + near} ${lane.gateY} L360 ${lane.gateY} Z" fill="#0A0F1E"/>
+    <circle cx="122" cy="466" r="150" fill="url(#lampg)"/>
+    <g id="bows"></g>
+    <g id="glayer"></g>
+    <rect x="0" y="${lane.gateY + 4}" width="360" height="${500 - lane.gateY - 4}" fill="#141B2E"/>
+    <rect x="118" y="${lane.gateY - 2}" width="124" height="12" rx="3" fill="#6B4A2E" id="gate"/>
+    <g id="players"></g>
+    <g id="glabels"></g>
+    <g id="fx"></g>`;
+}
+
+function ghostEl(g) {
+  const face = lookFromSeed(g.seed);
+  const el = document.createElementNS(NS, 'g');
+  el.innerHTML = `<g class="gb"><ellipse cx="0" cy="-44" rx="32" ry="48" fill="url(#gglow)"/>${ghostSvg(face.look, face.expr, face.age, 0, 0, 0.2)}</g>`;
+  const tag = L.GHOSTS[g.type].tag;
+  const label = document.createElementNS(NS, 'g');
+  label.innerHTML = `<rect x="-17" y="-3" width="34" height="6" rx="3" fill="#0B0F1E" opacity="0.85"/><rect class="hpb" x="-17" y="-3" width="34" height="6" rx="3" fill="#FF6B6B"/>
+    ${tag ? `<g transform="translate(0 -15)"><circle r="10" fill="${tag[1]}" stroke="#0B0F1E" stroke-width="1.5"/><text y="4.5" text-anchor="middle" font-size="12" font-weight="700" fill="#1E2A2C">${tag[0]}</text></g>` : ''}`;
+  $('glayer').append(el);
+  $('glabels').append(label);
+  return { el, gb: el.querySelector('.gb'), label, hpb: label.querySelector('.hpb'), hp: g.hp, x: g.x, y: g.y, k: g.k };
+}
+
+function floatText(x, y, text, cls) {
+  const t = document.createElementNS(NS, 'text');
+  t.setAttribute('x', x.toFixed(1)); t.setAttribute('y', y.toFixed(1)); t.setAttribute('text-anchor', 'middle');
+  t.setAttribute('class', 'dmg ' + (cls || '')); t.textContent = text;
+  const fx = $('fx'); if (!fx) return;
+  fx.append(t); setTimeout(() => t.remove(), 700);
+}
+function slash(x, y, color) {
+  const l = document.createElementNS(NS, 'line');
+  l.setAttribute('x1', (x - 12).toFixed(1)); l.setAttribute('y1', (y - 12).toFixed(1)); l.setAttribute('x2', (x + 12).toFixed(1)); l.setAttribute('y2', (y + 12).toFixed(1));
+  l.setAttribute('stroke', color); l.setAttribute('stroke-width', '3'); l.setAttribute('stroke-linecap', 'round');
+  const fx = $('fx'); if (!fx) return;
+  fx.append(l); setTimeout(() => l.remove(), 120);
+}
+
+let drawnPlayers = '';
+function drawPlayers(s) {
+  const guest = s.guests[0];
+  const key = s.item + '|' + (guest ? guest.item : '-');
+  if (key === drawnPlayers) return;
+  drawnPlayers = key;
+  const badge = (x, item, name, mine) => `<g transform="translate(${x} 400)"><circle r="13" fill="#0B0F1E" stroke="${ITEM[item].c}" stroke-width="2.5"/><text y="5" text-anchor="middle" font-size="13" font-weight="700" fill="${ITEM[item].c}">${ITEM[item].g}</text>
+    <text y="-19" text-anchor="middle" font-size="11" fill="#DCE8F7" paint-order="stroke" stroke="#0B0F1E" stroke-width="3">${esc(name)}${mine ? '（你）' : ''}</text></g>`;
+  const meHost = role === 'host';
+  $('players').innerHTML = person(HOST.look, 'angry', 'adult', 120, 498, 0.19) + badge(120, s.item, HOST.name, meHost)
+    + (guest ? person(GUEST.look, 'angry', 'adult', 244, 498, 0.19) + badge(244, guest.item, GUEST.name, !meHost) : '');
+}
+
+function drawView(s) {
+  if (!$('nsvg')) return;
+  $('nwave').textContent = `第 ${Math.min(s.wave + 1, s.waves)} / ${s.waves} 波`;
+  const p = clamp(s.door / s.doorMax, 0, 1);
+  $('nd-bar').querySelector('i').style.width = (p * 100).toFixed(1) + '%';
+  $('nd-bar').classList.toggle('low', p < 0.3);
+  $('nd-num').textContent = `${Math.max(0, Math.ceil(s.door))} / ${s.doorMax}`;
+  const seen = new Set();
+  for (const g of s.ghosts) {
+    seen.add(g.id);
+    let r = ghostEls.get(g.id);
+    if (!r) { r = ghostEl(g); ghostEls.set(g.id, r); }
+    if (g.hp < r.hp - 0.5) floatText(g.x + g.ox, g.y - 70 * g.k, '-' + Math.round(r.hp - g.hp));
+    r.hp = g.hp; r.x = g.x + g.ox; r.y = g.y; r.k = g.k;
+    r.el.setAttribute('transform', `translate(${(g.x + g.ox).toFixed(1)} ${g.y.toFixed(1)}) scale(${g.k})`);
+    r.gb.setAttribute('opacity', g.type === 'shade' ? (g.vis ? '0.9' : '0.07') : '0.95');
+    r.label.setAttribute('transform', `translate(${(g.x + g.ox).toFixed(1)} ${(g.y - 96 * g.k).toFixed(1)})`);
+    r.label.setAttribute('opacity', g.vis ? '1' : '0');
+    r.hpb.setAttribute('width', (34 * clamp(g.hp / g.max, 0, 1)).toFixed(1));
+  }
+  for (const [id, r] of ghostEls) {
+    if (seen.has(id)) continue;
+    floatText(r.x, r.y - 40, '散了', 'good');
+    r.el.remove(); r.label.remove(); ghostEls.delete(id);
+  }
+  $('bows').innerHTML = [40, 320, 92, 268].slice(0, s.bows).map((x) => `<g transform="translate(${x} 410)"><rect x="-12" y="-6" width="24" height="12" rx="3" fill="#5A4632"/><line x1="-14" y1="-8" x2="14" y2="-8" stroke="#C9A76A" stroke-width="2"/></g>`).join('');
+  drawPlayers(s);
+  const mine = role === 'host' ? s.item : (s.guests[0] || {}).item;
+  $('app').querySelectorAll('[data-item]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.item === mine)));
+  const guest = s.guests[0];
+  $('nstatus').innerHTML = guest
+    ? `<b>${role === 'host' ? GUEST.name : HOST.name}</b>拿着${ITEM[role === 'host' ? guest.item : s.item].g}，和你一起打。援兵到了，鬼多了一半`
+    : role === 'host' ? (H && H.bot ? `等${GUEST.name}赶过来……` : '弹窗已经发给族人了，等人来帮忙……') : '';
+  const pk = Object.entries(s.pk);
+  $('perkline').textContent = pk.length ? '今晚的本事：' + pk.map(([k, n]) => L.PERKS[k].n + (n > 1 ? ` ×${n}` : '')).join('、') : '守住一波，挑一个本事。';
+  drawPick(s);
+}
+
+let pickKey = '';
+function drawPick(s) {
+  const box = $('pickbox');
+  const meId = role === 'host' ? 'host' : GUEST.id;
+  const together = s.pickers.length > 0;
+  const mustPick = s.picking && (!together ? role === 'host' : s.pickers.includes(meId) && !s.pickedBy.includes(meId));
+  const waiting = s.picking && !mustPick;
+  const key = s.picking ? `${s.wave}|${mustPick}|${s.pickedBy.join(',')}` : '';
+  if (key === pickKey) return;
+  pickKey = key;
+  if (!s.picking) { box.innerHTML = ''; return; }
+  if (waiting) {
+    box.innerHTML = `<div class="pick"><div class="card"><h2>第 ${s.wave + 1} 波守住了！</h2><p class="muted">等${role === 'host' ? GUEST.name : HOST.name}挑本事……</p></div></div>`;
+    return;
+  }
+  const taken = (id) => s.pk[id] && !L.PERKS[id].stack;
+  box.innerHTML = `<div class="pick"><div class="card" role="dialog" aria-labelledby="pk-t"><h2 id="pk-t">第 ${s.wave + 1} 波守住了！挑一个本事</h2>
+    <p class="note">${together ? '两个人各挑一个，挑完才开下一波。' : '本事只在今晚有用。'}</p>
+    ${s.offer.map((id) => `<button type="button" class="big perk" data-perk="${id}"${taken(id) ? ' disabled' : ''}><b>${L.PERKS[id].n}</b><small>${taken(id) ? '对方挑了这个' : L.PERKS[id].d}</small></button>`).join('')}</div></div>`;
+  box.querySelectorAll('[data-perk]').forEach((b) => { b.onclick = () => { act({ type: 'perk', id: b.dataset.perk }); box.innerHTML = `<div class="pick"><div class="card"><p class="muted">挑好了。</p></div></div>`; }; });
+  const first = box.querySelector('[data-perk]:not([disabled])'); if (first) first.focus({ preventScroll: true });
+}
+
+// ---------- 打完 ----------
+function renderEnd(sum, me) {
+  role = 'end';
+  cancelAnimationFrame(raf);
+  const together = sum.guestIn;
+  $('app').innerHTML = `<h1>${sum.won ? '守住了！' : '门破了'}</h1>
+    <div class="card">
+      <dl class="stat"><dt>打散的鬼</dt><dd>${sum.kills}</dd><dt>纸钱</dt><dd>${sum.won ? sum.coins + ' 文' : '没有'}</dd>
+      <dt>一起打</dt><dd>${together ? `${HOST.name} + ${GUEST.name}${sum.bot ? '（电脑）' : ''}` : '没有人来'}</dd></dl>
+      ${together && sum.won ? `<p class="note">两个人都拿全份纸钱：${HOST.name} ${sum.coins} 文，${GUEST.name} ${sum.coins} 文。</p>` : ''}
+      <p class="verify ${sum.ok ? 'ok' : 'bad'}" id="verify">${sum.ok ? '✅' : '❌'} 服务器重放核对：${sum.ok ? '一致' : '对不上'}（${sum.calls} 步、${sum.ops} 个操作）</p>
+      <p class="note">打的时候${me === 'host' ? '你这边' : `${HOST.name}那边`}一步一步算，${GUEST.name}的点击也记进了同一份记录。打完照记录从头重放一遍，结果一样，说明谁也改不了战果。</p>
+    </div>
+    ${me === 'host' ? '<button type="button" class="big main" data-a="again"><b>再来一夜</b></button>' : '<button type="button" class="big main" data-a="wait"><b>回家接着等</b></button>'}
+    <button type="button" class="big" data-a="back"><b>回到开头</b></button>`;
+  const again = $('app').querySelector('[data-a=again]'); if (again) again.onclick = () => startHost(sum.bot);
+  const wait = $('app').querySelector('[data-a=wait]'); if (wait) wait.onclick = () => renderWaiting();
+  $('app').querySelector('[data-a=back]').onclick = renderMenu;
+}
+
+// ---------- 收消息 ----------
+let guestKey = null;
+listen((m) => {
+  if (!m || m.from === TAB) return;
+  if (role === 'host' && H && m.key === H.nightKey) {
+    if (m.t === 'go' && !H.guestTab && !H.n.over && !H.bot) {
+      H.guestTab = m.from;
+      H.queue.push({ type: 'join', by: GUEST.id, item: m.item, power: m.power, hp: m.hp, day: m.day });
+      send({ t: 'welcome', key: H.nightKey, to: m.from });
+      clearInterval(callTimer);
+    } else if (m.t === 'act' && m.from === H.guestTab && m.action && ['hitAt', 'item', 'perk'].includes(m.action.type)) {
+      H.queue.push({ ...m.action, by: GUEST.id });
+    }
+    return;
+  }
+  if (m.t === 'call' && role === 'waiting' && m.key !== declined) showPopup(m);
+  if (m.t === 'welcome' && m.to === TAB && role === 'waiting') {
+    role = 'guest'; guestKey = m.key; drawnPlayers = ''; pickKey = '';
+    buildNight('guest');
+    toast(`进了${HOST.house}的夜里，开打！`);
+  }
+  if (m.t === 'state' && role === 'guest' && m.key === guestKey) { view = m.s; drawView(view); }
+  if (m.t === 'end' && role === 'guest' && m.key === guestKey) renderEnd(m.summary, 'guest');
+});
+
+renderMenu();
+</script>
+</body></html>

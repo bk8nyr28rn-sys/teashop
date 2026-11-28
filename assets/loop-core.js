@@ -25,18 +25,26 @@ var LoopCore = (() => {
     AFTERLIFE: () => AFTERLIFE,
     AUTO_DEFENSE: () => AUTO_DEFENSE,
     BANK_CAP: () => BANK_CAP,
+    COOP: () => COOP,
+    DOORS: () => DOORS,
     FAMILY: () => FAMILY,
     FIREWOOD_PER_LOG: () => FIREWOOD_PER_LOG,
+    GHOSTS: () => GHOSTS,
     GOODS: () => GOODS,
     HAUNT: () => HAUNT,
+    MULT: () => MULT,
+    NIGHT: () => NIGHT,
+    PERKS: () => PERKS,
     REBIRTH: () => REBIRTH,
     Rng: () => Rng,
     TRADE: () => TRADE,
+    TRAPS: () => TRAPS,
     YARD: () => YARD,
     acceptRequest: () => acceptRequest,
     accompany: () => accompany,
     accrueDays: () => accrueDays,
     addLifePortrait: () => addLifePortrait,
+    applyNightAction: () => applyNightAction,
     autoLossLimit: () => autoLossLimit,
     beginNightLedger: () => beginNightLedger,
     birth: () => birth,
@@ -63,6 +71,8 @@ var LoopCore = (() => {
     freeStove: () => freeStove,
     fromView: () => fromView,
     getAbsenceSummary: () => getAbsenceSummary,
+    ghostAt: () => ghostAt,
+    ghostCenter: () => ghostCenter,
     giveGift: () => giveGift,
     givePersonalGood: () => givePersonalGood,
     goodsValue: () => goodsValue,
@@ -71,20 +81,26 @@ var LoopCore = (() => {
     hauntDodge: () => hauntDodge,
     hauntOutcome: () => hauntOutcome,
     hauntStep: () => hauntStep,
+    helpCandidates: () => helpCandidates,
     karmaRows: () => karmaRows,
     karmaTotal: () => karmaTotal,
+    lampHeld: () => lampHeld,
     leaveGuardianReward: () => leaveGuardianReward,
     makeDayBank: () => makeDayBank,
+    makeHouse: () => makeHouse,
+    makePerson: () => makePerson,
     markAbsenceRead: () => markAbsenceRead,
     markActiveDate: () => markActiveDate,
     match: () => match,
     migrateSave: () => migrateSave,
     moveDecor: () => moveDecor,
+    nearestGhost: () => nearestGhost,
     newFamily: () => newFamily,
     nextLifeView: () => nextLifeView,
     nextYard: () => nextYard,
     nightKarma: () => nightKarma,
     nightPayout: () => nightPayout,
+    nightStep: () => nightStep,
     offerFor: () => offerFor,
     ownThread: () => ownThread,
     paperReward: () => paperReward,
@@ -99,6 +115,7 @@ var LoopCore = (() => {
     refreshRequest: () => refreshRequest,
     removeDecor: () => removeDecor,
     requestBoard: () => requestBoard,
+    revealed: () => revealed,
     sameNight: () => sameNight,
     sellAllOrdinary: () => sellAllOrdinary,
     sellOrdinary: () => sellOrdinary,
@@ -110,6 +127,7 @@ var LoopCore = (() => {
     spendDawn: () => spendDawn,
     splitFirewood: () => splitFirewood,
     startHaunt: () => startHaunt,
+    startNight: () => startNight,
     startStove: () => startStove,
     storeBelongings: () => storeBelongings,
     stoveCount: () => stoveCount,
@@ -160,6 +178,7 @@ var LoopCore = (() => {
   };
 
   // src/core/loop/base.ts
+  var RULE_VERSION = 2;
   var CFG = {
     lifeDays: 5,
     dayStart: 360,
@@ -170,6 +189,24 @@ var LoopCore = (() => {
     buddyAt: 20,
     helpAt: 40
   };
+  var AGE_FX = {
+    child: { dmg: 0.8, fight: -0.1, walk: 1 },
+    adult: { dmg: 1, fight: 0, walk: 1 },
+    elder: { dmg: 0.85, fight: -0.05, walk: 1.2 }
+  };
+  var AGE_LIMITS = { adult: 0.2, elder: 0.7 };
+  function balanceAge(day) {
+    const fraction = (day - 1) / Math.max(1, CFG.lifeDays - 1);
+    if (fraction < AGE_LIMITS.adult) return "child";
+    return fraction < AGE_LIMITS.elder ? "adult" : "elder";
+  }
+  function nextRandom(stream2) {
+    const rng = new Rng(1);
+    rng.setState(stream2.rngState);
+    const value = rng.next();
+    stream2.rngState = rng.getState();
+    return value;
+  }
 
   // src/core/loop/time.ts
   var BANK_CAP = 3;
@@ -324,8 +361,23 @@ var LoopCore = (() => {
   }
 
   // src/core/loop/state.ts
+  var FIRST_PERSON = { power: 1.05, friends: { wang: 26, li: 8, zhao: 0 } };
   function makeHouse() {
     return { door: 0, traps: { crossbow: 0, lamp: 0, talisman: 0 }, chest: 0, store: {}, treasures: [] };
+  }
+  function makePerson() {
+    return {
+      day: 1,
+      time: CFG.dayStart,
+      hp: CFG.hpMax,
+      bag: [],
+      purse: 0,
+      goods: {},
+      personalTreasures: [],
+      item: "sword",
+      power: FIRST_PERSON.power,
+      friends: { ...FIRST_PERSON.friends }
+    };
   }
 
   // src/core/loop/field-config.ts
@@ -452,9 +504,9 @@ var LoopCore = (() => {
       } else if (b.s === "charge" && b.c <= 0) {
         b.s = "wait";
         b.c = between(rng, HAUNT.wait);
-        const hit = h.dodge <= 0;
-        if (hit) h.souls--;
-        events.push({ kind: "shot", bow: i, hit });
+        const hit2 = h.dodge <= 0;
+        if (hit2) h.souls--;
+        events.push({ kind: "shot", bow: i, hit: hit2 });
       }
     });
     h.rngState = rng.getState();
@@ -867,6 +919,36 @@ var LoopCore = (() => {
     lamp: { name: "灯笼串", cost: 30, max: 1, desc: "走到门口的隐身鬼会现形" },
     talisman: { name: "镇宅符", cost: 40, max: 2, desc: "门口的鬼走得慢" }
   };
+  var GHOSTS = {
+    evil: { name: "恶鬼", hp: 42, speed: 26, hit: 7, tag: null },
+    fly: { name: "飞鬼", hp: 30, speed: 34, hit: 5, tag: ["飞", "#9CC9F0"] },
+    shade: { name: "隐身鬼", hp: 34, speed: 24, hit: 8, tag: ["隐", "#B9A2E8"] },
+    armor: { name: "铁甲鬼", hp: 70, speed: 18, hit: 11, tag: ["甲", "#B8BFC9"] }
+  };
+  var MULT = {
+    sword: { evil: 1.5, fly: 0.3, shade: 1, armor: 0.5 },
+    bow: { evil: 0.9, fly: 2, shade: 0.9, armor: 0.5 },
+    lamp: { evil: 0.6, fly: 0.6, shade: 1.5, armor: 0.4 }
+  };
+  var PERKS = {
+    heavy: { n: "重手", d: "点一下伤害 +40%，铁甲也挡不住", stack: true },
+    crit: { n: "会心一击", d: "每下有 25% 机会打出三倍伤害", stack: true },
+    sweep: { n: "横扫", d: "点中一个鬼，旁边的鬼也挨一半", stack: false },
+    qi: { n: "剑气", d: "剑能砍到天上的飞鬼", stack: false },
+    pierce: { n: "穿云箭", d: "弓的伤害 +60%", stack: true },
+    burn: { n: "灯光烧鬼", d: "提着灯时，灯光里的鬼一直掉血", stack: true },
+    ear: { n: "听声辨位", d: "看不见的鬼也能打，伤害减半", stack: false },
+    eye: { n: "火眼", d: "隐身鬼走到半路就现形", stack: false },
+    lampstr: { n: "挂灯笼", d: "今晚墙上多挂一串灯笼，门口的隐身鬼现形", stack: false },
+    bowplus: { n: "连弩", d: "每台弩机多射一个鬼；没有弩机就先送你一台", stack: true },
+    bowfast: { n: "快弩", d: "弩机射得快一倍", stack: true },
+    rain: { n: "剑雨", d: "每打散 5 个鬼，全场落一阵剑雨", stack: true },
+    fix: { n: "连夜补门", d: "门马上回 40% 的血", stack: true },
+    bolt: { n: "铁门栓", d: "门挨的打少三成", stack: true },
+    slow: { n: "定身符", d: "门口的鬼走得更慢", stack: true },
+    soul: { n: "吸魂", d: "每打散一个鬼，门回 3 点血", stack: true },
+    coins: { n: "纸钱雨", d: "每打散一个鬼，多掉 3 文纸钱", stack: true }
+  };
   var NIGHT = {
     waves: 5,
     spread: 3.5,
@@ -974,6 +1056,7 @@ var LoopCore = (() => {
     ally: { duration: 18, firstCd: 0.4, rate: 0.45, idleCd: 0.15, friendship: 2, maxFriendship: 100 },
     guardian: { power: 1.25, slow: 0.65 }
   };
+  var COOP = { maxGuests: 1, ghostScale: 1.5 };
   function waveCounts(d, w, swordOnly = false) {
     const c = NIGHT.counts;
     if (d === 1 && swordOnly) return { evil: c.firstNightEvil[w], fly: 0, shade: 0, armor: 0 };
@@ -1423,10 +1506,10 @@ var LoopCore = (() => {
     }
     return null;
   }
-  function offerFor(lifeId, day, neighbors) {
-    if (!neighbors.length) return null;
+  function offerFor(lifeId, day, neighbors2) {
+    if (!neighbors2.length) return null;
     const rng = stream(lifeId, day, "request");
-    const neighbor = rng.pick(neighbors);
+    const neighbor = rng.pick(neighbors2);
     const kind = rng.pick(Object.keys(TRADE.request.wants));
     const [lo, hi] = TRADE.request.wants[kind];
     const count2 = rng.int(lo, hi);
@@ -1437,15 +1520,15 @@ var LoopCore = (() => {
     const r = house.request;
     if (r?.status === "accepted" && (r.lifeId !== lifeId || day > r.dueDay)) r.status = "expired";
   }
-  function requestBoard(house, lifeId, day, neighbors) {
+  function requestBoard(house, lifeId, day, neighbors2) {
     refreshRequest(house, lifeId, day);
     const r = house.request;
     if (r?.status === "accepted") return { active: r, offer: null };
     if (r && r.lifeId === lifeId && r.day === day) return { active: null, offer: null };
-    return { active: null, offer: offerFor(lifeId, day, neighbors) };
+    return { active: null, offer: offerFor(lifeId, day, neighbors2) };
   }
-  function acceptRequest(house, lifeId, day, neighbors) {
-    const { active, offer } = requestBoard(house, lifeId, day, neighbors);
+  function acceptRequest(house, lifeId, day, neighbors2) {
+    const { active, offer } = requestBoard(house, lifeId, day, neighbors2);
     if (active || !offer) return null;
     house.request = { ...offer, status: "accepted", acceptedDay: day, dueDay: day + TRADE.request.days - 1 };
     return house.request;
@@ -1589,10 +1672,10 @@ var LoopCore = (() => {
     /** 交情深的邻居下一世还记得你（留一半）；其余随机重新认识 */
     friends: { keepAt: CFG.helpAt, keepShare: 0.5, fresh: [0, 15] }
   };
-  function karmaRows(g, neighbors) {
+  function karmaRows(g, neighbors2) {
     const K = REBIRTH.karma;
     const autoHeld = g.autoHeld ?? 0;
-    const friends = neighbors.reduce((a, id) => a + (g.friends[id] ?? 0), 0);
+    const friends = neighbors2.reduce((a, id) => a + (g.friends[id] ?? 0), 0);
     const rows = [
       [
         "家业",
@@ -1634,14 +1717,425 @@ var LoopCore = (() => {
   function ownThread(rng) {
     return threadName(rng.int(REBIRTH.ownLove[0], REBIRTH.ownLove[1]));
   }
-  function carryFriends(prev, neighbors, rng) {
+  function carryFriends(prev, neighbors2, rng) {
     const F = REBIRTH.friends;
     const out = {};
-    for (const id of neighbors) {
+    for (const id of neighbors2) {
       const v = prev[id] ?? 0;
       out[id] = v >= F.keepAt ? Math.floor(v * F.keepShare) : rng.int(F.fresh[0], F.fresh[1]);
     }
     return out;
+  }
+
+  // src/core/loop/night.ts
+  var ghostTypes = Object.keys(GHOSTS);
+  var perkIds = Object.keys(PERKS);
+  var equipmentPerks = ["pierce", "burn", "lampstr", "bowplus", "bowfast"];
+  var neighbors = ["wang", "li", "zhao"];
+  var surnames = [..."孙周吴郑冯陈褚卫蒋沈韩杨朱秦许何吕施张孔"];
+  var given = ["太爷爷", "老祖宗", "大娘", "三叔", "二姑奶奶", "老太公", "大伯", "小姑", "老掌柜", "大侠", "书生", "镖头"];
+  function eventRng(seed, wave, event) {
+    const rng = new Rng(seed);
+    rng.setState(seed + (wave + 1) * 65537 + event * 257);
+    return rng;
+  }
+  function orderNightDeck(items, draw2) {
+    if (items.length < 2) return items;
+    let end = 1;
+    if (items.length > 16) {
+      const reversePrefix = draw2() < 0.5;
+      end = 2;
+      while (end < items.length && draw2() < 0.5 === reversePrefix) end++;
+      if (reversePrefix) {
+        for (let left = 0, right = end - 1; left < right; left++, right--) {
+          [items[left], items[right]] = [items[right], items[left]];
+        }
+      }
+    }
+    for (let i = end; i < items.length; i++) {
+      const item = items[i];
+      let lo = 0, hi = i;
+      while (lo < hi) {
+        const mid = lo + hi >>> 1;
+        if (draw2() < 0.5) hi = mid;
+        else lo = mid + 1;
+      }
+      items.copyWithin(lo + 1, lo, i);
+      items[lo] = item;
+    }
+    return items;
+  }
+  function familyHelpers(options) {
+    const cfg = NIGHT.family;
+    const helpers = [];
+    if (options.spouse && !options.guardian) {
+      helpers.push({ dmg: cfg.spouseDamage, rate: cfg.spouseRate, cd: cfg.spouseCd });
+    }
+    for (const [i, power] of (options.childPowers ?? []).slice(0, cfg.maxKids).entries()) {
+      helpers.push({ dmg: Math.round(cfg.childBaseDamage * power), rate: cfg.childRate, cd: cfg.childCd + i * cfg.childStagger });
+    }
+    return helpers;
+  }
+  function startNight(house, person, options) {
+    const door = DOORS[house.door];
+    if (!door) throw new RangeError("未知的院门等级");
+    const guardian = options.guardian ?? false;
+    const advancedItems = options.advancedItems ?? true;
+    const bows = NIGHT.bows.x.slice(0, house.traps.crossbow).map((x, i) => ({ x, y: NIGHT.bows.y, cd: NIGHT.bows.firstCd + i * NIGHT.bows.stagger }));
+    const state = {
+      ruleVersion: RULE_VERSION,
+      seed: options.seed >>> 0,
+      rngState: options.seed >>> 0,
+      cosmeticSeedState: (options.cosmeticSeed ?? options.seed ^ 2654435769) >>> 0,
+      nextId: 1,
+      spawnedInWave: 0,
+      d: guardian ? CFG.lifeDays : person.day,
+      guardian,
+      advancedItems,
+      helpEnabled: options.helpEnabled ?? true,
+      hp: person.hp,
+      power: person.power,
+      item: advancedItems ? person.item : "sword",
+      traps: { ...house.traps },
+      lossBase: options.lossBase ?? house.chest,
+      purse: person.purse,
+      lootPlan: planNightLoot(options.seed, house.treasures),
+      treasures: house.treasures.map((t) => ({ ...t })),
+      friends: { ...person.friends },
+      friendship: {},
+      t: 0,
+      door: door.hp,
+      doorMax: door.hp,
+      wave: -1,
+      spawns: [],
+      ghosts: [],
+      pk: {},
+      offer: [],
+      picking: false,
+      bows,
+      fam: familyHelpers(options),
+      ally: null,
+      helpUsed: false,
+      kin: [...options.kin ?? []],
+      helper: null,
+      rainCount: 0,
+      burnT: 0,
+      kills: 0,
+      coins: 0,
+      over: false,
+      result: null
+    };
+    startWave(state, 0);
+    return state;
+  }
+  function startWave(n, wave) {
+    if (n.over || wave !== n.wave + 1 || wave >= NIGHT.waves || wave > 0 && !n.picking) return;
+    const swordOnly = n.ruleVersion >= 2 && !n.guardian && !n.advancedItems;
+    const counts = waveCounts(n.d, wave, swordOnly);
+    if (n.guests?.length) for (const type of ghostTypes) counts[type] = Math.round(counts[type] * COOP.ghostScale);
+    const types = ghostTypes.flatMap((type) => Array(counts[type]).fill(type));
+    const draw2 = eventRng(n.seed, wave, 0);
+    orderNightDeck(types, () => draw2.next());
+    n.spawns = types.map((type, i) => ({ at: n.t + NIGHT.waveDelay + i * NIGHT.spread / types.length, type, wave }));
+    n.wave = wave;
+    n.spawnedInWave = 0;
+    n.offer = [];
+    n.picking = false;
+    if (n.pickers) {
+      n.pickers = [];
+      n.pickedBy = [];
+    }
+  }
+  function perkAvailable(n, id) {
+    if (!n.advancedItems && equipmentPerks.includes(id) || n.pk[id] && !PERKS[id].stack) return false;
+    if (id === "bowfast") return n.bows.length > 0;
+    if (id === "lampstr") return !n.traps.lamp;
+    if (id === "fix") return n.door <= n.doorMax * NIGHT.perk.fixBelow;
+    return true;
+  }
+  function offerPerks(n) {
+    const pool = perkIds.filter((id) => perkAvailable(n, id));
+    const draw2 = eventRng(n.seed, n.wave, 200);
+    n.offer = orderNightDeck(pool, () => draw2.next()).slice(0, NIGHT.offerCount);
+    n.picking = true;
+    if (n.guests?.length) {
+      n.pickers = ["host", ...n.guests.map((g) => g.id)];
+      n.pickedBy = [];
+    }
+  }
+  function choosePerk(n, id, by) {
+    if (!n.picking || !n.offer.includes(id)) return;
+    const who = by ?? "host";
+    if (n.pickers?.length) {
+      if (!n.pickers.includes(who) || n.pickedBy.includes(who) || n.pk[id] && !PERKS[id].stack) return;
+      n.pickedBy.push(who);
+    } else if (by !== void 0) return;
+    n.pk[id] = (n.pk[id] ?? 0) + 1;
+    if (id === "fix") n.door = Math.min(n.doorMax, n.door + n.doorMax * NIGHT.perk.fix);
+    if (id === "bowplus" && !n.bows.length) {
+      n.bows.push({ x: NIGHT.bows.x[0], y: NIGHT.bows.y, cd: NIGHT.bows.giftCd });
+    }
+    if (n.pickers?.length && n.pickers.some((p) => !n.pickedBy.includes(p))) return;
+    startWave(n, n.wave + 1);
+  }
+  function spawnGhost(n, sp) {
+    const rng = eventRng(n.seed, sp.wave, ++n.spawnedInWave);
+    const between2 = ([lo, hi]) => lo + rng.next() * (hi - lo);
+    const cfg = NIGHT.spawn;
+    const ghost = GHOSTS[sp.type];
+    const max = ghost.hp * ((1 + NIGHT.hpPerDay * (n.d - 1)) * (1 + NIGHT.hpPerWave * sp.wave));
+    const look = new Rng(n.cosmeticSeedState);
+    look.setState(n.cosmeticSeedState);
+    const name = look.pick(surnames) + "家的" + look.pick(given);
+    const lookSeed = look.int(0, 4294967295);
+    n.cosmeticSeedState = look.getState();
+    const g = {
+      id: n.nextId++,
+      type: sp.type,
+      hp: max,
+      max,
+      lane: between2(cfg.lane),
+      x: NIGHT.lane.centerX,
+      y: between2(cfg.y),
+      ox: 0,
+      k: NIGHT.lane.depthBase,
+      tx: NIGHT.lane.centerX + between2(cfg.gateXOffset),
+      ty: NIGHT.lane.gateY + between2(cfg.gateYOffset) - (sp.type === "fly" ? cfg.flyRise : 0),
+      speed: ghost.speed * between2(cfg.speed),
+      state: "walk",
+      bashT: between2(cfg.bashDelay),
+      ph: 0,
+      hit: ghost.hit,
+      flash: 0,
+      name,
+      lookSeed
+    };
+    rng.next();
+    rng.next();
+    g.ph = between2(cfg.phase);
+    n.ghosts.push(g);
+  }
+  function ghostCenter(g) {
+    return { x: g.x + g.ox, y: g.y - NIGHT.lane.centerHeight * g.k };
+  }
+  function ghostAt(n, x, y) {
+    let nearest = null;
+    let distance = Infinity;
+    for (const ghost of n.ghosts) {
+      const c = ghostCenter(ghost);
+      const d = Math.hypot(x - c.x, y - c.y);
+      if (d < distance && d < NIGHT.lane.hitRadius * Math.max(ghost.k, NIGHT.lane.minHitScale)) {
+        nearest = ghost;
+        distance = d;
+      }
+    }
+    return nearest;
+  }
+  function lampHeld(n) {
+    return n.item === "lamp" || !!n.guests?.some((g) => g.item === "lamp");
+  }
+  function revealed(n, g) {
+    return g.type !== "shade" || lampHeld(n) && g.y > NIGHT.reveal.lamp || !!(n.traps.lamp || n.pk.lampstr) && g.y > NIGHT.reveal.wall || !!n.pk.eye && g.y > NIGHT.reveal.eye || g.flash > 0;
+  }
+  function nearestGhost(n, visibleOnly = true) {
+    let nearest = null;
+    for (const ghost of n.ghosts) {
+      if ((!visibleOnly || revealed(n, ghost)) && (!nearest || ghost.y > nearest.y)) nearest = ghost;
+    }
+    return nearest;
+  }
+  function tapMult(n, g, item = n.item) {
+    let multiplier = MULT[item][g.type];
+    if (g.type === "armor" && n.pk.heavy) multiplier = MULT[item].evil;
+    if (g.type === "fly" && item === "sword" && n.pk.qi) multiplier = NIGHT.perk.qi;
+    if (item === "bow") multiplier *= 1 + NIGHT.perk.pierce * (n.pk.pierce ?? 0);
+    return multiplier * (1 + NIGHT.perk.heavy * (n.pk.heavy ?? 0));
+  }
+  function hurtGhost(n, g, dmg, byPlayer = false) {
+    if (g.hp <= 0) return;
+    g.hp -= dmg;
+    g.flash = NIGHT.reveal.flashTime;
+    if (g.hp > 0) return;
+    n.ghosts.splice(n.ghosts.indexOf(g), 1);
+    n.kills++;
+    n.coins += (byPlayer ? NIGHT.weapon.playerCoins : 0) + NIGHT.perk.coins * (n.pk.coins ?? 0);
+    if (n.pk.soul) n.door = Math.min(n.doorMax, n.door + NIGHT.perk.soul * n.pk.soul);
+    if (n.pk.rain && ++n.rainCount >= NIGHT.perk.rainKills) {
+      n.rainCount = 0;
+      for (const other of n.ghosts.slice()) hurtGhost(n, other, NIGHT.perk.rainDamage * n.pk.rain);
+    }
+  }
+  function hit(n, g, guest) {
+    if (!g) return;
+    const hidden = !revealed(n, g);
+    if (hidden && !n.pk.ear) return;
+    const multiplier = tapMult(n, g, guest?.item ?? n.item) * (hidden ? NIGHT.perk.ear : 1);
+    const hp = guest?.hp ?? n.hp;
+    const guardian = !guest && n.guardian;
+    const hurt = guardian || hp >= CFG.hpMax ? 1 : hp <= 1 ? NIGHT.weapon.badlyHurt : NIGHT.weapon.hurt;
+    const age = guardian ? AGE_FX.child : AGE_FX[balanceAge(guest?.d ?? n.d)];
+    const power = guardian ? NIGHT.guardian.power : (guest ? guest.power : n.power) || 1;
+    const crit = nextRandom(n) < Math.min(NIGHT.perk.critCap, NIGHT.perk.critChance * (n.pk.crit ?? 0));
+    const dmg = Math.max(1, Math.round(NIGHT.tap * multiplier * age.dmg * hurt * power * (crit ? NIGHT.perk.critDamage : 1)));
+    const center = ghostCenter(g);
+    hurtGhost(n, g, dmg, true);
+    if (!n.pk.sweep) return;
+    for (const other of n.ghosts.slice()) {
+      if (other === g || !revealed(n, other)) continue;
+      const c = ghostCenter(other);
+      if (Math.hypot(c.x - center.x, c.y - center.y) < NIGHT.perk.sweepRadius) {
+        hurtGhost(n, other, Math.max(1, Math.round(dmg * NIGHT.perk.sweepFactor)), true);
+      }
+    }
+  }
+  function helpCandidates(n) {
+    if (!n.helpEnabled || n.helpUsed) return [];
+    const friends = neighbors.filter((id) => (n.friends[id] ?? 0) >= CFG.helpAt).sort((a, b) => n.friends[b] - n.friends[a]);
+    return [...friends, ...(n.kin ?? []).filter((id) => !friends.includes(id))];
+  }
+  function callHelp(n, choice) {
+    const list2 = helpCandidates(n);
+    const id = choice === void 0 ? list2[0] : list2.includes(choice) ? choice : void 0;
+    if (!id) return;
+    n.helpUsed = true;
+    n.helper = id;
+    n.ally = { id, t: NIGHT.ally.duration, cd: NIGHT.ally.firstCd };
+    if (neighbors.includes(id)) n.friendship[id] = Math.min(NIGHT.ally.friendship, NIGHT.ally.maxFriendship - n.friends[id]);
+  }
+  function join(n, a) {
+    n.guests ?? (n.guests = []);
+    if (n.guardian || n.guests.length >= COOP.maxGuests || n.guests.some((g) => g.id === a.by) || a.by === "host") return;
+    const item = a.item && (n.advancedItems || a.item === "sword") ? a.item : "sword";
+    n.guests.push({ id: a.by, item, power: a.power ?? 1, hp: a.hp ?? CFG.hpMax, d: a.day ?? n.d });
+  }
+  function applyNightAction(n, action) {
+    if (n.over) return;
+    if (action.type === "join") return join(n, action);
+    const by = "by" in action ? action.by : void 0;
+    const guest = by === void 0 ? void 0 : n.guests?.find((g) => g.id === by);
+    if (by !== void 0 && !guest) return;
+    if (action.type === "perk") return choosePerk(n, action.id, by);
+    if (n.picking) return;
+    switch (action.type) {
+      case "hit":
+        return hit(n, n.ghosts.find((g) => g.id === action.id) ?? null, guest);
+      case "hitAt":
+        return hit(n, ghostAt(n, action.x, action.y), guest);
+      case "item":
+        if (n.advancedItems || action.item === "sword") {
+          if (guest) guest.item = action.item;
+          else n.item = action.item;
+        }
+        return;
+      case "help":
+        return callHelp(n, action.id);
+    }
+  }
+  var clamp01 = (v) => Math.min(1, Math.max(0, v));
+  function advanceGhosts(n) {
+    const dt = NIGHT.step, lane = NIGHT.lane;
+    const slowNear = NIGHT.gate.talismanFactor ** n.traps.talisman * NIGHT.perk.slow ** (n.pk.slow ?? 0) * (n.guardian ? NIGHT.guardian.slow : 1);
+    for (const g of n.ghosts) {
+      g.flash = Math.max(0, g.flash - dt);
+      if (g.state === "bash") {
+        g.bashT -= dt;
+        if (g.bashT <= 0) {
+          g.bashT = NIGHT.gate.bashCd;
+          n.door -= g.hit * (1 + NIGHT.hitPerDay * (n.d - 1)) * NIGHT.perk.bolt ** (n.pk.bolt ?? 0);
+        }
+        continue;
+      }
+      const slow = g.y > NIGHT.gate.slowFrom ? slowNear : 1;
+      g.y = Math.min(g.ty, g.y + g.speed * slow * dt);
+      const progress = clamp01((g.y - lane.depthStart) / (g.ty - lane.depthStart));
+      const halfWidth = lane.farWidth + lane.extraWidth * clamp01((g.y - lane.widenFrom) / lane.widenDistance);
+      const merge = clamp01((progress - lane.mergeFrom) / lane.mergeDistance);
+      g.x = lane.centerX + g.lane * halfWidth * (1 - merge) + (g.tx - lane.centerX) * merge;
+      if (g.y >= g.ty) g.state = "bash";
+      g.ox = g.type === "fly" ? Math.sin(n.t * lane.flyFrequency + g.ph) * lane.flySwing * clamp01((g.ty - g.y) / lane.flySettleDistance) : 0;
+      g.k = lane.depthBase + lane.depthGain * clamp01((g.y - lane.depthStart) / (lane.gateY - lane.depthStart));
+    }
+  }
+  function fireBows(n) {
+    const cfg = NIGHT.bows;
+    for (const b of n.bows) {
+      b.cd -= NIGHT.step;
+      if (b.cd > 0) continue;
+      const distance = (g) => Math.hypot(g.x - b.x, g.y - b.y);
+      const targets = n.ghosts.filter((g) => revealed(n, g) && g.y > cfg.fromY).sort((a, c) => distance(a) - distance(c)).slice(0, 1 + (n.pk.bowplus ?? 0));
+      if (!targets.length) {
+        b.cd = cfg.idleCd;
+        continue;
+      }
+      b.cd = Math.max(cfg.minCd, NIGHT.bowCd * cfg.fastFactor ** (n.pk.bowfast ?? 0));
+      for (const target of targets) hurtGhost(n, target, NIGHT.bowDmg);
+    }
+  }
+  function burnGhosts(n) {
+    if (!n.pk.burn || !lampHeld(n)) return;
+    n.burnT += NIGHT.step;
+    if (n.burnT < NIGHT.perk.burnInterval) return;
+    n.burnT = 0;
+    for (const g of n.ghosts.slice()) {
+      const c = ghostCenter(g);
+      if (c.y > NIGHT.perk.burnMinY && Math.hypot(c.x - NIGHT.weapon.lampX, c.y - NIGHT.weapon.lampY) < NIGHT.weapon.lampRadius) {
+        hurtGhost(n, g, NIGHT.perk.burnDamage * n.pk.burn);
+      }
+    }
+  }
+  function helpDefend(n) {
+    for (const member of n.fam) {
+      member.cd -= NIGHT.step;
+      if (member.cd > 0) continue;
+      const target = nearestGhost(n);
+      member.cd = target ? member.rate : NIGHT.family.idleCd;
+      if (target) hurtGhost(n, target, member.dmg);
+    }
+    const ally = n.ally;
+    if (!ally) return;
+    ally.t -= NIGHT.step;
+    ally.cd -= NIGHT.step;
+    if (ally.cd <= 0) {
+      const target = nearestGhost(n);
+      ally.cd = target ? NIGHT.ally.rate : NIGHT.ally.idleCd;
+      if (target) hurtGhost(n, target, NIGHT.allyDmg);
+    }
+    if (ally.t <= 0) n.ally = null;
+  }
+  function endNight(n, won) {
+    n.over = true;
+    if (!won) n.door = 0;
+    const plan = n.lootPlan ?? planNightLoot(n.seed, n.treasures);
+    const payout = nightPayout(plan, { purse: n.purse ?? 0, chest: n.lossBase, treasures: n.treasures }, won, n.coins);
+    n.result = {
+      won,
+      kills: n.kills,
+      coins: n.coins,
+      door: n.door,
+      doorMax: n.doorMax,
+      creditedKills: won ? n.kills : 0,
+      ...payout,
+      lostMoney: payout.purseLost + payout.chestLost,
+      held: won && !n.guardian ? 1 : 0,
+      broken: !won && !n.guardian ? 1 : 0,
+      friendship: { ...n.friendship }
+    };
+  }
+  function nightStep(n, actions = []) {
+    for (const action of actions) applyNightAction(n, action);
+    if (n.over || n.picking) return n;
+    n.t += NIGHT.step;
+    while (n.spawns.length && n.spawns[0].at <= n.t) spawnGhost(n, n.spawns.shift());
+    advanceGhosts(n);
+    fireBows(n);
+    burnGhosts(n);
+    helpDefend(n);
+    if (n.door <= 0) endNight(n, false);
+    else if (!n.ghosts.length && !n.spawns.length) {
+      if (n.wave === NIGHT.waves - 1) endNight(n, true);
+      else offerPerks(n);
+    }
+    return n;
   }
   return __toCommonJS(browser_exports);
 })();

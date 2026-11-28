@@ -148,10 +148,12 @@ export function nightEnd(ctx: Ctx, life: Life, nightId: string, log: NightLog, c
   if (night.status !== 'open') fail('这一夜已经结过账了');
   // 打到一半离开：当天回来接着打；隔天才回来，那一夜当交给机关守（11-20 定）
   if (ctx.today !== night.realDate) return { outcome: settleByTraps(ctx, life, night, 'offline'), stale: true };
-  // 族人只认主人当场喊定的那一个；记录里偷偷喊别人，重放时那一下不算
+  // 族人只认主人当场喊定的那一个：他点了「去帮忙」→ 实时一起打（记录里的 join）；
+  // 没回答、按设置自动派人 → 电脑操控他的人物（help）。记录里偷偷加别人，重放时那一下不算
   const call = closeCall(ctx, night);
-  const kin = call?.used ? [call.used] : [];
-  const n = replayNight({ ...night.start, options: { ...night.start.options, kin } }, log);
+  const live = call?.used && call.answers[call.used] === 'go' ? ctx.w.lives[call.used] ?? null : null;
+  const auto = call?.used && !call.answers[call.used] ? call.used : null;
+  const n = replayNight({ ...night.start, options: { ...night.start.options, kin: auto ? [auto] : [] } }, cleanJoins(log, live));
   if (!n.over || !n.result) fail('这一夜还没打完');
   const house = ctx.house(night.houseId);
   const won = n.result.won;
@@ -170,7 +172,16 @@ export function nightEnd(ctx: Ctx, life: Life, nightId: string, log: NightLog, c
   for (const [id, gain] of Object.entries(n.result.friendship)) {
     life.person.friends[id] = (life.person.friends[id] ?? 0) + gain;
   }
-  // 族人派人来帮了忙：他上线时看到；门守住了，他钱袋里多几文
+  // 一起打的援兵：门守住了，两个人都拿全份纸钱
+  const guest = live && n.guests?.some(g => g.id === live.id) ? live : null;
+  if (guest) {
+    if (won) {
+      guest.person.purse += pay.earnedMoney;
+      ctx.ledger(guest.id, guest.houseId, 0, pay.earnedMoney, `和${life.name}一起守门`);
+    }
+    ctx.tell({ lifeId: guest.id }, 'fought', `你和${life.name}一起守门，` + (won ? `守住了，带回 ${pay.earnedMoney} 文。` : '可惜门还是破了。'));
+  }
+  // 族人派人来帮了忙（电脑操控）：他上线时看到；门守住了，他钱袋里多几文
   const helper = n.helper ? ctx.w.lives[n.helper] : undefined;
   if (helper) {
     if (won) {
@@ -193,6 +204,15 @@ export function nightEnd(ctx: Ctx, life: Life, nightId: string, log: NightLog, c
   night.result = outcome;
   afterNight(life);
   return { outcome, stale: false };
+}
+
+/** 援兵进来那一下：只认服务器喊定的那个人，强弱、体力、年纪用服务器记的（手机报的不算） */
+function cleanJoins(log: NightLog, live: Life | null): NightLog {
+  return log.map(([call, actions]) => [call, actions.flatMap((a): NightAction[] => {
+    if (a.type !== 'join') return [a];
+    if (!live || a.by !== live.id) return [];
+    return [{ type: 'join', by: live.id, item: a.item, power: live.person.power, hp: live.person.hp, day: live.person.day }];
+  })]);
 }
 
 /** 隔天才回来，还开着的那一夜当交给机关守 */

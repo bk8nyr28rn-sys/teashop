@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 import { CFG, HAUNT } from '../../src/core/loop';
-import { CLAN, Server } from '../../src/server';
+import { CLAN, replayNight, Server } from '../../src/server';
 import { bashAll, clock, marry, moveTogether, Phone, playNight, twoAdults } from './helpers';
 
 function couple(date = '2026-12-01') {
@@ -116,11 +116,11 @@ describe('族人被砸门：弹窗问去不去（11-28 定）', () => {
     return { s, a, b, kid };
   }
 
-  test('同族的人收到弹窗，点「去帮忙」；主人喊他，他来帮忙（实时一起打以前先由电脑操控），门守住了他也有赏', () => {
+  test('同族的人收到弹窗，点「去帮忙」，进来一起打；门守住了两个人都拿全份纸钱', () => {
     const { s, a, kid } = kidNight();
     a.ok({ type: 'settings', autoHelpKin: false });
     const begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
-    // 娘家是别的族的伴侣不算族人；a 关了自动去，要等他自己点
+    // 娘家是别的族的伴侣不算族人；a 关了自动派人，要等他自己点
     expect(begin.kin).toEqual([{ id: a.life.id, name: a.life.name, ready: false }]);
     const popup = a.ok({ type: 'view' }).helpCalls;
     expect(popup).toEqual([{ id: begin.callId, host: kid.life.name, houseId: kid.life.houseId }]);
@@ -128,11 +128,39 @@ describe('族人被砸门：弹窗问去不去（11-28 定）', () => {
     expect(a.ok({ type: 'view' }).helpCalls).toEqual([]);
     kid.ok({ type: 'useHelp', callId: begin.callId, helperId: a.life.id });
     const purse = a.life.person.purse;
+    const local = playNight(begin.start, true, undefined, { id: a.life.id, power: a.life.person.power });
+    const end = kid.ok({ type: 'nightEnd', nightId: begin.nightId, log: local.log, claim: { won: local.state.result!.won } });
+    expect(end.outcome).toMatchObject({ won: true, kills: local.state.result!.kills, suspicious: false });
+    expect(s.world.inbox.at(-1)).toMatchObject({ lifeId: a.life.id, kind: 'fought' });
+    expect(a.life.person.purse).toBe(purse + end.outcome.earnedMoney);
+  });
+
+  test('手机把援兵的强弱改大：服务器用它记的强弱重放，结果对不上就记一笔可疑', () => {
+    const { s, a, kid } = kidNight();
+    a.ok({ type: 'answerHelp', callId: kid.ok({ type: 'nightBegin', mode: 'hand' }).callId, go: true });
+    const night = Object.values(s.world.nights).at(-1)!;
+    kid.ok({ type: 'useHelp', callId: night.helpCallId!, helperId: a.life.id });
+    const strong = playNight(night.start, true, undefined, { id: a.life.id, power: 50 });
+    const honest = playNight(night.start, true, undefined, { id: a.life.id, power: a.life.person.power });
+    const end = kid.ok({ type: 'nightEnd', nightId: night.id, log: strong.log, claim: { won: strong.state.result!.won } });
+    // 重放出来的是真实强弱下这串点击的结果，不是手机算的
+    expect(end.outcome.kills).toBe(replayNight({ ...night.start, options: { ...night.start.options, kin: [] } },
+      strong.log.map(([c, acts]) => [c, acts.map(x => x.type === 'join' ? { ...x, power: a.life.person.power, hp: a.life.person.hp, day: a.life.person.day } : x)])).result!.kills);
+    if (strong.state.result!.won !== end.outcome.won) expect(end.outcome.suspicious).toBe(true);
+    expect(honest.state.result).not.toBeNull();
+  });
+
+  test('没回答、设置开着「不在线时自动派人」：他的人物由电脑操控来帮忙', () => {
+    const { s, a, kid } = kidNight();
+    const begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
+    expect(begin.kin[0].ready).toBe(true);
+    kid.ok({ type: 'useHelp', callId: begin.callId, helperId: a.life.id });
+    const purse = a.life.person.purse;
     const local = playNight(begin.start, true, a.life.id);
+    expect(local.state.helper).toBe(a.life.id);
     const end = kid.ok({ type: 'nightEnd', nightId: begin.nightId, log: local.log });
-    expect(end.outcome.won).toBe(true);
     expect(s.world.inbox.at(-1)).toMatchObject({ lifeId: a.life.id, kind: 'helped' });
-    expect(a.life.person.purse).toBe(purse + CLAN.helpReward);
+    expect(a.life.person.purse).toBe(purse + (end.outcome.won ? CLAN.helpReward : 0));
   });
 
   test('点了「不去」就喊不来；不在线没回答的，按设置里的「不在线时自动派我的人去」', () => {
@@ -150,13 +178,13 @@ describe('族人被砸门：弹窗问去不去（11-28 定）', () => {
     expect(a.send({ type: 'answerHelp', callId: begin.callId, go: false }).ok).toBe(false);
   });
 
-  test('没经过服务器喊定，在记录里偷偷喊族人：重放时那一下不算', () => {
+  test('没经过服务器喊定，在记录里偷偷喊族人、偷偷加援兵：重放时那几下不算', () => {
     const { a, kid } = kidNight();
     const begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
-    const local = playNight(begin.start, true, a.life.id);
+    const local = playNight(begin.start, true, a.life.id, { id: a.life.id });
     expect(local.state.helper).toBe(a.life.id);
     kid.ok({ type: 'nightEnd', nightId: begin.nightId, log: local.log });
-    expect(kid.server.world.inbox.some(m => m.lifeId === a.life.id && m.kind === 'helped')).toBe(false);
+    expect(kid.server.world.inbox.some(m => m.lifeId === a.life.id && (m.kind === 'helped' || m.kind === 'fought'))).toBe(false);
   });
 });
 

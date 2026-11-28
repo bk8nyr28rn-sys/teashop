@@ -1,6 +1,6 @@
 import { Rng } from '../rng';
 import { AGE_FX, balanceAge, CFG, nextRandom, RULE_VERSION } from './base';
-import { DOORS, GHOSTS, MULT, NIGHT, PERKS, waveCounts } from './night-config';
+import { COOP, DOORS, GHOSTS, MULT, NIGHT, PERKS, waveCounts } from './night-config';
 import type { GhostType, PerkId } from './night-config';
 import type { House, Item, Person, Treasure } from './state';
 import { nightPayout, planNightLoot, type NightLootPlan } from './settlement';
@@ -22,11 +22,16 @@ export interface NightOptions {
   lossBase?: number;
 }
 
+/**
+ * by：谁点的。不填是主人；填援兵的 id 就是援兵点的（两个人一起打，主人的手机把援兵的点击也记进记录）。
+ * join：援兵进来了，带着他自己的家伙和强弱；以后的波次鬼变多
+ */
 export type NightAction =
-  | { type: 'hit'; id: number }
-  | { type: 'hitAt'; x: number; y: number }
-  | { type: 'item'; item: Item }
-  | { type: 'perk'; id: PerkId }
+  | { type: 'hit'; id: number; by?: string }
+  | { type: 'hitAt'; x: number; y: number; by?: string }
+  | { type: 'item'; item: Item; by?: string }
+  | { type: 'perk'; id: PerkId; by?: string }
+  | { type: 'join'; by: string; item?: Item; power?: number; hp?: number; day?: number }
   /** 喊人帮忙。id 是自己挑的那个人（见 helpCandidates）；不给就喊交情最深的邻居 */
   | { type: 'help'; id?: string };
 
@@ -56,6 +61,8 @@ interface Spawn { at: number; type: GhostType; wave: number }
 interface Crossbow { x: number; y: number; cd: number }
 interface FamilyHelper { dmg: number; rate: number; cd: number }
 interface Ally { id: string; t: number; cd: number }
+/** 一起打的援兵：他自己的家伙、强弱、体力、年纪 */
+export interface NightGuest { id: string; item: Item; power: number; hp: number; d: number }
 
 export interface NightResult {
   won: boolean;
@@ -114,6 +121,11 @@ export interface NightState {
   kin?: string[];
   /** 这一夜喊来的是谁 */
   helper?: string | null;
+  /** 一起打的援兵（旧快照没有） */
+  guests?: NightGuest[];
+  /** 这一轮挑本事要等谁挑完（主人是 'host'），谁已经挑了 */
+  pickers?: string[];
+  pickedBy?: string[];
   rainCount: number;
   burnT: number;
   kills: number;
@@ -211,6 +223,8 @@ export function startWave(n: NightState, wave: number): void {
   // 旧版打到一半的快照继续使用原来的五波。
   const swordOnly = n.ruleVersion >= 2 && !n.guardian && !n.advancedItems;
   const counts = waveCounts(n.d, wave, swordOnly);
+  // 援兵到了：这一波起鬼变多，打得更热闹
+  if (n.guests?.length) for (const type of ghostTypes) counts[type] = Math.round(counts[type] * COOP.ghostScale);
   const types = ghostTypes.flatMap(type => Array<GhostType>(counts[type]).fill(type));
   const draw = eventRng(n.seed, wave, 0);
   orderNightDeck(types, () => draw.next());
@@ -219,6 +233,7 @@ export function startWave(n: NightState, wave: number): void {
   n.spawnedInWave = 0;
   n.offer = [];
   n.picking = false;
+  if (n.pickers) { n.pickers = []; n.pickedBy = []; }
 }
 
 export function perkAvailable(n: NightState, id: PerkId): boolean {
@@ -234,15 +249,24 @@ function offerPerks(n: NightState): void {
   const draw = eventRng(n.seed, n.wave, 200);
   n.offer = orderNightDeck(pool, () => draw.next()).slice(0, NIGHT.offerCount);
   n.picking = true;
+  // 两个人一起打：守住一波，两个人各挑一个本事
+  if (n.guests?.length) { n.pickers = ['host', ...n.guests.map(g => g.id)]; n.pickedBy = []; }
 }
 
-function choosePerk(n: NightState, id: PerkId): void {
+function choosePerk(n: NightState, id: PerkId, by?: string): void {
   if (!n.picking || !n.offer.includes(id)) return;
+  const who = by ?? 'host';
+  if (n.pickers?.length) {
+    // 不能叠的本事，同一轮另一个人已经挑了，就挑别的
+    if (!n.pickers.includes(who) || n.pickedBy!.includes(who) || (n.pk[id] && !PERKS[id].stack)) return;
+    n.pickedBy!.push(who);
+  } else if (by !== undefined) return;
   n.pk[id] = (n.pk[id] ?? 0) + 1;
   if (id === 'fix') n.door = Math.min(n.doorMax, n.door + n.doorMax * NIGHT.perk.fix);
   if (id === 'bowplus' && !n.bows.length) {
     n.bows.push({ x: NIGHT.bows.x[0], y: NIGHT.bows.y, cd: NIGHT.bows.giftCd });
   }
+  if (n.pickers?.length && n.pickers.some(p => !n.pickedBy!.includes(p))) return;
   startWave(n, n.wave + 1);
 }
 
@@ -291,8 +315,13 @@ export function ghostAt(n: NightState, x: number, y: number): NightGhost | null 
   return nearest;
 }
 
+/** 有人手里拿着灯（主人或援兵）。一个拿灯照隐身鬼，另一个就能放心打别的 */
+export function lampHeld(n: NightState): boolean {
+  return n.item === 'lamp' || !!n.guests?.some(g => g.item === 'lamp');
+}
+
 export function revealed(n: NightState, g: NightGhost): boolean {
-  return g.type !== 'shade' || (n.item === 'lamp' && g.y > NIGHT.reveal.lamp)
+  return g.type !== 'shade' || (lampHeld(n) && g.y > NIGHT.reveal.lamp)
     || (!!(n.traps.lamp || n.pk.lampstr) && g.y > NIGHT.reveal.wall)
     || (!!n.pk.eye && g.y > NIGHT.reveal.eye) || g.flash > 0;
 }
@@ -306,11 +335,11 @@ export function nearestGhost(n: NightState, visibleOnly = true): NightGhost | nu
   return nearest;
 }
 
-export function tapMult(n: NightState, g: NightGhost): number {
-  let multiplier: number = MULT[n.item][g.type];
-  if (g.type === 'armor' && n.pk.heavy) multiplier = MULT[n.item].evil;
-  if (g.type === 'fly' && n.item === 'sword' && n.pk.qi) multiplier = NIGHT.perk.qi;
-  if (n.item === 'bow') multiplier *= 1 + NIGHT.perk.pierce * (n.pk.pierce ?? 0);
+export function tapMult(n: NightState, g: NightGhost, item: Item = n.item): number {
+  let multiplier: number = MULT[item][g.type];
+  if (g.type === 'armor' && n.pk.heavy) multiplier = MULT[item].evil;
+  if (g.type === 'fly' && item === 'sword' && n.pk.qi) multiplier = NIGHT.perk.qi;
+  if (item === 'bow') multiplier *= 1 + NIGHT.perk.pierce * (n.pk.pierce ?? 0);
   return multiplier * (1 + NIGHT.perk.heavy * (n.pk.heavy ?? 0));
 }
 
@@ -329,14 +358,16 @@ function hurtGhost(n: NightState, g: NightGhost, dmg: number, byPlayer = false):
   }
 }
 
-function hit(n: NightState, g: NightGhost | null): void {
+function hit(n: NightState, g: NightGhost | null, guest?: NightGuest): void {
   if (!g) return;
   const hidden = !revealed(n, g);
   if (hidden && !n.pk.ear) return;
-  const multiplier = tapMult(n, g) * (hidden ? NIGHT.perk.ear : 1);
-  const hurt = n.guardian || n.hp >= CFG.hpMax ? 1 : n.hp <= 1 ? NIGHT.weapon.badlyHurt : NIGHT.weapon.hurt;
-  const age = n.guardian ? AGE_FX.child : AGE_FX[balanceAge(n.d)];
-  const power = n.guardian ? NIGHT.guardian.power : n.power || 1;
+  const multiplier = tapMult(n, g, guest?.item ?? n.item) * (hidden ? NIGHT.perk.ear : 1);
+  const hp = guest?.hp ?? n.hp;
+  const guardian = !guest && n.guardian;
+  const hurt = guardian || hp >= CFG.hpMax ? 1 : hp <= 1 ? NIGHT.weapon.badlyHurt : NIGHT.weapon.hurt;
+  const age = guardian ? AGE_FX.child : AGE_FX[balanceAge(guest?.d ?? n.d)];
+  const power = guardian ? NIGHT.guardian.power : (guest ? guest.power : n.power) || 1;
   const crit = nextRandom(n) < Math.min(NIGHT.perk.critCap, NIGHT.perk.critChance * (n.pk.crit ?? 0));
   const dmg = Math.max(1, Math.round(NIGHT.tap * multiplier * age.dmg * hurt * power * (crit ? NIGHT.perk.critDamage : 1)));
   const center = ghostCenter(g);
@@ -371,16 +402,32 @@ function callHelp(n: NightState, choice?: string): void {
   if (neighbors.includes(id)) n.friendship[id] = Math.min(NIGHT.ally.friendship, NIGHT.ally.maxFriendship - n.friends[id]!);
 }
 
+/** 援兵进来：最多一个；护家神的夜不来援兵 */
+function join(n: NightState, a: Extract<NightAction, { type: 'join' }>): void {
+  n.guests ??= [];
+  if (n.guardian || n.guests.length >= COOP.maxGuests || n.guests.some(g => g.id === a.by) || a.by === 'host') return;
+  const item = a.item && (n.advancedItems || a.item === 'sword') ? a.item : 'sword';
+  n.guests.push({ id: a.by, item, power: a.power ?? 1, hp: a.hp ?? CFG.hpMax, d: a.day ?? n.d });
+}
+
 /** 输入按调用次序立即生效，不推进墙钟或游戏时钟。挑本事时战斗暂停。 */
 export function applyNightAction(n: NightState, action: NightAction): void {
   if (n.over) return;
-  if (action.type === 'perk') return choosePerk(n, action.id);
+  if (action.type === 'join') return join(n, action);
+  // 援兵点的：找不到这个援兵（没进来、被服务器拦下）就不算
+  const by = 'by' in action ? action.by : undefined;
+  const guest = by === undefined ? undefined : n.guests?.find(g => g.id === by);
+  if (by !== undefined && !guest) return;
+  if (action.type === 'perk') return choosePerk(n, action.id, by);
   if (n.picking) return;
   switch (action.type) {
-    case 'hit': return hit(n, n.ghosts.find(g => g.id === action.id) ?? null);
-    case 'hitAt': return hit(n, ghostAt(n, action.x, action.y));
+    case 'hit': return hit(n, n.ghosts.find(g => g.id === action.id) ?? null, guest);
+    case 'hitAt': return hit(n, ghostAt(n, action.x, action.y), guest);
     case 'item':
-      if (n.advancedItems || action.item === 'sword') n.item = action.item;
+      if (n.advancedItems || action.item === 'sword') {
+        if (guest) guest.item = action.item;
+        else n.item = action.item;
+      }
       return;
     case 'help': return callHelp(n, action.id);
   }
@@ -435,7 +482,7 @@ function fireBows(n: NightState): void {
 }
 
 function burnGhosts(n: NightState): void {
-  if (!n.pk.burn || n.item !== 'lamp') return;
+  if (!n.pk.burn || !lampHeld(n)) return;
   n.burnT += NIGHT.step;
   if (n.burnT < NIGHT.perk.burnInterval) return;
   n.burnT = 0;

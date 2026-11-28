@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   applyNightAction, ghostAt, ghostCenter, helpCandidates, nearestGhost, nightStep, perkAvailable, revealed, startNight, startWave, tapMult, waveCounts,
 } from '../../src/core/loop/night.js';
-import type { NightGhost, NightState } from '../../src/core/loop/night.js';
-import { DOORS, GHOSTS, MULT, PERKS, type GhostType, type PerkId } from '../../src/core/loop/night-config.js';
+import type { NightAction, NightGhost, NightState } from '../../src/core/loop/night.js';
+import { DOORS, GHOSTS, MULT, NIGHT, PERKS, type GhostType, type PerkId } from '../../src/core/loop/night-config.js';
+import { AGE_FX, balanceAge } from '../../src/core/loop/base.js';
 import { fight, inputs, newTrial, STEP_LIMIT, type Replay } from '../../scripts/loop-night-bot.js';
 
 const setup = { day: 3, door: 1, bows: 0, trial: 2 };
@@ -427,5 +428,92 @@ describe('结算和回放', () => {
     expect(differentFaces).not.toEqual(n);
     expect(differentFaces.result).toEqual(n.result);
     expect(expected.steps).toBeLessThan(STEP_LIMIT);
+  });
+});
+
+describe('两个人一起打（11-28 定，爽度优先）', () => {
+  it('援兵中途进来：下一波起鬼变多 1.5 倍；护家神的夜不来援兵；最多一个', () => {
+    const { house, person } = inputs(setup);
+    const solo = startNight(house, person, { seed: 4 });
+    const duo = startNight(house, person, { seed: 4 });
+    applyNightAction(duo, { type: 'join', by: 'kin-1', item: 'bow', power: 1.1 });
+    applyNightAction(duo, { type: 'join', by: 'kin-2' });
+    expect(duo.guests).toEqual([{ id: 'kin-1', item: 'bow', power: 1.1, hp: 3, d: 3 }]);
+    // 这一波已经开始了，不变；下一波才变多
+    expect(duo.spawns.length).toBe(solo.spawns.length);
+    for (const n of [solo, duo]) { n.ghosts = []; n.spawns = []; nightStep(n); }
+    expect(duo.picking).toBe(true);
+    applyNightAction(duo, { type: 'perk', id: duo.offer[0]! });
+    applyNightAction(duo, { type: 'perk', id: duo.offer[1]!, by: 'kin-1' });
+    applyNightAction(solo, { type: 'perk', id: solo.offer[0]! });
+    const counts = (n: NightState) => n.spawns.reduce((m, s) => ({ ...m, [s.type]: (m[s.type] ?? 0) + 1 }), {} as Record<string, number>);
+    const a = counts(solo), b = counts(duo);
+    for (const type of Object.keys(a)) expect(b[type]).toBe(Math.round(a[type]! * 1.5));
+    const guard = startNight(house, person, { seed: 4, guardian: true });
+    applyNightAction(guard, { type: 'join', by: 'kin-1' });
+    expect(guard.guests ?? []).toEqual([]);
+  });
+
+  it('守住一波两个人各挑一个本事，都挑完才开下一波；不能叠的本事不能两个人都挑', () => {
+    const { house, person } = inputs(setup);
+    const n = startNight(house, person, { seed: 4 });
+    applyNightAction(n, { type: 'join', by: 'kin-1' });
+    n.ghosts = []; n.spawns = []; nightStep(n);
+    const [first, second] = n.offer;
+    applyNightAction(n, { type: 'perk', id: first! });
+    expect(n.picking).toBe(true);
+    // 主人挑过了，不能再挑；没进来的人挑不了
+    applyNightAction(n, { type: 'perk', id: second! });
+    applyNightAction(n, { type: 'perk', id: second!, by: 'stranger' });
+    expect(n.wave).toBe(0);
+    if (!PERKS[first!].stack) {
+      applyNightAction(n, { type: 'perk', id: first!, by: 'kin-1' });
+      expect(n.picking).toBe(true);
+    }
+    applyNightAction(n, { type: 'perk', id: second!, by: 'kin-1' });
+    expect(n.wave).toBe(1);
+    expect(n.pk[first!]).toBe(1);
+    expect(n.pk[second!]).toBe(1);
+  });
+
+  it('援兵点鬼用他自己的家伙和强弱；援兵拿着灯，隐身鬼也现形', () => {
+    const { house, person } = inputs(setup);
+    const { n, add } = encounter(startNight(house, person, { seed: 4 }));
+    const shade = add('shade', { y: 300 });
+    expect(revealed(n, shade)).toBe(false);
+    applyNightAction(n, { type: 'join', by: 'kin-1', item: 'lamp', power: 1 });
+    expect(revealed(n, shade)).toBe(true);
+    const evil = add('evil');
+    applyNightAction(n, { type: 'item', item: 'sword', by: 'kin-1' });
+    expect(n.item).toBe('sword');
+    applyNightAction(n, { type: 'hit', id: evil.id, by: 'kin-1' });
+    const byGuest = 100 - evil.hp;
+    // 没进来的人点的不算
+    applyNightAction(n, { type: 'hit', id: evil.id, by: 'stranger' });
+    expect(100 - evil.hp).toBe(byGuest);
+    expect(byGuest).toBe(Math.round(NIGHT.tap * 1.5 * AGE_FX[balanceAge(3)].dmg));
+  });
+
+  it('同一份记录重放两遍结果一样（服务器靠这个核对两个人一起打的夜）', () => {
+    const { house, person } = inputs(setup);
+    const run = () => {
+      const n = startNight(house, person, { seed: 9 });
+      for (let call = 0; call < 8000 && !n.over; call++) {
+        const actions: NightAction[] = [];
+        if (call === 40) actions.push({ type: 'join', by: 'kin-1', item: 'bow' });
+        if (n.picking) {
+          actions.push({ type: 'perk', id: n.offer[0]! });
+          if (n.pickers?.includes('kin-1')) actions.push({ type: 'perk', id: n.offer.find(id => id !== n.offer[0] || PERKS[id].stack) ?? n.offer[1]!, by: 'kin-1' });
+        } else {
+          const g = nearestGhost(n, false);
+          if (g) actions.push({ type: 'hit', id: g.id }, { type: 'hit', id: g.id, by: 'kin-1' });
+        }
+        nightStep(n, actions);
+      }
+      return n.result;
+    };
+    const a = run();
+    expect(a).not.toBeNull();
+    expect(run()).toEqual(a);
   });
 });

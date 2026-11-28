@@ -5,7 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 
 const SOURCE = 'docs/art/creator/index.html';
-const TARGETS = ['docs/proto/loop/index.html'];
+const TARGETS = ['docs/proto/loop/index.html', 'docs/proto/coop/index.html'];
 const BEGIN = '// @@shared-begin';
 const END = '// @@shared-end';
 
@@ -31,7 +31,7 @@ for (const file of TARGETS) {
   console.log(`${file}: 已同步`);
 }
 // 可直接打开的交接版使用同一份页面，只调整相邻捏人台及公共资源的位置。
-for (const [source, target] of [[SOURCE, 'prototype/creator.html'], [TARGETS[0], 'prototype/loop.html']]) {
+for (const [source, target] of [[SOURCE, 'prototype/creator.html'], [TARGETS[0], 'prototype/loop.html'], [TARGETS[1], 'prototype/coop.html']]) {
   const page = readFileSync(source, 'utf8')
     .replaceAll('../../../assets/', '../assets/')
     .replace('data-editor="../../art/creator/index.html?', 'data-editor="./creator.html?');

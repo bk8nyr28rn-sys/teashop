@@ -29,20 +29,26 @@ export function clock(date: string, hour = 12) {
 }
 
 /** 手机上打一夜：active 每步点最近的鬼、换克它的家伙，挑本事拿第一个；不 active 就站着不动 */
-export function playNight(start: { house: House; person: Person; options: NightOptions }, active: boolean, help?: string) {
+export function playNight(start: { house: House; person: Person; options: NightOptions }, active: boolean, help?: string,
+  guest?: { id: string; power?: number }) {
   const n: NightState = startNight(JSON.parse(JSON.stringify(start.house)), JSON.parse(JSON.stringify(start.person)), start.options);
   const log: NightLog = [];
   for (let call = 0; call < 40000 && !n.over; call++) {
     const actions: NightAction[] = [];
     if (help && call === 0) actions.push({ type: 'help', id: help });
-    if (n.picking) actions.push({ type: 'perk', id: n.offer[0]! });
-    else if (active) {
+    // 一起打：援兵第 0 步进来，拿弓；守住一波两个人各挑一个
+    if (guest && call === 0) actions.push({ type: 'join', by: guest.id, item: 'bow', power: guest.power });
+    if (n.picking) {
+      actions.push({ type: 'perk', id: n.offer[0]! });
+      if (guest) actions.push({ type: 'perk', id: n.offer[1]!, by: guest.id });
+    } else if (active) {
       // 隐身鬼也要盯着：换灯笼它就现形了
       const g = nearestGhost(n, false);
       if (g) {
         const best = (Object.keys(MULT) as Item[]).sort((a, b) => MULT[b][g.type] - MULT[a][g.type])[0]!;
         if (best !== n.item) actions.push({ type: 'item', item: best });
         actions.push({ type: 'hit', id: g.id });
+        if (guest) actions.push({ type: 'hit', id: g.id, by: guest.id });
       }
     }
     if (actions.length) log.push([call, actions]);

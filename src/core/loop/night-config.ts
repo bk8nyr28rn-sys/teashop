@@ -88,6 +88,9 @@ export const NIGHT = {
   guardian: { power: 1.25, slow: 0.65 },
 } as const;
 
+/** 两个人一起打（族人被砸门时点「去帮忙」，11-28 定）：最多来一个援兵；援兵到了以后，下一波起鬼变多 */
+export const COOP = { maxGuests: 1, ghostScale: 1.5 } as const;
+
 export const NIGHT_CONFIG = { DOORS, TRAPS, GHOSTS, MULT, PERKS, NIGHT } as const;
 
 // w 从零起算，最后一波的 w 是 4。不同鬼的增兵门槛与样机相同。
