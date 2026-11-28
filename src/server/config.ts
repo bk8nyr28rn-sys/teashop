@@ -22,6 +22,8 @@ export const CLAN = {
   newHouseDoor: 1,
   /** 自立门户时，最多从原来那座房的钱箱分走几成 */
   splitShare: 0.3,
+  /** 族人派人来帮忙、门守住了，帮忙的人钱袋里多几文（暂定） */
+  helpReward: 10,
 } as const;
 
 export const SURNAMES = [...'林陈周吴郑王冯褚卫蒋沈韩杨朱秦许何吕施张孔曹严华金魏陶姜'];

@@ -4,7 +4,7 @@ import { realDate } from './clock';
 import { runDayOps, type DayOp } from './day';
 import { touchHouse } from './house';
 import { emptyWorld, type World } from './model';
-import { dawn, nightBegin, nightEnd, settleStaleNight, type NightLog } from './night';
+import { answerHelp, dawn, nightBegin, nightEnd, settleStaleNight, useHelp, type NightLog } from './night';
 import { raidBegin, raidEnd, type HauntLog } from './raid';
 import { clone, Ctx, Fail, fail } from './world';
 
@@ -16,7 +16,9 @@ export type Request = { accountId: string; opId?: string; ruleVersion?: number; 
   | { type: 'nightBegin'; mode: 'hand' | 'delegated' }
   | { type: 'nightEnd'; nightId: string; log: NightLog; claim?: { won: boolean } }
   | { type: 'dawn' }
-  | { type: 'settings'; allowKinHelp: boolean }
+  | { type: 'settings'; autoHelpKin: boolean }
+  | { type: 'answerHelp'; callId: string; go: boolean }
+  | { type: 'useHelp'; callId: string; helperId: string }
   | { type: 'foundHouse'; amount: number }
   | { type: 'moveIn'; houseId: string }
   | { type: 'proposeBond'; to: string }
@@ -100,9 +102,11 @@ function route(ctx: Ctx, req: Request): unknown {
     case 'nightEnd': return nightEnd(ctx, life, req.nightId, req.log, req.claim);
     case 'dawn': return dawn(ctx, life, account.bank);
     case 'settings':
-      if (typeof req.allowKinHelp !== 'boolean') fail('设置不对');
-      account.allowKinHelp = req.allowKinHelp;
-      return { allowKinHelp: account.allowKinHelp };
+      if (typeof req.autoHelpKin !== 'boolean') fail('设置不对');
+      account.autoHelpKin = req.autoHelpKin;
+      return { autoHelpKin: account.autoHelpKin };
+    case 'answerHelp': return answerHelp(ctx, life, req.callId, req.go);
+    case 'useHelp': return useHelp(ctx, life, req.callId, req.helperId);
     case 'foundHouse': return foundHouse(ctx, life, req.amount);
     case 'moveIn': return moveIn(ctx, life, req.houseId);
     case 'proposeBond': return proposeBond(ctx, life, req.to);
@@ -140,5 +144,9 @@ function view(ctx: Ctx, accountId: string) {
     bank: account.bank, life, house, clan: ctx.clan(life.clanId),
     inbox: ctx.w.inbox.filter(m => m.houseId === house.id || m.lifeId === life.id).slice(-20),
     asks: Object.values(ctx.w.asks).filter(a => a.status === 'open' && a.askers.includes(life.id)),
+    // 弹窗：族人正在被鬼砸门，还没回答的
+    helpCalls: Object.values(ctx.w.helpCalls).filter(c => c.status === 'open' && c.realDate === ctx.today
+      && c.kin.includes(life.id) && !c.answers[life.id] && c.used !== life.id)
+      .map(c => ({ id: c.id, host: ctx.life(c.hostLifeId).name, houseId: c.houseId })),
   };
 }

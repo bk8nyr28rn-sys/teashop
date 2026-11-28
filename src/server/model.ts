@@ -7,8 +7,8 @@ export interface Account {
   bank: DayBank;
   /** 现在这一世；走完了、还没投胎时指向走完的那一世 */
   lifeId: string;
-  /** 族人能不能喊我去帮忙守门。不填当作能（11-28 定：能喊，但要给选项） */
-  allowKinHelp?: boolean;
+  /** 我不在线时，族人被砸门，让我的人自动去帮忙。不填当作开（11-28 定） */
+  autoHelpKin?: boolean;
 }
 
 /** 一个人这一辈子走到哪了 */
@@ -102,6 +102,24 @@ export interface NightDoc {
   status: 'open' | 'settled';
   mode?: 'hand' | 'delegated' | 'offline';
   result?: NightOutcome;
+  helpCallId?: string;
+}
+
+/**
+ * 「林小家正在被鬼砸门！去帮忙吗？」弹给同族的人，每个人自己选（11-28 定）。
+ * send = 派人去（他的人物由电脑操控）；skip = 不去。以后加 come = 亲自去（实时一起打）。
+ * 没回答的按他设置里的「不在线时自动去帮忙」。主人点「喊人」时服务器当场定下喊的是谁，之后谁都改不了
+ */
+export interface HelpCall {
+  id: string;
+  nightId: string;
+  hostLifeId: string;
+  houseId: string;
+  realDate: string;
+  kin: string[];
+  answers: Record<string, 'send' | 'skip'>;
+  used: string | null;
+  status: 'open' | 'closed';
 }
 
 export interface NightOutcome {
@@ -172,6 +190,7 @@ export interface World {
   nights: Record<string, NightDoc>;
   raids: Record<string, RaidDoc>;
   asks: Record<string, Ask>;
+  helpCalls: Record<string, HelpCall>;
   inbox: InboxItem[];
   ledger: LedgerEntry[];
   /** 可疑的事（手机报的结果和重放对不上）。先不封号，看看有多少 */
@@ -182,5 +201,5 @@ export interface World {
 
 export function emptyWorld(seed = 1): World {
   return { seq: 0, rngState: seed >>> 0 || 1, accounts: {}, lives: {}, houses: {}, clans: {}, bonds: {},
-    nights: {}, raids: {}, asks: {}, inbox: [], ledger: [], suspects: [], ops: {} };
+    nights: {}, raids: {}, asks: {}, helpCalls: {}, inbox: [], ledger: [], suspects: [], ops: {} };
 }

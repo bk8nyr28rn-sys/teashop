@@ -104,25 +104,59 @@ describe('家族 → 房 → 人：住哪随你（11-28 定）', () => {
   });
 });
 
-describe('族里互相帮着守门（11-28 定：能喊，但要给选项）', () => {
-  test('同族的人不用交情就能喊，自己挑喊谁；被喊的人能在设置里关掉', () => {
+describe('族人被砸门：弹窗问去不去（11-28 定）', () => {
+  /** a、b 住一起，a 的族里生了个孩子；孩子长大一天，开始亲手守夜 */
+  function kidNight() {
     const { s, a, b } = couple();
     moveTogether(a, b);
     readyForKid(s, a);
     const kid = new Phone(s, 'kid');
     kid.login();
     kid.ok({ type: 'dawn' });
+    return { s, a, b, kid };
+  }
+
+  test('同族的人收到弹窗，点「派人去」；主人喊他，他的人物来帮忙，门守住了他也有赏', () => {
+    const { s, a, kid } = kidNight();
+    a.ok({ type: 'settings', autoHelpKin: false });
     const begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
-    // 娘家是别的族的伴侣不算族人
-    expect(begin.kin.map((k: { id: string }) => k.id)).toEqual([a.life.id]);
+    // 娘家是别的族的伴侣不算族人；a 关了自动去，要等他自己点
+    expect(begin.kin).toEqual([{ id: a.life.id, name: a.life.name, ready: false }]);
+    const popup = a.ok({ type: 'view' }).helpCalls;
+    expect(popup).toEqual([{ id: begin.callId, host: kid.life.name, houseId: kid.life.houseId }]);
+    a.ok({ type: 'answerHelp', callId: begin.callId, go: true });
+    expect(a.ok({ type: 'view' }).helpCalls).toEqual([]);
+    kid.ok({ type: 'useHelp', callId: begin.callId, helperId: a.life.id });
+    const purse = a.life.person.purse;
+    const local = playNight(begin.start, true, a.life.id);
+    const end = kid.ok({ type: 'nightEnd', nightId: begin.nightId, log: local.log });
+    expect(end.outcome.won).toBe(true);
+    expect(s.world.inbox.at(-1)).toMatchObject({ lifeId: a.life.id, kind: 'helped' });
+    expect(a.life.person.purse).toBe(purse + CLAN.helpReward);
+  });
+
+  test('点了「不去」就喊不来；不在线没回答的，按设置里的「不在线时自动去帮忙」', () => {
+    const { a, kid } = kidNight();
+    let begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
+    expect(begin.kin[0].ready).toBe(true);
+    a.ok({ type: 'answerHelp', callId: begin.callId, go: false });
+    expect(kid.send({ type: 'useHelp', callId: begin.callId, helperId: a.life.id })).toEqual({ ok: false, error: '他今晚来不了' });
+    kid.ok({ type: 'nightEnd', nightId: begin.nightId, log: playNight(begin.start, true).log });
+    kid.ok({ type: 'dawn' });
+    // 第二夜 a 没回答，设置开着 → 直接能喊
+    begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
+    expect(kid.ok({ type: 'useHelp', callId: begin.callId, helperId: a.life.id })).toEqual({ helperId: a.life.id });
+    // 喊定了就改不了
+    expect(a.send({ type: 'answerHelp', callId: begin.callId, go: false }).ok).toBe(false);
+  });
+
+  test('没经过服务器喊定，在记录里偷偷喊族人：重放时那一下不算', () => {
+    const { a, kid } = kidNight();
+    const begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
     const local = playNight(begin.start, true, a.life.id);
     expect(local.state.helper).toBe(a.life.id);
     kid.ok({ type: 'nightEnd', nightId: begin.nightId, log: local.log });
-    expect(s.world.inbox.at(-1)).toMatchObject({ lifeId: a.life.id, kind: 'helped' });
-    // a 关掉「族人可以喊我去帮忙」，下一夜就喊不到他了
-    a.ok({ type: 'settings', allowKinHelp: false });
-    kid.ok({ type: 'dawn' });
-    expect(kid.ok({ type: 'nightBegin', mode: 'hand' }).kin).toEqual([]);
+    expect(kid.server.world.inbox.some(m => m.lifeId === a.life.id && m.kind === 'helped')).toBe(false);
   });
 });
 

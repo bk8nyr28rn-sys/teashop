@@ -2,9 +2,9 @@ import {
   autoLossLimit, CFG, FAMILY, nightPayout, nightStep, planNightLoot, settleAutoNight, startDay, startNight,
   type House, type NightAction, type NightOptions, type NightState, type Person,
 } from '../core/loop';
-import { SERVER } from './config';
+import { CLAN, SERVER } from './config';
 import { markGuarded, touchHouse } from './house';
-import type { HouseDoc, Life, NightDoc, NightOutcome } from './model';
+import type { HelpCall, HouseDoc, Life, NightDoc, NightOutcome } from './model';
 import { clone, fail, type Ctx } from './world';
 
 /** 手机交上来的守夜记录：第几次调用 nightStep，那一步之前点了什么 */
@@ -56,14 +56,63 @@ export function nightBegin(ctx: Ctx, life: Life, mode: 'hand' | 'delegated') {
   life.openNightId = night.id;
   life.phase = 'night';
   if (mode === 'delegated') return { nightId: night.id, outcome: settleByTraps(ctx, life, night, 'delegated') };
-  // 手机拿 helpCandidates 列出能喊的人让玩家挑；族人的名字在这里
-  return { nightId: night.id, seed, options, start: night.start, kin };
+  // 亲手守：弹给同族的人「正在被鬼砸门，去帮忙吗」
+  let callId: string | null = null;
+  if (kin.length) {
+    const call: HelpCall = { id: ctx.id('help'), nightId: night.id, hostLifeId: life.id, houseId: house.id, realDate: ctx.today,
+      kin: kin.map(k => k.id), answers: {}, used: null, status: 'open' };
+    ctx.w.helpCalls[call.id] = call;
+    night.helpCallId = callId = call.id;
+    for (const k of kin) ctx.tell({ lifeId: k.id }, 'helpCall', `${life.name}家正在被鬼砸门！去帮忙吗？`);
+  }
+  // ready：现在就能喊（他设置了不在线时自动去）；别的要等他点「派人去」
+  return { nightId: night.id, seed, options, start: night.start, callId,
+    kin: kin.map(k => ({ ...k, ready: canSend(ctx, k.id, {}) })) };
 }
 
-/** 同族、活着的真人，没在设置里关掉「族人可以喊我去帮忙」。住哪座房都行 */
+/** 同族、活着的真人，住哪座房都行 */
 export function kinHelpers(ctx: Ctx, life: Life): Array<{ id: string; name: string }> {
   return Object.values(ctx.w.lives).filter(l => l.clanId === life.clanId && l.id !== life.id && l.accountId !== null
-    && l.phase !== 'dead' && ctx.w.accounts[l.accountId]?.allowKinHelp !== false).map(l => ({ id: l.id, name: l.name }));
+    && l.phase !== 'dead').map(l => ({ id: l.id, name: l.name }));
+}
+
+/** 能不能派他的人来：他点了「派人去」，或者没回答、设置里开着「不在线时自动去帮忙」 */
+function canSend(ctx: Ctx, lifeId: string, answers: HelpCall['answers']): boolean {
+  if (answers[lifeId]) return answers[lifeId] === 'send';
+  const accountId = ctx.w.lives[lifeId]?.accountId;
+  return !!accountId && ctx.w.accounts[accountId]?.autoHelpKin !== false;
+}
+
+function openCall(ctx: Ctx, callId: string): HelpCall {
+  const call = ctx.w.helpCalls[callId];
+  if (!call || call.status !== 'open' || call.realDate !== ctx.today) fail('这一夜已经结束了');
+  return call;
+}
+
+/** 族人看到弹窗：派人去，或者不去 */
+export function answerHelp(ctx: Ctx, life: Life, callId: string, go: boolean) {
+  const call = openCall(ctx, callId);
+  if (!call.kin.includes(life.id)) fail('没有喊你');
+  if (call.used === life.id) fail('你的人已经过去了');
+  call.answers[life.id] = go ? 'send' : 'skip';
+  return { answer: call.answers[life.id] };
+}
+
+/** 主人点「喊人」挑了谁：服务器当场定下，之后谁都改不了；重放时只认这一个族人 */
+export function useHelp(ctx: Ctx, life: Life, callId: string, helperId: string) {
+  const call = openCall(ctx, callId);
+  if (call.hostLifeId !== life.id) fail('这不是你家的夜');
+  if (call.used) fail('今晚已经喊过人了');
+  if (!call.kin.includes(helperId) || !canSend(ctx, helperId, call.answers)) fail('他今晚来不了');
+  call.used = helperId;
+  return { helperId };
+}
+
+function closeCall(ctx: Ctx, night: NightDoc): HelpCall | null {
+  const call = night.helpCallId ? ctx.w.helpCalls[night.helpCallId] : undefined;
+  if (!call) return null;
+  call.status = 'closed';
+  return call;
 }
 
 /** 交给机关守，或者隔天才回来（当交给机关守，没有纸钱）。和单机一样用规则核心的 settleAutoNight */
@@ -87,6 +136,7 @@ export function settleByTraps(ctx: Ctx, life: Life, night: NightDoc, mode: 'dele
   night.status = 'settled';
   night.mode = mode;
   night.result = outcome;
+  closeCall(ctx, night);
   afterNight(life);
   return outcome;
 }
@@ -98,7 +148,10 @@ export function nightEnd(ctx: Ctx, life: Life, nightId: string, log: NightLog, c
   if (night.status !== 'open') fail('这一夜已经结过账了');
   // 打到一半离开：当天回来接着打；隔天才回来，那一夜当交给机关守（11-20 定）
   if (ctx.today !== night.realDate) return { outcome: settleByTraps(ctx, life, night, 'offline'), stale: true };
-  const n = replayNight(night.start, log);
+  // 族人只认主人当场喊定的那一个；记录里偷偷喊别人，重放时那一下不算
+  const call = closeCall(ctx, night);
+  const kin = call?.used ? [call.used] : [];
+  const n = replayNight({ ...night.start, options: { ...night.start.options, kin } }, log);
   if (!n.over || !n.result) fail('这一夜还没打完');
   const house = ctx.house(night.houseId);
   const won = n.result.won;
@@ -117,9 +170,15 @@ export function nightEnd(ctx: Ctx, life: Life, nightId: string, log: NightLog, c
   for (const [id, gain] of Object.entries(n.result.friendship)) {
     life.person.friends[id] = (life.person.friends[id] ?? 0) + gain;
   }
-  // 喊来帮忙的是族人：他上线时看到
+  // 族人派人来帮了忙：他上线时看到；门守住了，他钱袋里多几文
   const helper = n.helper ? ctx.w.lives[n.helper] : undefined;
-  if (helper) ctx.tell({ lifeId: helper.id }, 'helped', `${life.name}夜里喊你去帮忙守门，你去了。` + (won ? '门守住了。' : '可惜门还是破了。'));
+  if (helper) {
+    if (won) {
+      helper.person.purse += CLAN.helpReward;
+      ctx.ledger(helper.id, helper.houseId, 0, CLAN.helpReward, `帮${life.name}守门`);
+    }
+    ctx.tell({ lifeId: helper.id }, 'helped', `你的人去帮${life.name}守门了，` + (won ? `门守住了，带回 ${CLAN.helpReward} 文。` : '可惜门还是破了。'));
+  }
   const suspicious = !!claim && claim.won !== won;
   if (suspicious) ctx.w.suspects.push({ opId: ctx.opId, lifeId: life.id, nightId, claimed: claim!.won, replayed: won, realDate: ctx.today });
   ctx.ledger(life.id, house.id, -chestLost, pay.earnedMoney - pay.purseLost, '亲手守夜');
