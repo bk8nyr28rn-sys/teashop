@@ -16,6 +16,8 @@ export interface NightOptions {
   helpEnabled?: boolean;
   spouse?: boolean;
   childPowers?: readonly number[];
+  /** 同族能喊来帮忙的人，不用攒交情（多人版由服务器给；他自己能在设置里关掉）。单机样机不给 */
+  kin?: readonly string[];
   // 兼容第一阶段模拟器的显式钱箱余额。
   lossBase?: number;
 }
@@ -25,7 +27,8 @@ export type NightAction =
   | { type: 'hitAt'; x: number; y: number }
   | { type: 'item'; item: Item }
   | { type: 'perk'; id: PerkId }
-  | { type: 'help' };
+  /** 喊人帮忙。id 是自己挑的那个人（见 helpCandidates）；不给就喊交情最深的邻居 */
+  | { type: 'help'; id?: string };
 
 export interface NightGhost {
   id: number;
@@ -107,6 +110,10 @@ export interface NightState {
   fam: FamilyHelper[];
   ally: Ally | null;
   helpUsed: boolean;
+  /** 同族能喊的人。旧的打到一半的快照没有这一项 */
+  kin?: string[];
+  /** 这一夜喊来的是谁 */
+  helper?: string | null;
   rainCount: number;
   burnT: number;
   kills: number;
@@ -192,7 +199,7 @@ export function startNight(house: House, person: Person, options: NightOptions):
     treasures: house.treasures.map(t => ({ ...t })),
     friends: { ...person.friends }, friendship: {}, t: 0, door: door.hp, doorMax: door.hp,
     wave: -1, spawns: [], ghosts: [], pk: {}, offer: [], picking: false,
-    bows, fam: familyHelpers(options), ally: null, helpUsed: false,
+    bows, fam: familyHelpers(options), ally: null, helpUsed: false, kin: [...(options.kin ?? [])], helper: null,
     rainCount: 0, burnT: 0, kills: 0, coins: 0, over: false, result: null,
   };
   startWave(state, 0);
@@ -344,15 +351,24 @@ function hit(n: NightState, g: NightGhost | null): void {
   }
 }
 
-function callHelp(n: NightState): void {
-  if (!n.helpEnabled || n.helpUsed) return;
+/** 这一夜还能喊谁：交情到驰援的邻居（交情深的在前），再加上同族的人。喊过一次就空了 */
+export function helpCandidates(n: NightState): string[] {
+  if (!n.helpEnabled || n.helpUsed) return [];
   // 交情相同仍按样机面板的王、李、赵顺序。
-  const id = neighbors.filter(id => (n.friends[id] ?? 0) >= CFG.helpAt)
-    .sort((a, b) => n.friends[b]! - n.friends[a]!)[0];
+  const friends = neighbors.filter(id => (n.friends[id] ?? 0) >= CFG.helpAt)
+    .sort((a, b) => n.friends[b]! - n.friends[a]!);
+  return [...friends, ...(n.kin ?? []).filter(id => !friends.includes(id))];
+}
+
+function callHelp(n: NightState, choice?: string): void {
+  const list = helpCandidates(n);
+  const id = choice === undefined ? list[0] : list.includes(choice) ? choice : undefined;
   if (!id) return;
   n.helpUsed = true;
+  n.helper = id;
   n.ally = { id, t: NIGHT.ally.duration, cd: NIGHT.ally.firstCd };
-  n.friendship[id] = Math.min(NIGHT.ally.friendship, NIGHT.ally.maxFriendship - n.friends[id]!);
+  // 帮一次涨交情只算邻居；族人本来就不用交情
+  if (neighbors.includes(id)) n.friendship[id] = Math.min(NIGHT.ally.friendship, NIGHT.ally.maxFriendship - n.friends[id]!);
 }
 
 /** 输入按调用次序立即生效，不推进墙钟或游戏时钟。挑本事时战斗暂停。 */
@@ -366,7 +382,7 @@ export function applyNightAction(n: NightState, action: NightAction): void {
     case 'item':
       if (n.advancedItems || action.item === 'sword') n.item = action.item;
       return;
-    case 'help': return callHelp(n);
+    case 'help': return callHelp(n, action.id);
   }
 }
 

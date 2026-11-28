@@ -41,7 +41,9 @@ export function nightBegin(ctx: Ctx, life: Life, mode: 'hand' | 'delegated') {
   const seed = ctx.seed();
   const bond = life.bondId ? ctx.w.bonds[life.bondId] : null;
   const spouse = bond ? (bond.a === life.id ? bond.b : bond.a) : null;
-  const options: NightOptions = { seed, lossBase: house.chest, spouse: !!spouse && house.residents.includes(spouse) };
+  const kin = kinHelpers(ctx, life);
+  const options: NightOptions = { seed, lossBase: house.chest, spouse: !!spouse && house.residents.includes(spouse),
+    kin: kin.map(k => k.id) };
   const night: NightDoc = {
     id: ctx.id('night'), lifeId: life.id, houseId: house.id, realDate: ctx.today, day: life.person.day, seed,
     plan: planNightLoot(seed, house.treasures),
@@ -54,7 +56,14 @@ export function nightBegin(ctx: Ctx, life: Life, mode: 'hand' | 'delegated') {
   life.openNightId = night.id;
   life.phase = 'night';
   if (mode === 'delegated') return { nightId: night.id, outcome: settleByTraps(ctx, life, night, 'delegated') };
-  return { nightId: night.id, seed, options, start: night.start };
+  // 手机拿 helpCandidates 列出能喊的人让玩家挑；族人的名字在这里
+  return { nightId: night.id, seed, options, start: night.start, kin };
+}
+
+/** 同族、活着的真人，没在设置里关掉「族人可以喊我去帮忙」。住哪座房都行 */
+export function kinHelpers(ctx: Ctx, life: Life): Array<{ id: string; name: string }> {
+  return Object.values(ctx.w.lives).filter(l => l.clanId === life.clanId && l.id !== life.id && l.accountId !== null
+    && l.phase !== 'dead' && ctx.w.accounts[l.accountId]?.allowKinHelp !== false).map(l => ({ id: l.id, name: l.name }));
 }
 
 /** 交给机关守，或者隔天才回来（当交给机关守，没有纸钱）。和单机一样用规则核心的 settleAutoNight */
@@ -108,6 +117,9 @@ export function nightEnd(ctx: Ctx, life: Life, nightId: string, log: NightLog, c
   for (const [id, gain] of Object.entries(n.result.friendship)) {
     life.person.friends[id] = (life.person.friends[id] ?? 0) + gain;
   }
+  // 喊来帮忙的是族人：他上线时看到
+  const helper = n.helper ? ctx.w.lives[n.helper] : undefined;
+  if (helper) ctx.tell({ lifeId: helper.id }, 'helped', `${life.name}夜里喊你去帮忙守门，你去了。` + (won ? '门守住了。' : '可惜门还是破了。'));
   const suspicious = !!claim && claim.won !== won;
   if (suspicious) ctx.w.suspects.push({ opId: ctx.opId, lifeId: life.id, nightId, claimed: claim!.won, replayed: won, realDate: ctx.today });
   ctx.ledger(life.id, house.id, -chestLost, pay.earnedMoney - pay.purseLost, '亲手守夜');

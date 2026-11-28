@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { CFG, HAUNT } from '../../src/core/loop';
 import { CLAN, Server } from '../../src/server';
-import { bashAll, clock, marry, moveTogether, Phone, twoAdults } from './helpers';
+import { bashAll, clock, marry, moveTogether, Phone, playNight, twoAdults } from './helpers';
 
 function couple(date = '2026-12-01') {
   const c = clock(date);
@@ -101,6 +101,28 @@ describe('家族 → 房 → 人：住哪随你（11-28 定）', () => {
     a.life.person.purse = 0;
     expect(a.ok({ type: 'foundHouse', amount: 60 }).houseId).toBe(a.life.houseId);
     expect(a.house.chest).toBe(0);
+  });
+});
+
+describe('族里互相帮着守门（11-28 定：能喊，但要给选项）', () => {
+  test('同族的人不用交情就能喊，自己挑喊谁；被喊的人能在设置里关掉', () => {
+    const { s, a, b } = couple();
+    moveTogether(a, b);
+    readyForKid(s, a);
+    const kid = new Phone(s, 'kid');
+    kid.login();
+    kid.ok({ type: 'dawn' });
+    const begin = kid.ok({ type: 'nightBegin', mode: 'hand' });
+    // 娘家是别的族的伴侣不算族人
+    expect(begin.kin.map((k: { id: string }) => k.id)).toEqual([a.life.id]);
+    const local = playNight(begin.start, true, a.life.id);
+    expect(local.state.helper).toBe(a.life.id);
+    kid.ok({ type: 'nightEnd', nightId: begin.nightId, log: local.log });
+    expect(s.world.inbox.at(-1)).toMatchObject({ lifeId: a.life.id, kind: 'helped' });
+    // a 关掉「族人可以喊我去帮忙」，下一夜就喊不到他了
+    a.ok({ type: 'settings', allowKinHelp: false });
+    kid.ok({ type: 'dawn' });
+    expect(kid.ok({ type: 'nightBegin', mode: 'hand' }).kin).toEqual([]);
   });
 });
 

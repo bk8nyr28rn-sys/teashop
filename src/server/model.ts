@@ -7,6 +7,8 @@ export interface Account {
   bank: DayBank;
   /** 现在这一世；走完了、还没投胎时指向走完的那一世 */
   lifeId: string;
+  /** 族人能不能喊我去帮忙守门。不填当作能（11-28 定：能喊，但要给选项） */
+  allowKinHelp?: boolean;
 }
 
 /** 一个人这一辈子走到哪了 */

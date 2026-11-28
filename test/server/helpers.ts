@@ -29,11 +29,12 @@ export function clock(date: string, hour = 12) {
 }
 
 /** 手机上打一夜：active 每步点最近的鬼、换克它的家伙，挑本事拿第一个；不 active 就站着不动 */
-export function playNight(start: { house: House; person: Person; options: NightOptions }, active: boolean) {
+export function playNight(start: { house: House; person: Person; options: NightOptions }, active: boolean, help?: string) {
   const n: NightState = startNight(JSON.parse(JSON.stringify(start.house)), JSON.parse(JSON.stringify(start.person)), start.options);
   const log: NightLog = [];
   for (let call = 0; call < 40000 && !n.over; call++) {
     const actions: NightAction[] = [];
+    if (help && call === 0) actions.push({ type: 'help', id: help });
     if (n.picking) actions.push({ type: 'perk', id: n.offer[0]! });
     else if (active) {
       // 隐身鬼也要盯着：换灯笼它就现形了

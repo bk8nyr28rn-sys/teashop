@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  applyNightAction, ghostAt, ghostCenter, nearestGhost, nightStep, perkAvailable, revealed, startNight, startWave, tapMult, waveCounts,
+  applyNightAction, ghostAt, ghostCenter, helpCandidates, nearestGhost, nightStep, perkAvailable, revealed, startNight, startWave, tapMult, waveCounts,
 } from '../../src/core/loop/night.js';
 import type { NightGhost, NightState } from '../../src/core/loop/night.js';
 import { DOORS, GHOSTS, MULT, PERKS, type GhostType, type PerkId } from '../../src/core/loop/night-config.js';
@@ -346,6 +346,30 @@ describe('本事、机关和帮手', () => {
     n.spawns = []; n.wave = 4; nightStep(n);
     expect(n.result?.friendship).toEqual({ li: 1 });
     expect(person.friends.li).toBe(99);
+  });
+
+  it('喊谁自己挑：交情够的邻居和同族的人都能喊，族人不用交情、也不涨交情；一晚还是只能喊一次', () => {
+    const { house, person } = inputs(setup);
+    person.friends.wang = 40; person.friends.li = 10;
+    const n = startNight(house, person, { seed: 1, kin: ['life-7', 'life-9'] });
+    expect(helpCandidates(n)).toEqual(['wang', 'life-7', 'life-9']);
+    // 交情不够的邻居挑不了
+    applyNightAction(n, { type: 'help', id: 'li' });
+    expect(n.ally).toBeNull();
+    applyNightAction(n, { type: 'help', id: 'life-9' });
+    expect(n).toMatchObject({ helper: 'life-9', ally: { id: 'life-9', t: 18 } });
+    expect(helpCandidates(n)).toEqual([]);
+    applyNightAction(n, { type: 'help', id: 'wang' });
+    expect(n.ally!.id).toBe('life-9');
+    expect(n.friendship).toEqual({});
+    // 没有交情够的邻居，不挑就喊第一个族人；单机不给族人，和原来一样
+    person.friends.wang = 0;
+    const solo = startNight(house, person, { seed: 1, kin: ['life-7'] });
+    applyNightAction(solo, { type: 'help' });
+    expect(solo.helper).toBe('life-7');
+    const alone = startNight(house, person, { seed: 1 });
+    applyNightAction(alone, { type: 'help' });
+    expect(alone.ally).toBeNull();
   });
 });
 

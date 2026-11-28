@@ -16,6 +16,7 @@ export type Request = { accountId: string; opId?: string; ruleVersion?: number; 
   | { type: 'nightBegin'; mode: 'hand' | 'delegated' }
   | { type: 'nightEnd'; nightId: string; log: NightLog; claim?: { won: boolean } }
   | { type: 'dawn' }
+  | { type: 'settings'; allowKinHelp: boolean }
   | { type: 'foundHouse'; amount: number }
   | { type: 'moveIn'; houseId: string }
   | { type: 'proposeBond'; to: string }
@@ -98,6 +99,10 @@ function route(ctx: Ctx, req: Request): unknown {
     case 'nightBegin': return nightBegin(ctx, life, req.mode);
     case 'nightEnd': return nightEnd(ctx, life, req.nightId, req.log, req.claim);
     case 'dawn': return dawn(ctx, life, account.bank);
+    case 'settings':
+      if (typeof req.allowKinHelp !== 'boolean') fail('设置不对');
+      account.allowKinHelp = req.allowKinHelp;
+      return { allowKinHelp: account.allowKinHelp };
     case 'foundHouse': return foundHouse(ctx, life, req.amount);
     case 'moveIn': return moveIn(ctx, life, req.houseId);
     case 'proposeBond': return proposeBond(ctx, life, req.to);
